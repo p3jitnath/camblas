@@ -1,0 +1,18 @@
+# Selected build-tool versions; NumPy here is a build dependency, not a timed backend.
+setuptools==79.0.1
+wheel==0.48.0
+build==1.6.0
+cmake==3.31.10
+Cython==3.1.8
+meson==1.12.0
+meson-python==0.20.0
+ninja==1.13.2
+patchelf==0.19.1.0
+numpy==2.3.2
+astunparse==1.6.3
+optree==0.20.0
+packaging==26.3
+psutil==7.2.2
+PyYAML==6.0.3
+requests==2.34.2
+-r runtime-requirements.txt
