@@ -22,7 +22,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("library", type=Path)
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float32")
-    parser.add_argument("--profile", choices=("deep", "shallow"), default="deep")
+    parser.add_argument(
+        "--profile", choices=("deep", "shallow", "batch"), default="deep"
+    )
     args = parser.parse_args()
     bridge = args.library.resolve()
     dtype = np.dtype(args.dtype)
@@ -77,6 +79,23 @@ def main():
             (128, 129, 128),
             (2049, 2049, 1025),
             (513, 513, 127),
+        ]
+    if args.profile == "batch":
+        # Check both sides of the batched square/transpose eligibility limits,
+        # including even dimensions with incomplete micro-panels.
+        shapes = [
+            (510, 510, 510),
+            (512, 512, 512),
+            (514, 514, 514),
+            (2046, 2046, 2046),
+            (2048, 2048, 2048),
+            (2050, 2050, 2050),
+            (2048, 512, 254),
+            (2048, 512, 256),
+            (2048, 512, 258),
+            (2048, 512, 1024),
+            (2048, 512, 1026),
+            (2050, 512, 512),
         ]
     for m, n, k in shapes:
         i = np.arange(m, dtype=np.int64)
@@ -191,7 +210,7 @@ def main():
                 cases=count,
                 dtype=args.dtype,
                 bridge_sha256=hashlib.sha256(bridge.read_bytes()).hexdigest(),
-                checks="Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation, deep M/N/K guard boundaries",
+                checks="Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries",
             )
         )
     )

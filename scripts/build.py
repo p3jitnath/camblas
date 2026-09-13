@@ -111,7 +111,16 @@ def main():
 
     config = json.loads((ROOT / "configs/grace.json").read_text())
     units = list(CORE) + (
-        ["sve", "deep_amicro", "deep_amicro64"] if args.target == "grace" else []
+        [
+            "sve",
+            "deep_amicro",
+            "deep_amicro64",
+            "rectangular64",
+            "rectangular32",
+            "batch_amicro64",
+        ]
+        if args.target == "grace"
+        else []
     )
     includes = [f"-I{ROOT / 'include'}", f"-I{ROOT / 'src'}"]
     objects = []

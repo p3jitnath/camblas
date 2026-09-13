@@ -788,6 +788,20 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
 #define try_bilinear_s(ta, ...) ((void)(ta), 0)
 #define try_bilinear_d(ta, ...) ((void)(ta), 0)
 #endif
+#if defined(CAMBLAS_FRAMEWORK_RECT64) && CAMBLAS_FRAMEWORK_RECT64
+#include "rectangular64_policy.h"
+#else
+#define try_rect64_d(...) 0
+#define release_rect64() ((void)0)
+#endif
+#if defined(CAMBLAS_FRAMEWORK_RECT32) && CAMBLAS_FRAMEWORK_RECT32
+#include "rectangular32_policy.h"
+#define try_rect64_s(...) try_rect32_s(__VA_ARGS__)
+#else
+#define try_rect64_s(...) 0
+#define release_rect32() ((void)0)
+#endif
+
 #define DEFINE_GEMM(SUFFIX, TYPE, FP64, VENDOR, COUNTER, STRASSEN_COUNTER)                                                  \
     typedef struct {                                                                                                        \
         camblas_ctx_t *ctx;                                                                                                 \
@@ -889,7 +903,12 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
             ensure_workspace(m, n, k, FP64, use_strassen);                                                                  \
             camblas_plan_t plan;                                                                                            \
             int rc;                                                                                                         \
-            if (use_strassen) {                                                                                             \
+            if (try_rect64_##SUFFIX(call_context, at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c,                          \
+                                    ldc, &plan)) {                                                                          \
+                rc = 0;                                                                                                     \
+                algorithm = "batched-strassen";                                                                             \
+                atomic_fetch_add_explicit(&counters[STRASSEN_COUNTER], 1, memory_order_relaxed);                            \
+            } else if (use_strassen) {                                                                                      \
                 if (scratches[FP64].n != n) {                                                                               \
                     free(scratches[FP64].data);                                                                             \
                     memset(&scratches[FP64], 0, sizeof(scratches[FP64]));                                                   \
@@ -1063,6 +1082,8 @@ DEFINE_SYRK(d, double, vendor_ds, DS)
 __attribute__((destructor)) static void release_resources(void)
 {
     if (owner && owner == getpid()) {
+        release_rect64();
+        release_rect32();
         if (pool)
             camblas_pthread_pool_destroy(pool);
         if (small_pool)

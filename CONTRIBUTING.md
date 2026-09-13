@@ -19,7 +19,7 @@ make format-check PYTHON=.frameworks/style-env/bin/python
 
 Include the following evidence and checks with each relevant change:
 
-- **Correctness:** add an independent regression test covering affected precisions, transposes, padding, alpha/beta, changed inputs and dispatch boundaries. Preserve caller-owned workspace and synchronous executor contracts; use sanitiser checks where relevant.
+- **Correctness:** add an independent regression test covering affected precisions, transposes, padding, alpha/beta, changed inputs and dispatch boundaries. For alternative multiplication algorithms, include cancellation and exceptional-input cases; overflow checks alone do not establish accuracy. Preserve caller-owned workspace and synchronous executor contracts; use sanitiser checks where relevant.
 - **Performance:** compare against an unchanged CAMBLAS control, OpenBLAS and NVPL with identical inputs, affinity and thread settings. Use at least three fresh-process rounds with rotated order; report medians, ranges and regressions. Record node-sharing conditions and confirm gains on idle allocated CPUs. Test affected cases first, identify rows not remeasured with the candidate, and report any non-default allocator or OpenMP settings separately.
 - **Reproduction:** include commands, compiler/dependency versions and library identities; verify actual backend calls. Explain the mechanism, limitations and any ABI or rounding changes.
 - **Hygiene:** keep binaries, wheels, dependencies, results, credentials and internal documents out of Git. Use ignored `build/`, `.frameworks/` and `results/` directories, and keep prose concise in British English.
