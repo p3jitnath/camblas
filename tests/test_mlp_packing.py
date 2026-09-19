@@ -82,7 +82,8 @@ def main():
         ]
     if args.profile == "batch":
         # Check both sides of the batched square/transpose eligibility limits,
-        # including even dimensions with incomplete micro-panels.
+        # including even dimensions with incomplete micro-panels, and the
+        # rectangular NN extension boundaries.
         shapes = [
             (510, 510, 510),
             (512, 512, 512),
@@ -96,6 +97,14 @@ def main():
             (2048, 512, 1024),
             (2048, 512, 1026),
             (2050, 512, 512),
+            (4096, 512, 2048),
+            (4094, 512, 2048),
+            (4098, 512, 2048),
+            (1024, 512, 4096),
+            (1024, 512, 4094),
+            (1024, 512, 4098),
+            (4096, 256, 512),
+            (4096, 1026, 512),
         ]
     for m, n, k in shapes:
         i = np.arange(m, dtype=np.int64)

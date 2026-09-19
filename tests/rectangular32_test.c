@@ -128,21 +128,36 @@ int main(void)
 {
     check_range();
     const int shapes[][3] = {
-        {2, 2, 2}, {14, 18, 30}, {50, 34, 66}, {256, 96, 512}, {260, 132, 1026}};
+        {2, 2, 2}, {14, 18, 30}, {50, 34, 66}, {256, 96, 512}, {260, 132, 1026},
+        {258, 1026, 1026}};
     const int workers[] = {1, 16, 64};
+    /* Selected application shapes are large; one worker count each keeps the
+     * compensated serial oracle affordable while still exercising deep
+     * depth-block tails, incomplete twelve-row panels and wide columns. */
+    const int application_shapes[][3] = {{4096, 512, 2048}, {1024, 512, 4096}};
+    const int application_workers[] = {16};
     double peak = 0;
+    long long cases = 0;
     for (int tb = 0; tb < 2; ++tb)
         for (size_t i = 0; i < sizeof(shapes) / sizeof(shapes[0]); ++i)
-            for (size_t j = 0; j < sizeof(workers) / sizeof(workers[0]); ++j)
+            for (size_t j = 0; j < sizeof(workers) / sizeof(workers[0]); ++j) {
                 peak = fmax(peak,
                             check_case(shapes[i][0], shapes[i][1], shapes[i][2], workers[j], tb));
+                ++cases;
+            }
+    for (size_t i = 0; i < sizeof(application_shapes) / sizeof(application_shapes[0]); ++i)
+        for (size_t j = 0; j < sizeof(application_workers) / sizeof(application_workers[0]); ++j) {
+            peak = fmax(peak, check_case(application_shapes[i][0], application_shapes[i][1],
+                                         application_shapes[i][2], application_workers[j], 0));
+            ++cases;
+        }
     size_t sentinel = 123;
     assert(camblas_experimental_rectangular32_bytes(5, 4, 4, &sentinel) == -1 && sentinel == 123);
     assert(camblas_experimental_rectangular32_bytes(4, 0, 4, &sentinel) == -1 && sentinel == 123);
     assert(camblas_experimental_rectangular32_bytes(8196, 4, 4, &sentinel) == -1 &&
            sentinel == 123);
-    printf("90 full-output scalar-oracle cases passed; max "
+    printf("%lld full-output scalar-oracle cases passed; max "
            "absolute-product-scaled error %.9g\n",
-           peak);
+           cases, peak);
     return 0;
 }

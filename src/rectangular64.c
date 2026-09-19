@@ -232,6 +232,9 @@ static void rectangular64_pack_all_a(rectangular64_t *w, int first, int last, in
     }
 }
 
+#ifndef RECT64_PACK_WEIGHT
+#define RECT64_PACK_WEIGHT 6
+#endif
 static void rectangular64_pack(const camblas_task_t *task, void *opaque)
 {
     rectangular64_t *w = opaque;
@@ -242,7 +245,7 @@ static void rectangular64_pack(const camblas_task_t *task, void *opaque)
     int a_blocks = (w->row_groups + per_block - 1) / per_block;
     /* Weight an all-seven A block more heavily than one B micro-panel when
      * distributing work. Only the first index in each weighted slot owns it. */
-    int weight = 6 * per_block, groups = a_blocks * weight + 7 * w->column_groups;
+    int weight = RECT64_PACK_WEIGHT * per_block, groups = a_blocks * weight + 7 * w->column_groups;
     int total = groups * w->depth_blocks, worker = task->i0;
     for (int index = total * worker / w->workers; index < total * (worker + 1) / w->workers;
          ++index) {
