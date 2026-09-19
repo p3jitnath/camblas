@@ -220,7 +220,10 @@ static inline int camblas_micro8_layout_f32(int m, int n, int k, float alpha, co
                     a2 = svld1_f32(all,
                                    A + camblas_micro8_a_index(i + 2 * vl, l + 1, lda,
                                                               CAMBLAS_MICRO8_ROWS * vl, a_micro));
-#if defined(CAMBLAS_MICRO8_UNROLL2) && CAMBLAS_MICRO8_UNROLL2
+#ifndef CAMBLAS_MICRO8_BARRIER
+#define CAMBLAS_MICRO8_BARRIER 1
+#endif
+#if defined(CAMBLAS_MICRO8_UNROLL2) && CAMBLAS_MICRO8_UNROLL2 && CAMBLAS_MICRO8_BARRIER
                     /* Keep the next unrolled B loads behind this K step. */
                     __asm__ volatile("" ::: "memory");
 #endif
@@ -704,7 +707,7 @@ static inline int camblas_micro8_layout_f64(int m, int n, int k, double alpha, c
                     a2 = svld1_f64(all,
                                    A + camblas_micro8_a_index(i + 2 * vl, l + 1, lda,
                                                               CAMBLAS_MICRO8_ROWS * vl, a_micro));
-#if defined(CAMBLAS_MICRO8_UNROLL2) && CAMBLAS_MICRO8_UNROLL2
+#if defined(CAMBLAS_MICRO8_UNROLL2) && CAMBLAS_MICRO8_UNROLL2 && CAMBLAS_MICRO8_BARRIER
                     __asm__ volatile("" ::: "memory");
 #endif
                 }
