@@ -8,73 +8,72 @@ The Grace implementation combines SVE128 kernels, packed operand panels and shap
 
 ## Benchmarks
 
-Application benchmark snapshot: **60/60 wins against OpenBLAS; 48/60 against NVPL**. The table contains all 60 cases: seven NumPy and eight PyTorch workloads, each at two precisions and 16/64 cores. **† marks 38 cases measured with this source configuration on an idle whole-node allocation:** all 30 64-core cases, whose executor the spinning worker pool replaces, plus the marked 16-core cases from the previous snapshot, whose execution paths are unchanged below 64 threads. The remaining unmarked 16-core cases use measurements from separate allocations and earlier CAMBLAS builds whose corresponding execution paths are unchanged; they have not been remeasured with this build, so the table remains a combined snapshot, not one complete run. Small median differences do not establish statistical significance, so entries within roughly two percent of 1× can move between sessions; and the PyTorch 64-core OpenBLAS medians vary several-fold between sessions on this allocation, so those entries are conservative rather than best-case for OpenBLAS.
+Application benchmark snapshot: **59/60 wins against OpenBLAS; 27/60 against NVPL**. The table contains all 60 cases from one complete run of this source configuration on an idle whole-node allocation (Grace, exclusive 288-core node): five NumPy and five PyTorch workloads (attention, gram, MLP, square 1024, transpose), each at two precisions and 4/16/64 cores. Small median differences do not establish statistical significance, so entries within roughly two percent of 1x can move between sessions.
 
-FP32 and FP64 denote single and double precision, respectively. Latency is reported in milliseconds, with lower values indicating better performance. Speed-up is vendor latency divided by CAMBLAS latency; **values above 1× favour CAMBLAS**. Each entry is the median of three fresh-process medians after three warm-ups. The eight marked 16-core square and transpose cases use 1001 timed calls per NumPy round and 201 per PyTorch round; the 30 marked 64-core cases use at least five calls per NumPy round and 25 per PyTorch round. Unmarked cases use at least five calls per round; some use the longer 1001/201-call protocol.
+FP32 and FP64 denote single and double precision, respectively. Latency is reported in milliseconds, with lower values indicating better performance. Speed-up is vendor latency divided by CAMBLAS latency; **values above 1x favour CAMBLAS**. Each entry is the median of three fresh-process medians after warm-up, with all four libraries using matching inputs, affinity and requested thread counts.
 
 | Framework | Workload | Precision | Cores | CAMBLAS ms | OpenBLAS ms | NVPL ms | vs OpenBLAS | vs NVPL |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| NumPy | Square 1024† | FP32 | 16 | 1.352 | 1.622 | 1.435 | 1.199× | 1.061× |
-| NumPy | Square 1024† | FP32 | 64 | 0.409 | 0.501 | 0.385 | 1.227× | 0.943× |
-| NumPy | Square 1024† | FP64 | 16 | 2.799 | 3.351 | 2.867 | 1.197× | 1.024× |
-| NumPy | Square 1024† | FP64 | 64 | 0.786 | 0.965 | 0.773 | 1.229× | 0.984× |
-| NumPy | Square 4096 | FP32 | 16 | 84.093 | 104.127 | 93.619 | 1.238× | 1.113× |
-| NumPy | Square 4096† | FP32 | 64 | 25.664 | 34.470 | 36.795 | 1.343× | 1.434× |
-| NumPy | Square 4096 | FP64 | 16 | 177.555 | 219.378 | 193.596 | 1.236× | 1.090× |
-| NumPy | Square 4096† | FP64 | 64 | 54.481 | 73.629 | 79.259 | 1.351× | 1.455× |
-| NumPy | Square 8192 | FP32 | 16 | 653.509 | 822.125 | 720.597 | 1.258× | 1.103× |
-| NumPy | Square 8192† | FP32 | 64 | 183.261 | 251.429 | 240.683 | 1.372× | 1.313× |
-| NumPy | Square 8192 | FP64 | 16 | 1387.948 | 1736.488 | 1493.413 | 1.251× | 1.076× |
-| NumPy | Square 8192† | FP64 | 64 | 385.468 | 530.695 | 484.353 | 1.377× | 1.257× |
-| NumPy | Transposed GEMM† | FP32 | 16 | 1.296 | 1.621 | 1.426 | 1.251× | 1.100× |
-| NumPy | Transposed GEMM† | FP32 | 64 | 0.394 | 0.505 | 0.377 | 1.281× | 0.955× |
-| NumPy | Transposed GEMM† | FP64 | 16 | 2.731 | 3.349 | 2.865 | 1.226× | 1.049× |
-| NumPy | Transposed GEMM† | FP64 | 64 | 0.751 | 0.960 | 0.775 | 1.279× | 1.033× |
-| NumPy | Gram | FP32 | 16 | 1.102 | 1.746 | 1.160 | 1.584× | 1.053× |
-| NumPy | Gram† | FP32 | 64 | 0.420 | 13.342 | 0.574 | 31.778× | 1.368× |
-| NumPy | Gram | FP64 | 16 | 2.152 | 2.896 | 2.336 | 1.345× | 1.085× |
-| NumPy | Gram† | FP64 | 64 | 0.818 | 27.398 | 1.021 | 33.504× | 1.249× |
-| NumPy | MLP forward | FP32 | 16 | 10.692 | 10.730 | 9.965 | 1.004× | 0.932× |
-| NumPy | MLP forward† | FP32 | 64 | 4.063 | 4.139 | 3.777 | 1.019× | 0.930× |
-| NumPy | MLP forward | FP64 | 16 | 22.569 | 26.578 | 21.522 | 1.178× | 0.954× |
-| NumPy | MLP forward† | FP64 | 64 | 8.785 | 20.201 | 12.000 | 2.299× | 1.366× |
-| NumPy | Attention | FP32 | 16 | 4.081 | 4.249 | 4.154 | 1.041× | 1.018× |
-| NumPy | Attention† | FP32 | 64 | 3.552 | 4.026 | 4.330 | 1.134× | 1.219× |
-| NumPy | Attention | FP64 | 16 | 6.956 | 7.394 | 6.768 | 1.063× | 0.973× |
-| NumPy | Attention† | FP64 | 64 | 6.100 | 6.413 | 6.207 | 1.051× | 1.018× |
-| PyTorch | Square 1024† | FP32 | 16 | 1.366 | 1.628 | 1.442 | 1.192× | 1.055× |
-| PyTorch | Square 1024† | FP32 | 64 | 0.421 | 0.508 | 0.400 | 1.205× | 0.950× |
-| PyTorch | Square 1024† | FP64 | 16 | 2.823 | 3.378 | 2.884 | 1.197× | 1.021× |
-| PyTorch | Square 1024† | FP64 | 64 | 0.807 | 0.968 | 0.785 | 1.200× | 0.972× |
-| PyTorch | Square 4096 | FP32 | 16 | 84.131 | 103.732 | 92.992 | 1.233× | 1.105× |
-| PyTorch | Square 4096† | FP32 | 64 | 26.073 | 34.484 | 36.703 | 1.323× | 1.408× |
-| PyTorch | Square 4096 | FP64 | 16 | 177.810 | 217.491 | 192.401 | 1.223× | 1.082× |
-| PyTorch | Square 4096† | FP64 | 64 | 54.685 | 72.256 | 78.260 | 1.321× | 1.431× |
-| PyTorch | Square 8192 | FP32 | 16 | 653.124 | 814.144 | 712.992 | 1.247× | 1.092× |
-| PyTorch | Square 8192† | FP32 | 64 | 183.209 | 241.877 | 233.113 | 1.320× | 1.272× |
-| PyTorch | Square 8192 | FP64 | 16 | 1386.473 | 1709.889 | 1467.706 | 1.233× | 1.059× |
-| PyTorch | Square 8192† | FP64 | 64 | 384.730 | 519.914 | 457.687 | 1.351× | 1.190× |
-| PyTorch | Transposed GEMM† | FP32 | 16 | 1.420 | 2.477 | 1.597 | 1.745× | 1.125× |
-| PyTorch | Transposed GEMM† | FP32 | 64 | 0.510 | 1.873 | 0.540 | 3.674× | 1.060× |
-| PyTorch | Transposed GEMM† | FP64 | 16 | 2.977 | 4.969 | 4.038 | 1.669× | 1.356× |
-| PyTorch | Transposed GEMM† | FP64 | 64 | 0.999 | 4.011 | 1.542 | 4.014× | 1.543× |
-| PyTorch | Gram | FP32 | 16 | 0.984 | 1.682 | 1.512 | 1.710× | 1.537× |
-| PyTorch | Gram† | FP32 | 64 | 0.299 | 0.909 | 0.484 | 3.044× | 1.621× |
-| PyTorch | Gram | FP64 | 16 | 1.916 | 3.596 | 3.115 | 1.877× | 1.626× |
-| PyTorch | Gram† | FP64 | 64 | 0.561 | 2.344 | 0.880 | 4.181× | 1.569× |
-| PyTorch | MLP forward | FP32 | 16 | 9.128 | 15.642 | 8.727 | 1.714× | 0.956× |
-| PyTorch | MLP forward† | FP32 | 64 | 3.694 | 8.770 | 2.463 | 2.374× | 0.667× |
-| PyTorch | MLP forward | FP64 | 16 | 20.420 | 32.244 | 21.466 | 1.579× | 1.051× |
-| PyTorch | MLP forward† | FP64 | 64 | 7.366 | 44.668 | 12.172 | 6.064× | 1.652× |
-| PyTorch | Attention | FP32 | 16 | 1.202 | 9.479 | 1.290 | 7.887× | 1.073× |
-| PyTorch | Attention† | FP32 | 64 | 0.916 | 2.357 | 1.500 | 2.572× | 1.637× |
-| PyTorch | Attention | FP64 | 16 | 2.487 | 14.507 | 2.356 | 5.834× | 0.948× |
-| PyTorch | Attention† | FP64 | 64 | 1.379 | 31.936 | 2.278 | 23.152× | 1.652× |
-| PyTorch | Forward + backward | FP32 | 16 | 23.236 | 52.699 | 25.239 | 2.268× | 1.086× |
-| PyTorch | Forward + backward† | FP32 | 64 | 9.429 | 44.957 | 17.762 | 4.768× | 1.884× |
-| PyTorch | Forward + backward | FP64 | 16 | 47.952 | 106.468 | 51.584 | 2.220× | 1.076× |
-| PyTorch | Forward + backward† | FP64 | 64 | 17.800 | 69.995 | 35.548 | 3.932× | 1.997× |
-
+| NumPy | Gram | FP32 | 4 | 3.860 | 3.851 | 3.508 | 0.998x | 0.909x |
+| NumPy | Transpose | FP32 | 4 | 5.683 | 6.396 | 5.575 | 1.125x | 0.981x |
+| NumPy | Attention | FP32 | 4 | 6.440 | 6.614 | 6.304 | 1.027x | 0.979x |
+| NumPy | Square 1024 | FP32 | 4 | 5.774 | 6.359 | 5.594 | 1.101x | 0.969x |
+| NumPy | MLP | FP32 | 4 | 37.255 | 39.261 | 36.269 | 1.054x | 0.974x |
+| NumPy | Gram | FP64 | 4 | 8.582 | 8.622 | 7.158 | 1.005x | 0.834x |
+| NumPy | Transpose | FP64 | 4 | 12.163 | 13.312 | 11.450 | 1.094x | 0.941x |
+| NumPy | Attention | FP64 | 4 | 11.284 | 12.051 | 10.928 | 1.068x | 0.969x |
+| NumPy | Square 1024 | FP64 | 4 | 12.011 | 13.368 | 11.554 | 1.113x | 0.962x |
+| NumPy | MLP | FP64 | 4 | 80.402 | 83.129 | 73.463 | 1.034x | 0.914x |
+| NumPy | Gram | FP32 | 16 | 1.108 | 1.754 | 1.167 | 1.582x | 1.053x |
+| NumPy | Transpose | FP32 | 16 | 1.330 | 1.630 | 1.441 | 1.225x | 1.083x |
+| NumPy | Attention | FP32 | 16 | 4.117 | 4.276 | 4.087 | 1.039x | 0.993x |
+| NumPy | Square 1024 | FP32 | 16 | 1.362 | 1.635 | 1.437 | 1.201x | 1.055x |
+| NumPy | MLP | FP32 | 16 | 10.580 | 10.931 | 10.018 | 1.033x | 0.947x |
+| NumPy | Gram | FP64 | 16 | 2.141 | 2.902 | 2.352 | 1.356x | 1.099x |
+| NumPy | Transpose | FP64 | 16 | 2.782 | 3.386 | 2.896 | 1.217x | 1.041x |
+| NumPy | Attention | FP64 | 16 | 6.947 | 7.335 | 6.766 | 1.056x | 0.974x |
+| NumPy | Square 1024 | FP64 | 16 | 2.853 | 3.383 | 2.905 | 1.186x | 1.018x |
+| NumPy | MLP | FP64 | 16 | 22.294 | 26.062 | 21.497 | 1.169x | 0.964x |
+| NumPy | Gram | FP32 | 64 | 0.417 | 13.334 | 0.586 | 31.943x | 1.404x |
+| NumPy | Transpose | FP32 | 64 | 0.397 | 0.507 | 0.381 | 1.278x | 0.961x |
+| NumPy | Attention | FP32 | 64 | 3.574 | 4.036 | 4.198 | 1.130x | 1.175x |
+| NumPy | Square 1024 | FP32 | 64 | 0.412 | 0.505 | 0.390 | 1.225x | 0.946x |
+| NumPy | MLP | FP32 | 64 | 4.026 | 4.065 | 3.781 | 1.010x | 0.939x |
+| NumPy | Gram | FP64 | 64 | 0.818 | 27.725 | 1.038 | 33.880x | 1.268x |
+| NumPy | Transpose | FP64 | 64 | 0.766 | 0.967 | 0.780 | 1.263x | 1.019x |
+| NumPy | Attention | FP64 | 64 | 6.070 | 6.362 | 6.252 | 1.048x | 1.030x |
+| NumPy | Square 1024 | FP64 | 64 | 0.782 | 0.959 | 0.782 | 1.226x | 1.000x |
+| NumPy | MLP | FP64 | 64 | 8.729 | 20.479 | 10.405 | 2.346x | 1.192x |
+| PyTorch | Gram | FP32 | 4 | 6.255 | 6.434 | 5.726 | 1.029x | 0.916x |
+| PyTorch | Transpose | FP32 | 4 | 5.973 | 6.600 | 5.823 | 1.105x | 0.975x |
+| PyTorch | Attention | FP32 | 4 | 3.998 | 7.116 | 3.843 | 1.780x | 0.961x |
+| PyTorch | Square 1024 | FP32 | 4 | 5.755 | 6.321 | 5.545 | 1.098x | 0.963x |
+| PyTorch | MLP | FP32 | 4 | 36.159 | 39.496 | 34.290 | 1.092x | 0.948x |
+| PyTorch | Gram | FP64 | 4 | 12.791 | 13.425 | 11.754 | 1.050x | 0.919x |
+| PyTorch | Transpose | FP64 | 4 | 12.793 | 13.757 | 11.829 | 1.075x | 0.925x |
+| PyTorch | Attention | FP64 | 4 | 8.314 | 14.912 | 7.988 | 1.794x | 0.961x |
+| PyTorch | Square 1024 | FP64 | 4 | 11.988 | 13.220 | 11.454 | 1.103x | 0.955x |
+| PyTorch | MLP | FP64 | 4 | 77.959 | 84.808 | 72.520 | 1.088x | 0.930x |
+| PyTorch | Gram | FP32 | 16 | 0.996 | 1.695 | 1.512 | 1.702x | 1.518x |
+| PyTorch | Transpose | FP32 | 16 | 1.447 | 2.475 | 1.587 | 1.710x | 1.097x |
+| PyTorch | Attention | FP32 | 16 | 1.264 | 9.469 | 1.306 | 7.490x | 1.033x |
+| PyTorch | Square 1024 | FP32 | 16 | 1.398 | 1.635 | 1.449 | 1.169x | 1.037x |
+| PyTorch | MLP | FP32 | 16 | 9.051 | 9.956 | 8.819 | 1.100x | 0.974x |
+| PyTorch | Gram | FP64 | 16 | 1.917 | 3.680 | 3.116 | 1.919x | 1.626x |
+| PyTorch | Transpose | FP64 | 16 | 2.998 | 5.031 | 3.496 | 1.678x | 1.166x |
+| PyTorch | Attention | FP64 | 16 | 2.534 | 14.484 | 2.525 | 5.715x | 0.996x |
+| PyTorch | Square 1024 | FP64 | 16 | 2.869 | 3.378 | 2.908 | 1.178x | 1.014x |
+| PyTorch | MLP | FP64 | 16 | 20.217 | 26.820 | 20.598 | 1.327x | 1.019x |
+| PyTorch | Gram | FP32 | 64 | 0.309 | 0.917 | 0.492 | 2.968x | 1.593x |
+| PyTorch | Transpose | FP32 | 64 | 0.534 | 1.817 | 0.522 | 3.404x | 0.978x |
+| PyTorch | Attention | FP32 | 64 | 0.929 | 2.400 | 1.496 | 2.584x | 1.611x |
+| PyTorch | Square 1024 | FP32 | 64 | 0.429 | 0.490 | 0.400 | 1.142x | 0.932x |
+| PyTorch | MLP | FP32 | 64 | 3.901 | 6.584 | 2.494 | 1.688x | 0.639x |
+| PyTorch | Gram | FP64 | 64 | 0.575 | 2.334 | 0.892 | 4.058x | 1.551x |
+| PyTorch | Transpose | FP64 | 64 | 1.012 | 4.038 | 1.518 | 3.991x | 1.500x |
+| PyTorch | Attention | FP64 | 64 | 1.431 | 15.479 | 2.328 | 10.816x | 1.627x |
+| PyTorch | Square 1024 | FP64 | 64 | 0.817 | 0.974 | 0.793 | 1.192x | 0.970x |
+| PyTorch | MLP | FP64 | 64 | 7.440 | 22.304 | 12.144 | 2.998x | 1.632x |
 Measurements used Grace, GCC 14.3, NumPy 2.3.2, PyTorch 2.8.0, OpenBLAS 0.3.33 (pthreads) and NVPL from HPC SDK 24.11 (LP64 GNU OpenMP). All libraries used matching inputs, affinity and requested thread counts. The [multi-layer perceptron workload](bench/workload.py) (MLP) uses batch size 512 and widths 2048 → 4096 → 1024. PyTorch uses the BLAS-focused build below, rather than default wheels or GPUs.
 
 ## Build
