@@ -26,12 +26,6 @@ static int try_rect32_s(camblas_ctx_t *ctx, char ta, char tb, int m, int n, int 
         camblas_matrix_span_fits(m, n, ldc, sizeof(float)) ||
         camblas_experimental_rectangular32_bytes(m, n, k, &needed) || needed > 512u * 1024u * 1024u)
         return 0;
-    int safe = rectangular32_range_safe_op(tb == 'T', ctx->executor, ctx->num_threads, m, n, k, a,
-                                           lda, b, ldb, 1);
-    if (safe < 0)
-        fail("FP32 rectangular range preflight");
-    if (!safe)
-        return 0;
     if (needed > rectangular32_capacity) {
         void *next = benchmark_alloc(needed);
         if (!next)
@@ -40,9 +34,15 @@ static int try_rect32_s(camblas_ctx_t *ctx, char ta, char tb, int m, int n, int 
         rectangular32_scratch = next;
         rectangular32_capacity = needed;
     }
-    if (camblas_experimental_rectangular32_f32_op(tb == 'T', ctx->executor, ctx->num_threads, m, n,
-                                                  k, a, lda, b, ldb, c, ldc, rectangular32_scratch,
-                                                  rectangular32_capacity))
+    /* The range preflight rides on the pack pass inside the op, so no
+     * separate scan of A and B runs on the hot path. A verdict of one means
+     * the conservative bounds prefer the classical route. */
+    int status = camblas_experimental_rectangular32_f32_op_checked(
+        tb == 'T', ctx->executor, ctx->num_threads, m, n, k, a, lda, b, ldb, c, ldc,
+        rectangular32_scratch, rectangular32_capacity, 1);
+    if (status == 1)
+        return 0;
+    if (status)
         fail("FP32 rectangular GEMM");
 
     memset(plan, 0, sizeof(*plan));

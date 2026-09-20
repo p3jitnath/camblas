@@ -10,6 +10,7 @@
 #include "gemm_bounds.h"
 #include <arm_neon.h>
 #include <stdatomic.h>
+#include <math.h>
 #include <stdint.h>
 
 /* Packing and recombination share this seven-product order:
@@ -47,19 +48,55 @@ typedef struct {
     size_t a_plane, b_plane, product_plane;
     const float *a[7], *a2[7], *b[7], *b2[7];
     float *packed_a, *packed_b, *products, *c;
+    float a_max[64], b_max[64];
     atomic_int failed;
 } rectangular32_t;
 
+/* The range preflight rides on the pack pass: every input element is already
+ * loaded exactly here, so the abs-max scan costs no extra memory traffic.
+ * Vector bodies keep the NEON max NaN-suppressing behaviour of the standalone
+ * scan; scalar tails flag non-finite values like the standalone scalar tail. */
+static float32x4_t rectangular32_abs_max4(float32x4_t acc, float32x4_t value)
+{
+    return vmaxq_f32(acc, vabsq_f32(value));
+}
+
+static void rectangular32_scan_max(float *acc, float value)
+{
+    float magnitude = fabsf(value);
+    if (!isfinite(magnitude))
+        *acc = INFINITY;
+    else if (magnitude > *acc)
+        *acc = magnitude;
+}
+
+static void rectangular32_store_max(float32x4_t acc, float tail, float *out)
+{
+    float peak = vmaxvq_f32(acc);
+    float merged = isfinite(peak) ? fmaxf(peak, tail) : INFINITY;
+    if (merged > *out)
+        *out = merged;
+}
+
 /* Return a small logical B tile as contiguous output-column vectors. */
 static void rectangular32_load_b_tile(const float *base, int stride, int transposed,
-                                      float32x4_t out[4])
+                                      float32x4_t out[4], float32x4_t *absmax)
 {
     if (transposed) {
-        for (int q = 0; q < 4; ++q)
+        for (int q = 0; q < 4; ++q) {
             out[q] = vld1q_f32(base + (size_t)q * stride);
+            if (absmax)
+                *absmax = rectangular32_abs_max4(*absmax, out[q]);
+        }
     } else {
         float32x4_t a = vld1q_f32(base), b = vld1q_f32(base + stride);
         float32x4_t c = vld1q_f32(base + 2 * stride), d = vld1q_f32(base + 3 * stride);
+        if (absmax) {
+            *absmax = rectangular32_abs_max4(*absmax, a);
+            *absmax = rectangular32_abs_max4(*absmax, b);
+            *absmax = rectangular32_abs_max4(*absmax, c);
+            *absmax = rectangular32_abs_max4(*absmax, d);
+        }
         float32x4_t t0 = vtrn1q_f32(a, b), t1 = vtrn2q_f32(a, b);
         float32x4_t t2 = vtrn1q_f32(c, d), t3 = vtrn2q_f32(c, d);
         out[0] = vcombine_f32(vget_low_f32(t0), vget_low_f32(t2));
@@ -70,13 +107,15 @@ static void rectangular32_load_b_tile(const float *base, int stride, int transpo
 }
 
 /* Load four quadrants once and produce all seven B transforms. */
-static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int bk)
+static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int bk, float *bmax)
 {
     int count = w->hn - column < 8 ? w->hn - column : 8;
     const float *quadrants[4] = {w->b[0], w->b[2], w->b[3], w->b[4]};
     size_t base_offset = w->tb ? column + (size_t)pc * w->ldb : pc + (size_t)column * w->ldb;
     float *base = w->packed_b + (size_t)pc * w->column_groups * 8 + (size_t)column * bk;
     size_t plane = w->b_plane;
+    float32x4_t acc = vdupq_n_f32(0);
+    float tail = 0;
     int q = 0;
     if (count == 8)
         for (; q + 4 <= bk; q += 4)
@@ -84,10 +123,10 @@ static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int
                 size_t offset =
                     base_offset + (w->tb ? j + (size_t)q * w->ldb : q + (size_t)j * w->ldb);
                 float32x4_t b11[4], b12[4], b21[4], b22[4];
-                rectangular32_load_b_tile(quadrants[0] + offset, w->ldb, w->tb, b11);
-                rectangular32_load_b_tile(quadrants[1] + offset, w->ldb, w->tb, b12);
-                rectangular32_load_b_tile(quadrants[2] + offset, w->ldb, w->tb, b21);
-                rectangular32_load_b_tile(quadrants[3] + offset, w->ldb, w->tb, b22);
+                rectangular32_load_b_tile(quadrants[0] + offset, w->ldb, w->tb, b11, &acc);
+                rectangular32_load_b_tile(quadrants[1] + offset, w->ldb, w->tb, b12, &acc);
+                rectangular32_load_b_tile(quadrants[2] + offset, w->ldb, w->tb, b21, &acc);
+                rectangular32_load_b_tile(quadrants[3] + offset, w->ldb, w->tb, b22, &acc);
                 for (int l = 0; l < 4; ++l) {
                     float *out = base + (size_t)(q + l) * 8 + j;
                     vst1q_f32(out, vaddq_f32(b11[l], b22[l]));
@@ -106,6 +145,12 @@ static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int
             float b12 = j < count ? quadrants[1][offset] : 0;
             float b21 = j < count ? quadrants[2][offset] : 0;
             float b22 = j < count ? quadrants[3][offset] : 0;
+            if (j < count) {
+                rectangular32_scan_max(&tail, b11);
+                rectangular32_scan_max(&tail, b12);
+                rectangular32_scan_max(&tail, b21);
+                rectangular32_scan_max(&tail, b22);
+            }
             float *out = base + (size_t)q * 8 + j;
             out[0] = b11 + b22;
             out[plane] = b11;
@@ -115,12 +160,16 @@ static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int
             out[5 * plane] = b11 + b12;
             out[6 * plane] = b21 + b22;
         }
+    rectangular32_store_max(acc, tail, bmax);
 }
 /* Reuse four loaded quadrants for all seven A transforms. A small row/depth
  * tile limits the live input set when original columns have a large stride. */
-static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, int pc, int bk)
+static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, int pc, int bk,
+                                     float *amax)
 {
     size_t plane = w->a_plane;
+    float32x4_t acc = vdupq_n_f32(0);
+    float tail = 0;
     for (int q0 = 0; q0 < bk; q0 += 16) {
         int end = bk - q0 < 16 ? bk : q0 + 16;
         for (int group = first; group < last; ++group) {
@@ -135,6 +184,10 @@ static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, in
                     float32x4_t a21 = vld1q_f32(w->a[1] + source + i);
                     float32x4_t a12 = vld1q_f32(w->a[6] + source + i);
                     float32x4_t a22 = vld1q_f32(w->a[3] + source + i);
+                    acc = rectangular32_abs_max4(acc, a11);
+                    acc = rectangular32_abs_max4(acc, a21);
+                    acc = rectangular32_abs_max4(acc, a12);
+                    acc = rectangular32_abs_max4(acc, a22);
                     vst1q_f32(out + i, vaddq_f32(a11, a22));
                     vst1q_f32(out + plane + i, vaddq_f32(a21, a22));
                     vst1q_f32(out + 2 * plane + i, a11);
@@ -146,6 +199,10 @@ static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, in
                 for (; i < count; ++i) {
                     float a11 = w->a[0][source + i], a21 = w->a[1][source + i];
                     float a12 = w->a[6][source + i], a22 = w->a[3][source + i];
+                    rectangular32_scan_max(&tail, a11);
+                    rectangular32_scan_max(&tail, a21);
+                    rectangular32_scan_max(&tail, a12);
+                    rectangular32_scan_max(&tail, a22);
                     out[i] = a11 + a22;
                     out[plane + i] = a21 + a22;
                     out[2 * plane + i] = a11;
@@ -160,11 +217,13 @@ static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, in
             }
         }
     }
+    rectangular32_store_max(acc, tail, amax);
 }
 
 static void rectangular32_pack(const camblas_task_t *task, void *opaque)
 {
     rectangular32_t *w = opaque;
+    float a_max = 0, b_max = 0;
     int per_block = 4;
     while (per_block > 1 &&
            ((w->row_groups + per_block - 1) / per_block) * w->depth_blocks < w->workers)
@@ -184,13 +243,15 @@ static void rectangular32_pack(const camblas_task_t *task, void *opaque)
             int first = group / weight * per_block, last = first + per_block;
             if (last > w->row_groups)
                 last = w->row_groups;
-            rectangular32_pack_all_a(w, first, last, pc, bk);
+            rectangular32_pack_all_a(w, first, last, pc, bk, &a_max);
         } else {
             group -= a_blocks * weight;
             if (group % 7 == 0)
-                rectangular32_pack_all_b(w, group / 7 * 8, pc, bk);
+                rectangular32_pack_all_b(w, group / 7 * 8, pc, bk, &b_max);
         }
     }
+    w->a_max[worker] = a_max;
+    w->b_max[worker] = b_max;
 }
 
 static void rectangular32_product(const camblas_task_t *task, void *opaque)
@@ -245,10 +306,12 @@ static void rectangular32_combine(const camblas_task_t *task, void *opaque)
     }
 }
 
-int camblas_experimental_rectangular32_f32_op(int tb, const camblas_executor_t *executor,
-                                              int workers, int m, int n, int k, const float *a,
-                                              int lda, const float *b, int ldb, float *c, int ldc,
-                                              void *scratch, size_t bytes)
+/* Core packed route. levels > 0 fuses the conservative range preflight into
+ * the pack pass and returns 1 when the classical path should own the call;
+ * levels == 0 keeps the historical unconditional behaviour. */
+static int rectangular32_execute(int tb, const camblas_executor_t *executor, int workers, int m,
+                                 int n, int k, const float *a, int lda, const float *b, int ldb,
+                                 float *c, int ldc, void *scratch, size_t bytes, int levels)
 {
     size_t needed;
     if ((tb != 0 && tb != 1) || !executor || !executor->run || workers < 1 || workers > 64 || !a ||
@@ -318,12 +381,43 @@ int camblas_experimental_rectangular32_f32_op(int tb, const camblas_executor_t *
                     j1 = hn;
                 product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
             }
-    /* Each synchronous stage completes before its outputs are consumed. */
-    if (executor->run(rectangular32_pack, workers_tasks, workers, &work, executor->user_data) ||
-        executor->run(rectangular32_product, product_tasks, count, &work, executor->user_data) ||
+    /* Each synchronous stage completes before its outputs are consumed. The
+     * pack pass also produces the per-worker operand maxima, so the range
+     * preflight costs no separate scan of A and B. */
+    if (executor->run(rectangular32_pack, workers_tasks, workers, &work, executor->user_data))
+        return -1;
+    if (levels) {
+        float a_peak = 0, b_peak = 0;
+        for (int t = 0; t < workers; ++t) {
+            a_peak = fmaxf(a_peak, work.a_max[t]);
+            b_peak = fmaxf(b_peak, work.b_max[t]);
+        }
+        if (!rectangular32_range_verdict(a_peak, b_peak, k, levels))
+            return 1;
+    }
+    if (executor->run(rectangular32_product, product_tasks, count, &work, executor->user_data) ||
         atomic_load_explicit(&work.failed, memory_order_relaxed))
         return -1;
     return executor->run(rectangular32_combine, workers_tasks, workers, &work, executor->user_data);
+}
+
+int camblas_experimental_rectangular32_f32_op(int tb, const camblas_executor_t *executor,
+                                              int workers, int m, int n, int k, const float *a,
+                                              int lda, const float *b, int ldb, float *c, int ldc,
+                                              void *scratch, size_t bytes)
+{
+    return rectangular32_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
+                                 bytes, 0);
+}
+
+int camblas_experimental_rectangular32_f32_op_checked(int tb, const camblas_executor_t *executor,
+                                                      int workers, int m, int n, int k,
+                                                      const float *a, int lda, const float *b,
+                                                      int ldb, float *c, int ldc, void *scratch,
+                                                      size_t bytes, int levels)
+{
+    return rectangular32_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
+                                 bytes, levels);
 }
 
 /* Convenience wrapper for an untransposed B operand. */
