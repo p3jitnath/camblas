@@ -14,9 +14,9 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 
 | Framework | Workload | Precision | Cores | CAMBLAS ms | OpenBLAS ms | NVPL ms | vs OpenBLAS | vs NVPL |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| NumPy | Square 1024† | FP32 | 16 | 1.360 | 1.632 | 1.432 | 1.200× | 1.053× |
+| NumPy | Square 1024† | FP32 | 16 | 1.352 | 1.622 | 1.435 | 1.199× | 1.061× |
 | NumPy | Square 1024† | FP32 | 64 | 0.409 | 0.501 | 0.385 | 1.227× | 0.943× |
-| NumPy | Square 1024† | FP64 | 16 | 2.824 | 3.362 | 2.885 | 1.190× | 1.022× |
+| NumPy | Square 1024† | FP64 | 16 | 2.799 | 3.351 | 2.867 | 1.197× | 1.024× |
 | NumPy | Square 1024† | FP64 | 64 | 0.786 | 0.965 | 0.773 | 1.229× | 0.984× |
 | NumPy | Square 4096 | FP32 | 16 | 84.093 | 104.127 | 93.619 | 1.238× | 1.113× |
 | NumPy | Square 4096† | FP32 | 64 | 25.664 | 34.470 | 36.795 | 1.343× | 1.434× |
@@ -26,9 +26,9 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | NumPy | Square 8192† | FP32 | 64 | 183.261 | 251.429 | 240.683 | 1.372× | 1.313× |
 | NumPy | Square 8192 | FP64 | 16 | 1387.948 | 1736.488 | 1493.413 | 1.251× | 1.076× |
 | NumPy | Square 8192† | FP64 | 64 | 385.468 | 530.695 | 484.353 | 1.377× | 1.257× |
-| NumPy | Transposed GEMM† | FP32 | 16 | 1.309 | 1.627 | 1.430 | 1.243× | 1.092× |
+| NumPy | Transposed GEMM† | FP32 | 16 | 1.296 | 1.621 | 1.426 | 1.251× | 1.100× |
 | NumPy | Transposed GEMM† | FP32 | 64 | 0.394 | 0.505 | 0.377 | 1.281× | 0.955× |
-| NumPy | Transposed GEMM† | FP64 | 16 | 2.750 | 3.355 | 2.888 | 1.220× | 1.050× |
+| NumPy | Transposed GEMM† | FP64 | 16 | 2.731 | 3.349 | 2.865 | 1.226× | 1.049× |
 | NumPy | Transposed GEMM† | FP64 | 64 | 0.751 | 0.960 | 0.775 | 1.279× | 1.033× |
 | NumPy | Gram | FP32 | 16 | 1.102 | 1.746 | 1.160 | 1.584× | 1.053× |
 | NumPy | Gram† | FP32 | 64 | 0.420 | 13.342 | 0.574 | 31.778× | 1.368× |
@@ -42,9 +42,9 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | NumPy | Attention† | FP32 | 64 | 3.552 | 4.026 | 4.330 | 1.134× | 1.219× |
 | NumPy | Attention | FP64 | 16 | 6.956 | 7.394 | 6.768 | 1.063× | 0.973× |
 | NumPy | Attention† | FP64 | 64 | 6.100 | 6.413 | 6.207 | 1.051× | 1.018× |
-| PyTorch | Square 1024† | FP32 | 16 | 1.387 | 1.629 | 1.451 | 1.175× | 1.046× |
+| PyTorch | Square 1024† | FP32 | 16 | 1.366 | 1.628 | 1.442 | 1.192× | 1.055× |
 | PyTorch | Square 1024† | FP32 | 64 | 0.421 | 0.508 | 0.400 | 1.205× | 0.950× |
-| PyTorch | Square 1024† | FP64 | 16 | 2.855 | 3.379 | 2.890 | 1.183× | 1.012× |
+| PyTorch | Square 1024† | FP64 | 16 | 2.823 | 3.378 | 2.884 | 1.197× | 1.021× |
 | PyTorch | Square 1024† | FP64 | 64 | 0.807 | 0.968 | 0.785 | 1.200× | 0.972× |
 | PyTorch | Square 4096 | FP32 | 16 | 84.131 | 103.732 | 92.992 | 1.233× | 1.105× |
 | PyTorch | Square 4096† | FP32 | 64 | 26.073 | 34.484 | 36.703 | 1.323× | 1.408× |
@@ -54,9 +54,9 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | PyTorch | Square 8192† | FP32 | 64 | 183.209 | 241.877 | 233.113 | 1.320× | 1.272× |
 | PyTorch | Square 8192 | FP64 | 16 | 1386.473 | 1709.889 | 1467.706 | 1.233× | 1.059× |
 | PyTorch | Square 8192† | FP64 | 64 | 384.730 | 519.914 | 457.687 | 1.351× | 1.190× |
-| PyTorch | Transposed GEMM† | FP32 | 16 | 1.490 | 2.449 | 1.621 | 1.644× | 1.088× |
+| PyTorch | Transposed GEMM† | FP32 | 16 | 1.420 | 2.477 | 1.597 | 1.745× | 1.125× |
 | PyTorch | Transposed GEMM† | FP32 | 64 | 0.510 | 1.873 | 0.540 | 3.674× | 1.060× |
-| PyTorch | Transposed GEMM† | FP64 | 16 | 3.001 | 4.899 | 3.463 | 1.632× | 1.154× |
+| PyTorch | Transposed GEMM† | FP64 | 16 | 2.977 | 4.969 | 4.038 | 1.669× | 1.356× |
 | PyTorch | Transposed GEMM† | FP64 | 64 | 0.999 | 4.011 | 1.542 | 4.014× | 1.543× |
 | PyTorch | Gram | FP32 | 16 | 0.984 | 1.682 | 1.512 | 1.710× | 1.537× |
 | PyTorch | Gram† | FP32 | 64 | 0.299 | 0.909 | 0.484 | 3.044× | 1.621× |
