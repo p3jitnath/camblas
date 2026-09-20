@@ -4,7 +4,7 @@
 #ifndef CAMBLAS_RECTANGULAR32_RANGE_H
 #define CAMBLAS_RECTANGULAR32_RANGE_H
 
-#include "camblas_executor.h"
+#include "rectangular32.h"
 #include <arm_neon.h>
 #include <float.h>
 #include <math.h>
@@ -78,13 +78,7 @@ static int rectangular32_range_safe_op(int tb, const camblas_executor_t *executo
         a_peak = fmax(a_peak, work.a_max[worker]);
         b_peak = fmax(b_peak, work.b_max[worker]);
     }
-    /* A sum contains at most two or four source values. Conservative bounds
-     * for intermediate products and recombination are 8*K and 64*K times
-     * the input maxima product. A factor of two leaves rounding headroom. */
-    float sum_bound = levels == 1 ? 4.0 : 8.0;
-    float product_bound = levels == 1 ? 16.0 : 128.0;
-    return a_peak <= FLT_MAX / sum_bound && b_peak <= FLT_MAX / sum_bound &&
-           (a_peak == 0 || b_peak <= ((FLT_MAX / product_bound) / k) / a_peak);
+    return rectangular32_range_verdict(a_peak, b_peak, k, levels);
 }
 
 /* Compatibility entry point for NN range-oracle checks. */
