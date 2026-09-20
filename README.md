@@ -4,20 +4,20 @@ CAMBLAS is an experimental CPU BLAS library for real single- and double-precisio
 
 Unsupported BLAS/LAPACK operations use an explicit OpenBLAS compatibility dependency. The binary interface remains unstable, so use matching headers and libraries. The framework adapter serialises concurrent GEMMs and requires spawn/exec after initialisation rather than fork; fast-mode results are not guaranteed to match vendor libraries bitwise.
 
-The Grace implementation combines SVE128 kernels, packed operand panels and shape-dependent task grids. Bounded paths use twelve-row FP32 or six-row FP64 layouts; transposed FP32 inputs can be packed directly into the kernel layout without an intermediate panel. Bounded square and transposed products also use one-level Strassen: seven half-size products, with operand sums formed during packing. Every call repacks its inputs. At 64 cores a persistent spinning worker-pool executor replaces per-call OpenMP fork/join (workers spin briefly after each dispatch and then sleep on futex; below 64 threads the OpenMP executor is retained). Runtime capability, bounds, workspace and finite-range checks retain classical fallbacks. Strassen changes rounding behaviour; the range check limits overflow growth, not general relative error.
+The Grace implementation combines SVE128 kernels, packed operand panels and shape-dependent task grids. Bounded paths use twelve-row FP32 or six-row FP64 layouts; transposed FP32 inputs can be packed directly into the kernel layout without an intermediate panel. Bounded square and transposed products also use one-level Strassen: seven half-size products, with operand sums formed during packing. Every call repacks its inputs, and the conservative finite-range preflight rides on the pack pass itself (per-worker abs-maxima reduced after packing) so no separate operand scan runs before the packed route; unsafe ranges still fall back to the classical path. At 64 cores a persistent spinning worker-pool executor replaces per-call OpenMP fork/join (workers spin briefly after each dispatch and then sleep on futex; below 64 threads the OpenMP executor is retained). Runtime capability, bounds, workspace and finite-range checks retain classical fallbacks. Strassen changes rounding behaviour; the range check limits overflow growth, not general relative error.
 
 ## Benchmarks
 
-Application benchmark snapshot: **60/60 wins against OpenBLAS; 47/60 against NVPL**. The table contains all 60 cases: seven NumPy and eight PyTorch workloads, each at two precisions and 16/64 cores. **† marks 38 cases measured with this source configuration on an idle whole-node allocation:** all 30 64-core cases, whose executor the spinning worker pool replaces, plus the marked 16-core cases from the previous snapshot, whose execution paths are unchanged below 64 threads. The remaining unmarked 16-core cases use measurements from separate allocations and earlier CAMBLAS builds whose corresponding execution paths are unchanged; they have not been remeasured with this build, so the table remains a combined snapshot, not one complete run. Small median differences do not establish statistical significance: the PyTorch FP32 64-core transposed-GEMM entry measured 0.95× and 1.00× against NVPL in two paired sessions and is counted as a loss, and the PyTorch 64-core OpenBLAS medians vary several-fold between sessions on this allocation, so those entries are conservative rather than best-case for OpenBLAS.
+Application benchmark snapshot: **60/60 wins against OpenBLAS; 48/60 against NVPL**. The table contains all 60 cases: seven NumPy and eight PyTorch workloads, each at two precisions and 16/64 cores. **† marks 38 cases measured with this source configuration on an idle whole-node allocation:** all 30 64-core cases, whose executor the spinning worker pool replaces, plus the marked 16-core cases from the previous snapshot, whose execution paths are unchanged below 64 threads. The remaining unmarked 16-core cases use measurements from separate allocations and earlier CAMBLAS builds whose corresponding execution paths are unchanged; they have not been remeasured with this build, so the table remains a combined snapshot, not one complete run. Small median differences do not establish statistical significance, so entries within roughly two percent of 1× can move between sessions; and the PyTorch 64-core OpenBLAS medians vary several-fold between sessions on this allocation, so those entries are conservative rather than best-case for OpenBLAS.
 
 FP32 and FP64 denote single and double precision, respectively. Latency is reported in milliseconds, with lower values indicating better performance. Speed-up is vendor latency divided by CAMBLAS latency; **values above 1× favour CAMBLAS**. Each entry is the median of three fresh-process medians after three warm-ups. The eight marked 16-core square and transpose cases use 1001 timed calls per NumPy round and 201 per PyTorch round; the 30 marked 64-core cases use at least five calls per NumPy round and 25 per PyTorch round. Unmarked cases use at least five calls per round; some use the longer 1001/201-call protocol.
 
 | Framework | Workload | Precision | Cores | CAMBLAS ms | OpenBLAS ms | NVPL ms | vs OpenBLAS | vs NVPL |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| NumPy | Square 1024† | FP32 | 16 | 1.384 | 1.632 | 1.441 | 1.179× | 1.041× |
-| NumPy | Square 1024† | FP32 | 64 | 0.412 | 0.501 | 0.387 | 1.214× | 0.938× |
-| NumPy | Square 1024† | FP64 | 16 | 2.812 | 3.379 | 2.898 | 1.202× | 1.031× |
-| NumPy | Square 1024† | FP64 | 64 | 0.787 | 0.953 | 0.777 | 1.210× | 0.987× |
+| NumPy | Square 1024† | FP32 | 16 | 1.360 | 1.632 | 1.432 | 1.200× | 1.053× |
+| NumPy | Square 1024† | FP32 | 64 | 0.409 | 0.501 | 0.385 | 1.227× | 0.943× |
+| NumPy | Square 1024† | FP64 | 16 | 2.824 | 3.362 | 2.885 | 1.190× | 1.022× |
+| NumPy | Square 1024† | FP64 | 64 | 0.786 | 0.965 | 0.773 | 1.229× | 0.984× |
 | NumPy | Square 4096 | FP32 | 16 | 84.093 | 104.127 | 93.619 | 1.238× | 1.113× |
 | NumPy | Square 4096† | FP32 | 64 | 25.664 | 34.470 | 36.795 | 1.343× | 1.434× |
 | NumPy | Square 4096 | FP64 | 16 | 177.555 | 219.378 | 193.596 | 1.236× | 1.090× |
@@ -26,10 +26,10 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | NumPy | Square 8192† | FP32 | 64 | 183.261 | 251.429 | 240.683 | 1.372× | 1.313× |
 | NumPy | Square 8192 | FP64 | 16 | 1387.948 | 1736.488 | 1493.413 | 1.251× | 1.076× |
 | NumPy | Square 8192† | FP64 | 64 | 385.468 | 530.695 | 484.353 | 1.377× | 1.257× |
-| NumPy | Transposed GEMM† | FP32 | 16 | 1.330 | 1.633 | 1.438 | 1.227× | 1.081× |
-| NumPy | Transposed GEMM† | FP32 | 64 | 0.390 | 0.506 | 0.375 | 1.297× | 0.962× |
-| NumPy | Transposed GEMM† | FP64 | 16 | 2.784 | 3.374 | 2.887 | 1.212× | 1.037× |
-| NumPy | Transposed GEMM† | FP64 | 64 | 0.761 | 0.956 | 0.776 | 1.256× | 1.020× |
+| NumPy | Transposed GEMM† | FP32 | 16 | 1.309 | 1.627 | 1.430 | 1.243× | 1.092× |
+| NumPy | Transposed GEMM† | FP32 | 64 | 0.394 | 0.505 | 0.377 | 1.281× | 0.955× |
+| NumPy | Transposed GEMM† | FP64 | 16 | 2.750 | 3.355 | 2.888 | 1.220× | 1.050× |
+| NumPy | Transposed GEMM† | FP64 | 64 | 0.751 | 0.960 | 0.775 | 1.279× | 1.033× |
 | NumPy | Gram | FP32 | 16 | 1.102 | 1.746 | 1.160 | 1.584× | 1.053× |
 | NumPy | Gram† | FP32 | 64 | 0.420 | 13.342 | 0.574 | 31.778× | 1.368× |
 | NumPy | Gram | FP64 | 16 | 2.152 | 2.896 | 2.336 | 1.345× | 1.085× |
@@ -42,10 +42,10 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | NumPy | Attention† | FP32 | 64 | 3.552 | 4.026 | 4.330 | 1.134× | 1.219× |
 | NumPy | Attention | FP64 | 16 | 6.956 | 7.394 | 6.768 | 1.063× | 0.973× |
 | NumPy | Attention† | FP64 | 64 | 6.100 | 6.413 | 6.207 | 1.051× | 1.018× |
-| PyTorch | Square 1024† | FP32 | 16 | 1.403 | 1.636 | 1.452 | 1.166× | 1.034× |
-| PyTorch | Square 1024† | FP32 | 64 | 0.421 | 0.498 | 0.394 | 1.183× | 0.935× |
-| PyTorch | Square 1024† | FP64 | 16 | 2.825 | 3.388 | 2.906 | 1.199× | 1.029× |
-| PyTorch | Square 1024† | FP64 | 64 | 0.806 | 0.957 | 0.790 | 1.187× | 0.980× |
+| PyTorch | Square 1024† | FP32 | 16 | 1.387 | 1.629 | 1.451 | 1.175× | 1.046× |
+| PyTorch | Square 1024† | FP32 | 64 | 0.421 | 0.508 | 0.400 | 1.205× | 0.950× |
+| PyTorch | Square 1024† | FP64 | 16 | 2.855 | 3.379 | 2.890 | 1.183× | 1.012× |
+| PyTorch | Square 1024† | FP64 | 64 | 0.807 | 0.968 | 0.785 | 1.200× | 0.972× |
 | PyTorch | Square 4096 | FP32 | 16 | 84.131 | 103.732 | 92.992 | 1.233× | 1.105× |
 | PyTorch | Square 4096† | FP32 | 64 | 26.073 | 34.484 | 36.703 | 1.323× | 1.408× |
 | PyTorch | Square 4096 | FP64 | 16 | 177.810 | 217.491 | 192.401 | 1.223× | 1.082× |
@@ -54,10 +54,10 @@ FP32 and FP64 denote single and double precision, respectively. Latency is repor
 | PyTorch | Square 8192† | FP32 | 64 | 183.209 | 241.877 | 233.113 | 1.320× | 1.272× |
 | PyTorch | Square 8192 | FP64 | 16 | 1386.473 | 1709.889 | 1467.706 | 1.233× | 1.059× |
 | PyTorch | Square 8192† | FP64 | 64 | 384.730 | 519.914 | 457.687 | 1.351× | 1.190× |
-| PyTorch | Transposed GEMM† | FP32 | 16 | 1.459 | 2.462 | 1.611 | 1.687× | 1.104× |
-| PyTorch | Transposed GEMM† | FP32 | 64 | 0.495 | 1.884 | 0.497 | 3.802× | 1.002× |
-| PyTorch | Transposed GEMM† | FP64 | 16 | 3.034 | 5.146 | 4.039 | 1.696× | 1.331× |
-| PyTorch | Transposed GEMM† | FP64 | 64 | 1.010 | 3.936 | 1.951 | 3.896× | 1.931× |
+| PyTorch | Transposed GEMM† | FP32 | 16 | 1.490 | 2.449 | 1.621 | 1.644× | 1.088× |
+| PyTorch | Transposed GEMM† | FP32 | 64 | 0.510 | 1.873 | 0.540 | 3.674× | 1.060× |
+| PyTorch | Transposed GEMM† | FP64 | 16 | 3.001 | 4.899 | 3.463 | 1.632× | 1.154× |
+| PyTorch | Transposed GEMM† | FP64 | 64 | 0.999 | 4.011 | 1.542 | 4.014× | 1.543× |
 | PyTorch | Gram | FP32 | 16 | 0.984 | 1.682 | 1.512 | 1.710× | 1.537× |
 | PyTorch | Gram† | FP32 | 64 | 0.299 | 0.909 | 0.484 | 3.044× | 1.621× |
 | PyTorch | Gram | FP64 | 16 | 1.916 | 3.596 | 3.115 | 1.877× | 1.626× |
