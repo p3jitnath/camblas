@@ -2232,7 +2232,7 @@ int camblas_sgemm_packed_executor_workspace(char trans_a, char trans_b, int m, i
     run_rc = 0;
 #if CAMBLAS_PACKED_FUSED_PREP && CAMBLAS_PACKED_SHARED_A && CAMBLAS_PACKED_SHARED_B
     camblas_task_t prepared_a[CAMBLAS_PACKED_MAX_TASKS], prepared_b[CAMBLAS_PACKED_MAX_TASKS];
-    int fused = m > n && m <= 8192 && n <= 2048 && k > 1024 && k <= 4096 && n_tasks >= 16;
+    int fused = m >= n && m <= 8192 && n <= 2048 && k >= 256 && k <= 8192 && n_tasks >= 16;
     if (fused) {
         work.prepared_a = prepared_a;
         work.prepared_b = prepared_b;
