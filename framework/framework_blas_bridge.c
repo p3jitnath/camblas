@@ -187,6 +187,22 @@ VENDOR_DIRECT(d, double)
 #undef VENDOR_DIRECT
 static camblas_topology_t topology;
 static camblas_ctx_t context;
+static int app_torch;
+static int detect_torch(void)
+{
+    FILE *f = fopen("/proc/self/maps", "r");
+    if (!f)
+        return 0;
+    char line[512];
+    int found = 0;
+    while (fgets(line, sizeof line, f))
+        if (strstr(line, "libtorch")) {
+            found = 1;
+            break;
+        }
+    fclose(f);
+    return found;
+}
 static camblas_pthread_pool_t *pool;
 static camblas_pthread_pool_t *small_pool;
 static camblas_ctx_t small_context;
@@ -254,7 +270,11 @@ static int framework_team_exchange(framework_team_t *team)
 }
 static int framework_team_call(void (*fn)(void *), void *data, int m, int n, int k)
 {
-    if (omp_in_parallel() || thread_count < 16 || m > 2048 || n > 2048 || k > 4096) {
+    int want_team = CAMBLAS_FRAMEWORK_SPIN_POOL
+                        ? (thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192 &&
+                           (thread_count < 64 || (app_torch && k > 1024)))
+                        : (thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192);
+    if (!want_team || omp_in_parallel()) {
         fn(data);
         return 0;
     }
@@ -361,12 +381,14 @@ static void fail(const char *message);
 static pthread_t spin_threads[SPIN_MAX_THREADS];
 static atomic_int spin_ack_slot[SPIN_MAX_THREADS];
 static atomic_int spin_gen;
+static atomic_int spin_call_open;
 static camblas_task_fn spin_fn;
 static const camblas_task_t *spin_tasks;
 static void *spin_gctx;
 static int spin_count;
 static int spin_workers;
 static _Thread_local int spin_inside;
+static void camblas_call_fence_task(const camblas_task_t *task, void *gctx);
 #if CAMBLAS_FRAMEWORK_PRETOUCH
 static framework_output_touch_t spin_touch;
 #endif
@@ -374,9 +396,9 @@ static inline void spin_pause(void)
 {
     __asm__ volatile("yield");
 }
-/* Workers spin briefly (intra-call phase gaps are only a few microseconds) and
- * then sleep on a futex so idle cores stay available to the application's own
- * thread pools; the master wakes them when the next batch is published. */
+/* Workers spin only while a GEMM call is open (bridging the gaps between its
+ * executor phases wake-free) and sleep on a futex once the master fences the
+ * call, so idle cores stay available to the application's own thread pools. */
 static void spin_futex_wait(int seen)
 {
     struct timespec timeout = {.tv_sec = 1};
@@ -388,9 +410,6 @@ static void spin_futex_wake(void)
 }
 static void spin_wait_for_work(int seen)
 {
-    /* Workers spin long enough to bridge the gaps between the phases of one
-     * call at the current team size, then sleep on the futex so idle cores
-     * stay available to the application's own thread pools. */
     struct timespec start, now;
     int have_clock = clock_gettime(CLOCK_MONOTONIC, &start) == 0;
     long limit = 4000L * (long)(spin_workers + 1);
@@ -453,8 +472,11 @@ static int spin_run(camblas_task_fn fn, const camblas_task_t *tasks, int count, 
     (void)data;
     if (!fn || count < 0 || (count && !tasks))
         return -1;
-    if (!count)
+    if (!count) {
+        if (fn == camblas_call_fence_task)
+            atomic_store_explicit(&spin_call_open, 0, memory_order_release);
         return 0;
+    }
     struct timespec profile_start = {0};
     if (CAMBLAS_FRAMEWORK_EXEC_PROFILE)
         clock_gettime(CLOCK_MONOTONIC, &profile_start);
@@ -478,6 +500,7 @@ static int spin_run(camblas_task_fn fn, const camblas_task_t *tasks, int count, 
     spin_tasks = tasks;
     spin_gctx = gctx;
     spin_count = count;
+    atomic_store_explicit(&spin_call_open, 1, memory_order_release);
     int gen = atomic_load_explicit(&spin_gen, memory_order_relaxed) + 1;
     atomic_store_explicit(&spin_gen, gen, memory_order_release);
     spin_futex_wake();
@@ -516,6 +539,19 @@ static void spin_pool_stop(void)
     for (int i = 0; i < spin_workers; i++)
         pthread_join(spin_threads[i], NULL);
     spin_workers = 0;
+}
+static void camblas_call_fence_task(const camblas_task_t *task, void *gctx)
+{
+    (void)task;
+    (void)gctx;
+}
+static void camblas_call_fence(void)
+{
+    spin_run(camblas_call_fence_task, NULL, 0, NULL, NULL);
+}
+#else
+static void camblas_call_fence(void)
+{
 }
 #endif
 #if !CAMBLAS_FRAMEWORK_TEAM_REUSE
@@ -702,7 +738,8 @@ static void camblas_ready(void)
         fail("CAMBLAS CPU count");
 #if CAMBLAS_FRAMEWORK_SPIN_POOL
     const camblas_executor_t *executor;
-    if (thread_count >= 64) {
+    app_torch = detect_torch();
+    if (CAMBLAS_FRAMEWORK_SPIN_POOL && thread_count >= 64) {
         (void)cpus;
         spin_pool_start();
         executor = &framework_spin_executor;
@@ -739,7 +776,7 @@ static void ensure_workspace(int m, int n, int k, int fp64, int strassen)
      * exact capacity before borrowing storage and can allocate A separately.
      * Keep asymmetric shared-A panels resident between calls, but repack all
      * input values on every call. The existing GEMM mutex owns this storage. */
-    if (CAMBLAS_FRAMEWORK_REUSE_WIDE_A && !strassen && thread_count >= 16 && m > n && m <= 8192 &&
+    if (CAMBLAS_FRAMEWORK_REUSE_WIDE_A && !strassen && thread_count >= 16 && m >= n && m <= 8192 &&
         n <= 2048 && k <= 4096) {
         size_t a_envelope, b_minimum;
         if (camblas_workspace_bytes(m + 256, k + 256, fp64 ? CAMBLAS_DTYPE_F64 : CAMBLAS_DTYPE_F32,
@@ -1067,6 +1104,10 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
                 return;                                                                                                     \
             }                                                                                                               \
             camblas_ctx_t *call_context = gemm_context(m, n, k);                                                            \
+            if (CAMBLAS_FRAMEWORK_SPIN_POOL)                                                                                \
+                call_context->executor = (thread_count >= 64 && !(app_torch && k > 1024))                                  \
+                                             ? &framework_spin_executor                                                    \
+                                             : &framework_omp_executor;                                                    \
             if (try_dot_##SUFFIX(at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {                                   \
                 clear_output_touch();                                                                                       \
                     if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
@@ -1153,6 +1194,7 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
                               int ldc)                                                                                      \
     {                                                                                                                       \
         gemm_##SUFFIX(order, ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, 0);                                      \
+        camblas_call_fence();                                                                                               \
     }                                                                                                                       \
     void SUFFIX##gemm_(const char *ta, const char *tb, const int *m, const int *n, const int *k,                            \
                        const TYPE *alpha, const TYPE *a, const int *lda, const TYPE *b,                                     \
@@ -1160,6 +1202,7 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
     {                                                                                                                       \
         gemm_##SUFFIX(102, ctrans(ta), ctrans(tb), *m, *n, *k, *alpha, a, *lda, b, *ldb, *beta, c,                          \
                       *ldc, 1);                                                                                             \
+        camblas_call_fence();                                                                                               \
     }
 DEFINE_GEMM(s, float, 0, vendor_sg, SG, STRASSEN_S)
 DEFINE_GEMM(d, double, 1, vendor_dg, DG, STRASSEN_D)
