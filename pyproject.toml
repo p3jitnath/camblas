@@ -2,6 +2,15 @@
 target-version = "py311"
 line-length = 88
 include = ["bench/*.py", "scripts/*.py", "tests/*.py"]
+extend-exclude = [
+    "bench/results",
+    "bench/build_final60_candidate.py",
+    "bench/compare_loss_frameworks.py",
+    "bench/framework_workload.py",
+    "bench/test_framework_*.py",
+    "bench/test_mlp_packing.py",
+    "bench/validate_final60_*.py",
+]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "D"]

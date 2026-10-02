@@ -33,7 +33,25 @@ def main():
             "Install configs/style-requirements.txt with this Python interpreter first"
         )
 
-    python_dirs = ["bench", "scripts", "tests"]
+    python_files = [
+        path
+        for path in subprocess.check_output(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "--",
+                "bench",
+                "scripts",
+                "tests",
+            ],
+            cwd=ROOT,
+            text=True,
+        ).splitlines()
+        if Path(path).suffix == ".py"
+    ]
     c_files = sorted(
         str(path.relative_to(ROOT))
         for directory in ("framework", "include", "src", "tests")
@@ -50,16 +68,16 @@ def main():
                 "--select",
                 "I",
                 "--fix",
-                *python_dirs,
+                *python_files,
             ],
-            [*ruff, "format", "--respect-gitignore", *python_dirs],
+            [*ruff, "format", "--respect-gitignore", *python_files],
             [str(clang_format), "-i", *c_files],
-            [*ruff, "check", "--respect-gitignore", *python_dirs],
+            [*ruff, "check", "--respect-gitignore", *python_files],
         ]
     else:
         commands = [
-            [*ruff, "check", "--respect-gitignore", *python_dirs],
-            [*ruff, "format", "--respect-gitignore", "--check", *python_dirs],
+            [*ruff, "check", "--respect-gitignore", *python_files],
+            [*ruff, "format", "--respect-gitignore", "--check", *python_files],
             [str(clang_format), "--dry-run", "--Werror", *c_files],
         ]
     for command in commands:
