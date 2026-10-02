@@ -7,7 +7,7 @@
   },
   "scores": {
     "openblas": 60,
-    "nvpl": 59,
+    "nvpl": 60,
     "within_2_percent_of_nvpl": 60
   },
   "manifest": {
@@ -303,21 +303,21 @@
       286,
       287
     ],
-    "hostname": "nid010267",
-    "slurm_job_id": "7002579",
+    "hostname": "nid010099",
+    "slurm_job_id": "7005823",
     "command": [
       "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/compare.py",
       "--full",
       "--rounds",
       "3",
       "--output",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/full60_20261002_neon6"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/full60_20261002_release"
     ],
     "backends": {
       "camblas": {
         "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/camblas/lib/libframework_blas.so",
-        "sha256": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4",
-        "core_sha256": "29f10ccf49ad89f82b3878b134686dd6fcd6781d343af9dfbb6cdc719eb1ef25"
+        "sha256": "63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f",
+        "core_sha256": "c33a09db9534f06d6a151262270e2814a7356356c2b57e83df9f964d08852f4b"
       },
       "openblas": {
         "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/openblas/lib/libframework_blas.so",
@@ -334,7 +334,7 @@
     "cases": 60,
     "wins": {
       "openblas": 60,
-      "nvpl": 59
+      "nvpl": 60
     }
   },
   "source_identity": {
@@ -366,12 +366,12 @@
     "deep64": false,
     "rect64": false,
     "source_tree": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas",
-    "build_hostname": "nid010267",
-    "build_allocation": "7002579",
-    "source_commit": "dcc6438d10c42f228820628ff9cc00a744a64a20",
+    "build_hostname": "nid010099",
+    "build_allocation": "7005823",
+    "source_commit": "e614792d215a4f8028d5fe5fcc0cd0d8d1a0ab4e",
     "source_sha256": {
       "configs/build-requirements.txt": "6df362c6b84bd65af99010bbdb6b2f199af37e2a65e921f5789575e6ba048b42",
-      "configs/grace.json": "81769fedcc575be89e6e99cc436a6aac7d43ad64e84c36e4fffbf686e092cb23",
+      "configs/grace.json": "2b280cac0f0cd62a7777d6f6c5fad7f2b9baf24b684e9c02208d0a2cbee0d760",
       "configs/runtime-requirements.txt": "ff6eae8ab1bb4faf369954aa662d43f57ee6f40849549bf2225b4ebb4e79002b",
       "configs/style-requirements.txt": "3a0a5b5699e15b5e0857538bfd652c74ed6f2ab27ba0f1b70b602d917f7afcbf",
       "framework/benchmark_alloc.h": "90b7a06c40125ff934b2590b91d92d7a71acc47e3c59e4e17cfe5139128290e4",
@@ -380,9 +380,9 @@
       "framework/output_page_touch.h": "d98888c6cfa77d40cab450dddbfce669a267c2337d73a8d2014b1acec681ce57",
       "framework/rectangular32_policy.h": "1132c0f302feef8798428f61835d62d685132c7358b8e1bbb28fc8d5df0db2d5",
       "framework/rectangular32_range.h": "7e7bd175448561d40fb1de86b2a5c89bd68d4d40b3375613fa9c39f819626e6d",
-      "framework/rectangular64_policy.h": "d6e534e028007233a483dd6967346fd834d1beb01496446961e0140284115308",
+      "framework/rectangular64_policy.h": "c478a6960ebc6a749ac532fd7f9a8dd7b4170bb7994db2f730ab18c152120472",
       "framework/rectangular64_range.h": "97bf3a867931c7daf05be6dab55b90b939539cc8bc1d98b0b151bc6217d91a16",
-      "framework/shared_grid32.h": "d6c343ac4f848df036f0c01d54087e730a76a94f79560a699012f6de4b797e06",
+      "framework/shared_grid32.h": "48b42a2a5d670851b113428c1033508c2e820d9d699ae6c762d654cec562b1ba",
       "framework/strassen_one_level.h": "53516df103e0df79a549c14783a2d51c0c2d5f37ac752541dff6212c60892d96",
       "include/camblas.h": "0f23791fd4e8946512eb143c726234686555dd6cc156a73503952e42114cf9b8",
       "include/camblas_cblas.h": "ee4c6ba99ba0294c7cca986cc231c668849e7e0f37455be13d351f3370858798",
@@ -413,9 +413,9 @@
       "src/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
       "src/planner.c": "f6ad3af3d350818d8963de27382a7fd60e9da01901a5a4fc406aff21744af9e8",
       "src/pthread_pool.c": "50df372878e8d77e726dba97e29e311b45b39951a0ecfef0ad659cb34b7d651b",
-      "src/rectangular32.c": "77d32650bb19004db525cc62b44fe9417c56e961358e77d12689d731067f8aa1",
+      "src/rectangular32.c": "d16d4cc7fcb84fffc8df7bb0e6b90d30a9ab18a1e67c39fb633ca908d59a7a67",
       "src/rectangular32.h": "ca46d780ee0672a311f708540bb6e2164d29ba6dae329bd488cd15f147c8cf38",
-      "src/rectangular64.c": "901b9564eb4e50fb4b341ad1bef3371cfa441ece0585cdbb275db0b6beb8e3b4",
+      "src/rectangular64.c": "eec8e8e68af9d6f574b1209f0cee38366bec20edbfb9e0846873c66ed356efa1",
       "src/rectangular64.h": "3abd0424db264d9db9b18c40724b83aaf9eb56af479b7a0480dd75c4833c38aa",
       "src/scalar.c": "3b3a6b57b970299150fd4966766b5b6d91a2748eee22ebcedd90fca6a624386e",
       "src/sve.c": "974a148b59b6674bdd802086a259696b9f7fcf21065d4f4c62e47927e6f15364",
@@ -441,12 +441,12 @@
     },
     "libraries": {
       "libcamblas_sve_nr4.so": {
-        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/libcamblas_sve_nr4.so",
-        "sha256": "29f10ccf49ad89f82b3878b134686dd6fcd6781d343af9dfbb6cdc719eb1ef25"
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/libcamblas_sve_nr4.so",
+        "sha256": "c33a09db9534f06d6a151262270e2814a7356356c2b57e83df9f964d08852f4b"
       },
       "libframework_blas.so": {
-        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/libframework_blas.so",
-        "sha256": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4"
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/libframework_blas.so",
+        "sha256": "63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f"
       },
       "libopenblas.so": {
         "path": "/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so",
@@ -488,12 +488,12 @@
       "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
       "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
       "-DCAMBLAS_SHARED_B_GUARD=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/scalar.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/scalar.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/scalar.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/scalar.o"
     ],
     [
       "taskset",
@@ -528,12 +528,12 @@
       "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
       "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
       "-DCAMBLAS_SHARED_B_GUARD=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/cblas_shim.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/cblas_shim.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/cblas_shim.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/cblas_shim.o"
     ],
     [
       "taskset",
@@ -568,12 +568,12 @@
       "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
       "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
       "-DCAMBLAS_SHARED_B_GUARD=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/topology.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/topology.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/topology.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/topology.o"
     ],
     [
       "taskset",
@@ -608,12 +608,12 @@
       "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
       "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
       "-DCAMBLAS_SHARED_B_GUARD=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/executor.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/executor.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/executor.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/executor.o"
     ],
     [
       "taskset",
@@ -648,12 +648,12 @@
       "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
       "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
       "-DCAMBLAS_SHARED_B_GUARD=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/packing.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/packing.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/packing.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/packing.o"
     ],
     [
       "taskset",
@@ -702,12 +702,12 @@
       "-DCAMBLAS_PACKED_SHALLOW_AMICRO32=1",
       "-DCAMBLAS_PACKED_SHALLOW_AMICRO32_WIDE=1",
       "-DCAMBLAS_PACKED_SHALLOW_AMICRO32_TRANSPOSE=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/packed.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/packed.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/packed.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/packed.o"
     ],
     [
       "taskset",
@@ -748,12 +748,12 @@
       "-DCAMBLAS_DEEP_ROW_BLOCK_FP64=256",
       "-DCAMBLAS_DEEP_ROW_BLOCK_MAX_THREADS=32",
       "-DCAMBLAS_SHALLOW_ASPECT_GRID_FP32=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/planner.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/planner.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/planner.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/planner.o"
     ],
     [
       "taskset",
@@ -805,12 +805,12 @@
       "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
       "-DCAMBLAS_MICRO8_NEON=0",
       "-DCAMBLAS_MICRO8_PREFETCH_K=0",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/sve.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/sve.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/sve.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/sve.o"
     ],
     [
       "taskset",
@@ -862,12 +862,12 @@
       "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
       "-DCAMBLAS_MICRO8_NEON=0",
       "-DCAMBLAS_MICRO8_PREFETCH_K=0",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/deep_amicro.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/deep_amicro.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/deep_amicro.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/deep_amicro.o"
     ],
     [
       "taskset",
@@ -919,12 +919,12 @@
       "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
       "-DCAMBLAS_MICRO8_NEON=0",
       "-DCAMBLAS_MICRO8_PREFETCH_K=0",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/deep_amicro64.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/deep_amicro64.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/deep_amicro64.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/deep_amicro64.o"
     ],
     [
       "taskset",
@@ -939,12 +939,12 @@
       "-mcpu=neoverse-v2",
       "-fPIC",
       "-DCAMBLAS_RECT64_NEON6=1",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/rectangular64.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/rectangular64.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/rectangular64.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/rectangular64.o"
     ],
     [
       "taskset",
@@ -958,12 +958,13 @@
       "-Werror",
       "-mcpu=neoverse-v2",
       "-fPIC",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-DCAMBLAS_RECT32_NEON12=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/rectangular32.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/rectangular32.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/rectangular32.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/rectangular32.o"
     ],
     [
       "taskset",
@@ -1015,12 +1016,12 @@
       "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
       "-DCAMBLAS_MICRO8_NEON=0",
       "-DCAMBLAS_MICRO8_PREFETCH_K=0",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/batch_amicro64.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/batch_amicro64.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/batch_amicro64.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/batch_amicro64.o"
     ],
     [
       "taskset",
@@ -1028,25 +1029,25 @@
       "287",
       "gcc-14",
       "-shared",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/scalar.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/cblas_shim.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/topology.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/executor.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/packing.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/packed.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/planner.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/sve.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/deep_amicro.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/deep_amicro64.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/rectangular64.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/rectangular32.o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/batch_amicro64.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/scalar.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/cblas_shim.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/topology.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/executor.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/packing.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/packed.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/planner.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/sve.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/deep_amicro.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/deep_amicro64.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/rectangular64.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/rectangular32.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/batch_amicro64.o",
       "-Wl,-z,defs",
       "-pthread",
       "-lm",
       "-Wl,-soname,libcamblas_sve_nr4.so",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/libcamblas_sve_nr4.so"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/libcamblas_sve_nr4.so"
     ],
     [
       "taskset",
@@ -1103,12 +1104,12 @@
       "-DCAMBLAS_FRAMEWORK_TOUCH_WIDE=1",
       "-DCAMBLAS_FRAMEWORK_REUSE_WIDE_A=1",
       "-DCAMBLAS_FRAMEWORK_TOUCH_MAX_BYTES=134217728",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
       "-c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/symmetric/symmetric.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/symmetric/symmetric.c",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/symmetric.o"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/symmetric.o"
     ],
     [
       "taskset",
@@ -1146,15 +1147,15 @@
       "-DCAMBLAS_FRAMEWORK_RECT64=1",
       "-DCAMBLAS_FRAMEWORK_SHARED_GRID32=1",
       "-DFRAMEWORK_VENDOR_LIBRARY=\"/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so\"",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/include",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/framework",
-      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/symmetric",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/framework",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/symmetric",
       "-shared",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/framework/framework_blas_bridge.c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/source/src/pthread_pool.c",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/symmetric.o",
-      "-L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/framework/framework_blas_bridge.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/source/src/pthread_pool.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/symmetric.o",
+      "-L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release",
       "-lcamblas_sve_nr4",
       "-Wl,--no-as-needed",
       "/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so",
@@ -1168,7 +1169,7 @@
       "-ldl",
       "-lm",
       "-o",
-      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T031825_428688Z_retained_neon6/libframework_blas.so"
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T071656_615972Z_retained_release/libframework_blas.so"
     ]
   ],
   "summary": [
@@ -1180,25 +1181,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.383771,
-          1.3787150000000001,
-          1.36582
+          1.410072,
+          1.3972720000000003,
+          1.387544
         ],
         "openblas": [
-          1.6291080000000002,
-          1.6138760000000003,
-          1.6284370000000001
+          1.6696170000000001,
+          1.6418740000000003,
+          1.6468330000000002
         ],
         "nvpl": [
-          1.4360260000000002,
-          1.437754,
-          1.4326340000000002
+          1.459062,
+          1.459351,
+          1.457143
         ]
       },
       "medians_ms": {
-        "camblas": 1.3787150000000001,
-        "openblas": 1.6284370000000001,
-        "nvpl": 1.4360260000000002
+        "camblas": 1.3972720000000003,
+        "openblas": 1.6468330000000002,
+        "nvpl": 1.459062
       },
       "max_scaled_sample_error": 8.926318057864597e-07
     },
@@ -1210,25 +1211,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          84.08230100000002,
-          83.78474100000001,
-          83.76918900000001
+          84.551167,
+          84.593183,
+          84.55008
         ],
         "openblas": [
-          103.538549,
-          103.6037,
-          103.62581100000001
+          104.70368400000001,
+          104.64119000000001,
+          104.16014700000001
         ],
         "nvpl": [
-          92.978767,
-          93.27597500000002,
-          92.96190400000002
+          94.42439200000001,
+          94.190383,
+          92.92465800000001
         ]
       },
       "medians_ms": {
-        "camblas": 83.78474100000001,
-        "openblas": 103.6037,
-        "nvpl": 92.978767
+        "camblas": 84.551167,
+        "openblas": 104.64119000000001,
+        "nvpl": 94.190383
       },
       "max_scaled_sample_error": 5.851871701657536e-07
     },
@@ -1240,25 +1241,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          648.8511680000001,
-          652.367917,
-          648.909897
+          655.996514,
+          655.3718640000001,
+          654.843015
         ],
         "openblas": [
-          808.7220380000001,
-          817.103333,
-          812.147048
+          827.3052190000001,
+          819.4897490000001,
+          825.185936
         ],
         "nvpl": [
-          704.008096,
-          714.095807,
-          706.7478110000001
+          723.635841,
+          723.1440690000001,
+          722.5981330000001
         ]
       },
       "medians_ms": {
-        "camblas": 648.909897,
-        "openblas": 812.147048,
-        "nvpl": 706.7478110000001
+        "camblas": 655.3718640000001,
+        "openblas": 825.185936,
+        "nvpl": 723.1440690000001
       },
       "max_scaled_sample_error": 5.201160667898378e-07
     },
@@ -1270,25 +1271,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.3223010000000002,
-          1.3181730000000003,
-          1.315133
+          1.3356090000000003,
+          1.3301060000000002,
+          1.3191300000000001
         ],
         "openblas": [
-          1.622068,
-          1.6255890000000002,
-          1.6310290000000003
+          1.649072,
+          1.6513110000000002,
+          1.6472160000000002
         ],
         "nvpl": [
-          1.425434,
-          1.425754,
-          1.423898
+          1.449238,
+          1.447094,
+          1.4474140000000002
         ]
       },
       "medians_ms": {
-        "camblas": 1.3181730000000003,
-        "openblas": 1.6255890000000002,
-        "nvpl": 1.425434
+        "camblas": 1.3301060000000002,
+        "openblas": 1.649072,
+        "nvpl": 1.4474140000000002
       },
       "max_scaled_sample_error": 1.1100948301773664e-06
     },
@@ -1300,25 +1301,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.0865950000000002,
-          1.0966420000000001,
-          1.105794
+          1.1135680000000001,
+          1.107904,
+          1.117888
         ],
         "openblas": [
-          1.758609,
-          1.7316340000000001,
-          1.7403050000000002
+          1.790284,
+          1.770124,
+          1.7816120000000002
         ],
         "nvpl": [
-          1.1450890000000002,
-          1.158306,
-          1.1598730000000002
+          1.169534,
+          1.16883,
+          1.174046
         ]
       },
       "medians_ms": {
-        "camblas": 1.0966420000000001,
-        "openblas": 1.7403050000000002,
-        "nvpl": 1.158306
+        "camblas": 1.1135680000000001,
+        "openblas": 1.7816120000000002,
+        "nvpl": 1.169534
       },
       "max_scaled_sample_error": 2.2455562967138867e-07
     },
@@ -1330,25 +1331,25 @@
       "calls_per_round": 1001,
       "round_medians_ms": {
         "camblas": [
-          9.826234000000001,
-          9.826777,
-          9.835097000000001
+          9.835331000000002,
+          9.84759,
+          9.853606000000001
         ],
         "openblas": [
-          10.700898,
-          10.671971000000001,
-          10.673985
+          10.789837,
+          10.803595000000001,
+          10.804961
         ],
         "nvpl": [
-          9.925719,
-          9.928310000000002,
-          9.915895
+          10.072992000000001,
+          10.039041000000001,
+          10.045473000000001
         ]
       },
       "medians_ms": {
-        "camblas": 9.826777,
-        "openblas": 10.673985,
-        "nvpl": 9.925719
+        "camblas": 9.84759,
+        "openblas": 10.803595000000001,
+        "nvpl": 10.045473000000001
       },
       "max_scaled_sample_error": 4.711449623531618e-07
     },
@@ -1360,25 +1361,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          3.7952250000000003,
-          3.762715,
-          3.7514830000000003
+          3.7506090000000003,
+          3.8247510000000005,
+          3.794992
         ],
         "openblas": [
-          4.326187,
-          4.335308,
-          4.359787000000001
+          4.348864,
+          4.355104,
+          4.3273280000000005
         ],
         "nvpl": [
-          4.10677,
-          4.089682,
-          4.106162
+          4.167813000000001,
+          4.138758,
+          4.158277
         ]
       },
       "medians_ms": {
-        "camblas": 3.762715,
-        "openblas": 4.335308,
-        "nvpl": 4.106162
+        "camblas": 3.794992,
+        "openblas": 4.348864,
+        "nvpl": 4.158277
       },
       "max_scaled_sample_error": 9.695433094220683e-07
     },
@@ -1390,25 +1391,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          2.8707710000000004,
-          2.8427720000000005,
-          2.8464830000000005
+          2.8395010000000003,
+          2.832301,
+          2.8182530000000003
         ],
         "openblas": [
-          3.361797,
-          3.366085,
-          3.353894
+          3.446362,
+          3.4417220000000004,
+          3.4424580000000002
         ],
         "nvpl": [
-          2.891379,
-          2.877586,
-          2.891954
+          2.9315300000000004,
+          2.941897,
+          2.9340580000000003
         ]
       },
       "medians_ms": {
-        "camblas": 2.8464830000000005,
-        "openblas": 3.361797,
-        "nvpl": 2.891379
+        "camblas": 2.832301,
+        "openblas": 3.4424580000000002,
+        "nvpl": 2.9340580000000003
       },
       "max_scaled_sample_error": 1.2417310022109174e-15
     },
@@ -1420,25 +1421,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          176.587348,
-          176.52415000000002,
-          176.688722
+          178.61141300000003,
+          178.223968,
+          177.464311
         ],
         "openblas": [
-          217.75414500000002,
-          218.67335300000002,
-          218.387345
+          219.89039000000002,
+          219.75029800000002,
+          219.88731800000002
         ],
         "nvpl": [
-          189.590775,
-          192.940444,
-          192.915358
+          194.697947,
+          195.88834500000002,
+          196.909466
         ]
       },
       "medians_ms": {
-        "camblas": 176.587348,
-        "openblas": 218.387345,
-        "nvpl": 192.915358
+        "camblas": 178.223968,
+        "openblas": 219.88731800000002,
+        "nvpl": 195.88834500000002
       },
       "max_scaled_sample_error": 1.0899958722021164e-15
     },
@@ -1450,25 +1451,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1386.012177,
-          1387.751266,
-          1387.156034
+          1398.5114950000002,
+          1397.50525,
+          1397.5451570000002
         ],
         "openblas": [
-          1721.749935,
-          1716.4859860000001,
-          1709.265304
+          1744.846097,
+          1739.1204500000001,
+          1734.036385
         ],
         "nvpl": [
-          1475.935481,
-          1472.770452,
-          1477.322513
+          1509.593088,
+          1484.6982870000002,
+          1513.949578
         ]
       },
       "medians_ms": {
-        "camblas": 1387.156034,
-        "openblas": 1716.4859860000001,
-        "nvpl": 1475.935481
+        "camblas": 1397.5451570000002,
+        "openblas": 1739.1204500000001,
+        "nvpl": 1509.593088
       },
       "max_scaled_sample_error": 1.022613369484984e-15
     },
@@ -1480,25 +1481,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          2.778932,
-          2.776597,
-          2.780501
+          2.8132950000000005,
+          2.806191,
+          2.7960480000000003
         ],
         "openblas": [
-          3.372964,
-          3.372068,
-          3.355813
+          3.414013,
+          3.414718,
+          3.4145580000000004
         ],
         "nvpl": [
-          2.8780660000000005,
-          2.874002,
-          2.888177
+          2.9451630000000004,
+          2.9393400000000005,
+          2.9432430000000003
         ]
       },
       "medians_ms": {
-        "camblas": 2.778932,
-        "openblas": 3.372068,
-        "nvpl": 2.8780660000000005
+        "camblas": 2.806191,
+        "openblas": 3.4145580000000004,
+        "nvpl": 2.9432430000000003
       },
       "max_scaled_sample_error": 1.520377344587375e-15
     },
@@ -1510,25 +1511,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          2.134374,
-          2.1617330000000003,
-          2.15783
+          2.146882,
+          2.189569,
+          2.2016640000000005
         ],
         "openblas": [
-          2.902705,
-          2.906353,
-          2.849523
+          2.9402670000000004,
+          2.882477,
+          2.969034
         ],
         "nvpl": [
-          2.3429450000000003,
-          2.3181130000000003,
-          2.3079370000000003
+          2.368635,
+          2.3510360000000006,
+          2.338844
         ]
       },
       "medians_ms": {
-        "camblas": 2.15783,
-        "openblas": 2.902705,
-        "nvpl": 2.3181130000000003
+        "camblas": 2.189569,
+        "openblas": 2.9402670000000004,
+        "nvpl": 2.3510360000000006
       },
       "max_scaled_sample_error": 4.1826755907577287e-16
     },
@@ -1540,25 +1541,25 @@
       "calls_per_round": 1001,
       "round_medians_ms": {
         "camblas": [
-          20.911049000000002,
-          20.784589000000004,
-          20.845613000000004
+          21.02765,
+          20.935627,
+          20.94929
         ],
         "openblas": [
-          26.19813,
-          26.302192,
-          26.577521000000004
+          27.113014,
+          26.616068000000002,
+          26.646407
         ],
         "nvpl": [
-          20.939201,
-          20.894090000000002,
-          20.930570000000003
+          21.139073,
+          21.147333,
+          21.058919000000003
         ]
       },
       "medians_ms": {
-        "camblas": 20.845613000000004,
-        "openblas": 26.302192,
-        "nvpl": 20.930570000000003
+        "camblas": 20.94929,
+        "openblas": 26.646407,
+        "nvpl": 21.139073
       },
       "max_scaled_sample_error": 1.2797981965679722e-15
     },
@@ -1570,25 +1571,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          6.521327,
-          6.3787080000000005,
-          6.363799000000001
+          6.583524000000001,
+          6.482951000000001,
+          6.4139930000000005
         ],
         "openblas": [
-          7.325114000000001,
-          7.344314,
-          7.3426540000000005
+          7.394029000000001,
+          7.350799,
+          7.389997
         ],
         "nvpl": [
-          6.737066,
-          6.715307,
-          6.729550000000001
+          6.88182,
+          6.836028,
+          6.767742
         ]
       },
       "medians_ms": {
-        "camblas": 6.3787080000000005,
-        "openblas": 7.3426540000000005,
-        "nvpl": 6.729550000000001
+        "camblas": 6.482951000000001,
+        "openblas": 7.389997,
+        "nvpl": 6.836028
       },
       "max_scaled_sample_error": 3.178410891443607e-15
     },
@@ -1600,25 +1601,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.38498200000000005,
-          0.38203800000000004,
-          0.382774
+          0.38510900000000003,
+          0.382037,
+          0.38031000000000004
         ],
         "openblas": [
-          0.50005,
-          0.49793800000000005,
-          0.498643
+          0.507089,
+          0.504209,
+          0.510034
         ],
         "nvpl": [
-          0.385846,
-          0.38543000000000005,
-          0.387126
+          0.388148,
+          0.390357,
+          0.39074000000000003
         ]
       },
       "medians_ms": {
-        "camblas": 0.382774,
-        "openblas": 0.498643,
-        "nvpl": 0.385846
+        "camblas": 0.382037,
+        "openblas": 0.507089,
+        "nvpl": 0.390357
       },
       "max_scaled_sample_error": 4.519654712842834e-07
     },
@@ -1630,25 +1631,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          25.758134000000002,
-          25.641593,
-          25.541820000000005
+          27.372722000000003,
+          27.398961000000003,
+          27.827141000000005
         ],
         "openblas": [
-          34.444176,
-          34.086297,
-          34.33531500000001
+          36.376689000000006,
+          35.35547,
+          35.449804
         ],
         "nvpl": [
-          36.711124000000005,
-          35.157181,
-          35.856138
+          37.352373,
+          38.85223500000001,
+          38.515987
         ]
       },
       "medians_ms": {
-        "camblas": 25.641593,
-        "openblas": 34.33531500000001,
-        "nvpl": 35.856138
+        "camblas": 27.398961000000003,
+        "openblas": 35.449804,
+        "nvpl": 38.515987
       },
       "max_scaled_sample_error": 3.684511812154745e-07
     },
@@ -1660,25 +1661,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          181.08896500000003,
-          182.219015,
-          181.04458200000002
+          194.434863,
+          198.275328,
+          195.56078200000002
         ],
         "openblas": [
-          238.760782,
-          236.920543,
-          233.377948
+          267.232303,
+          264.13786300000004,
+          257.60921800000006
         ],
         "nvpl": [
-          232.20031600000002,
-          244.61806700000002,
-          240.615452
+          254.62751,
+          263.159844,
+          235.640598
         ]
       },
       "medians_ms": {
-        "camblas": 181.08896500000003,
-        "openblas": 236.920543,
-        "nvpl": 240.615452
+        "camblas": 195.56078200000002,
+        "openblas": 264.13786300000004,
+        "nvpl": 254.62751
       },
       "max_scaled_sample_error": 5.201160667898378e-07
     },
@@ -1690,25 +1691,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.367222,
-          0.37144600000000005,
-          0.36815000000000003
+          0.36955800000000005,
+          0.369749,
+          0.369718
         ],
         "openblas": [
-          0.500563,
-          0.502355,
-          0.50677
+          0.512305,
+          0.513522,
+          0.512434
         ],
         "nvpl": [
-          0.376566,
-          0.37583,
-          0.37586200000000003
+          0.379157,
+          0.38318900000000006,
+          0.379317
         ]
       },
       "medians_ms": {
-        "camblas": 0.36815000000000003,
-        "openblas": 0.502355,
-        "nvpl": 0.37586200000000003
+        "camblas": 0.369718,
+        "openblas": 0.512434,
+        "nvpl": 0.379317
       },
       "max_scaled_sample_error": 7.182966548206488e-07
     },
@@ -1720,25 +1721,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.415445,
-          0.405525,
-          0.41266100000000006
+          0.41662800000000005,
+          0.423636,
+          0.41694800000000004
         ],
         "openblas": [
-          13.116517000000002,
-          13.256673,
-          13.460187
+          13.130057,
+          13.386594000000002,
+          13.310467000000001
         ],
         "nvpl": [
-          0.5800810000000001,
-          0.5744170000000001,
-          0.5681130000000001
+          0.580592,
+          0.5876950000000001,
+          0.5765270000000001
         ]
       },
       "medians_ms": {
-        "camblas": 0.41266100000000006,
-        "openblas": 13.256673,
-        "nvpl": 0.5744170000000001
+        "camblas": 0.41694800000000004,
+        "openblas": 13.310467000000001,
+        "nvpl": 0.580592
       },
       "max_scaled_sample_error": 2.2455562967138867e-07
     },
@@ -1750,25 +1751,25 @@
       "calls_per_round": 1001,
       "round_medians_ms": {
         "camblas": [
-          3.5686420000000005,
-          3.622367,
-          3.5315540000000003
+          3.629432,
+          3.58185,
+          3.632152
         ],
         "openblas": [
-          3.8743610000000004,
-          3.871642,
-          3.8833530000000005
+          3.97755,
+          4.027053,
+          3.9920150000000008
         ],
         "nvpl": [
-          3.7088940000000004,
-          3.70051,
-          3.7074850000000006
+          3.6625510000000006,
+          3.7245660000000003,
+          3.7251420000000004
         ]
       },
       "medians_ms": {
-        "camblas": 3.5686420000000005,
-        "openblas": 3.8743610000000004,
-        "nvpl": 3.7074850000000006
+        "camblas": 3.629432,
+        "openblas": 3.9920150000000008,
+        "nvpl": 3.7245660000000003
       },
       "max_scaled_sample_error": 3.9262080196096817e-07
     },
@@ -1780,25 +1781,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          3.538977,
-          3.5850880000000003,
-          3.553217
+          3.6297210000000004,
+          3.603513,
+          3.5785860000000005
         ],
         "openblas": [
-          4.069555,
-          4.05442,
-          3.9829650000000005
+          4.081964,
+          4.029389,
+          4.0064779999999995
         ],
         "nvpl": [
-          4.407211,
-          4.140625,
-          4.325325
+          4.3361,
+          4.28519,
+          4.288806
         ]
       },
       "medians_ms": {
-        "camblas": 3.553217,
-        "openblas": 4.05442,
-        "nvpl": 4.325325
+        "camblas": 3.603513,
+        "openblas": 4.029389,
+        "nvpl": 4.288806
       },
       "max_scaled_sample_error": 9.695433094220683e-07
     },
@@ -1810,25 +1811,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.732653,
-          0.7336760000000001,
-          0.7259
+          0.760074,
+          0.752939,
+          0.7450990000000001
         ],
         "openblas": [
-          16.000949000000002,
-          0.9459270000000001,
-          1.085123
+          1.005379,
+          0.9796520000000001,
+          0.9926750000000002
         ],
         "nvpl": [
-          0.811659,
-          0.77118,
-          0.768524
+          0.7860900000000001,
+          0.78641,
+          0.782218
         ]
       },
       "medians_ms": {
-        "camblas": 0.732653,
-        "openblas": 1.085123,
-        "nvpl": 0.77118
+        "camblas": 0.752939,
+        "openblas": 0.9926750000000002,
+        "nvpl": 0.7860900000000001
       },
       "max_scaled_sample_error": 1.80998078288371e-15
     },
@@ -1840,25 +1841,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          54.511826000000006,
-          54.200282,
-          55.114082
+          59.145131000000006,
+          60.040722,
+          59.064206
         ],
         "openblas": [
-          73.11619400000001,
-          72.889415,
-          72.841929
+          78.492292,
+          78.671903,
+          79.237103
         ],
         "nvpl": [
-          78.51317,
-          78.779242,
-          72.414805
+          81.334131,
+          83.91341700000001,
+          84.130852
         ]
       },
       "medians_ms": {
-        "camblas": 54.511826000000006,
-        "openblas": 72.889415,
-        "nvpl": 78.51317
+        "camblas": 59.145131000000006,
+        "openblas": 78.671903,
+        "nvpl": 83.91341700000001
       },
       "max_scaled_sample_error": 7.670341322903783e-16
     },
@@ -1870,25 +1871,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          387.521184,
-          386.34174800000005,
-          387.800845
+          408.589963,
+          418.171754,
+          412.166835
         ],
         "openblas": [
-          533.2369450000001,
-          533.7909790000001,
-          521.615171
+          583.261372,
+          571.005945,
+          558.358636
         ],
         "nvpl": [
-          497.98530900000003,
-          500.091685,
-          495.183784
+          535.3589280000001,
+          513.262599,
+          500.29573400000004
         ]
       },
       "medians_ms": {
-        "camblas": 387.521184,
-        "openblas": 533.2369450000001,
-        "nvpl": 497.98530900000003
+        "camblas": 412.166835,
+        "openblas": 571.005945,
+        "nvpl": 513.262599
       },
       "max_scaled_sample_error": 1.022613369484984e-15
     },
@@ -1900,25 +1901,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.8021860000000001,
-          0.7591800000000001,
-          0.742604
+          0.759434,
+          0.741931,
+          0.743467
         ],
         "openblas": [
-          0.9641980000000001,
-          0.960551,
-          0.9582140000000001
+          0.9699570000000001,
+          0.987108,
+          0.9827880000000001
         ],
         "nvpl": [
-          0.800394,
-          1.3819790000000003,
-          0.807339
+          0.7887450000000001,
+          0.7848740000000001,
+          0.7961050000000001
         ]
       },
       "medians_ms": {
-        "camblas": 0.7591800000000001,
-        "openblas": 0.960551,
-        "nvpl": 0.807339
+        "camblas": 0.743467,
+        "openblas": 0.9827880000000001,
+        "nvpl": 0.7887450000000001
       },
       "max_scaled_sample_error": 1.520377344587375e-15
     },
@@ -1930,25 +1931,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.81857,
-          0.8274980000000001,
-          0.844777
+          0.8203280000000001,
+          0.8253840000000001,
+          0.8404240000000001
         ],
         "openblas": [
-          27.154055000000003,
-          27.340866000000002,
-          27.592411000000002
+          27.06877,
+          27.699536000000002,
+          27.501910000000002
         ],
         "nvpl": [
-          1.016421,
-          1.024677,
-          1.032836
+          1.032418,
+          1.06029,
+          1.026531
         ]
       },
       "medians_ms": {
-        "camblas": 0.8274980000000001,
-        "openblas": 27.340866000000002,
-        "nvpl": 1.024677
+        "camblas": 0.8253840000000001,
+        "openblas": 27.501910000000002,
+        "nvpl": 1.032418
       },
       "max_scaled_sample_error": 4.1826755907577287e-16
     },
@@ -1960,25 +1961,25 @@
       "calls_per_round": 1001,
       "round_medians_ms": {
         "camblas": [
-          9.073933,
-          9.006766,
-          9.091819000000001
+          8.924963000000002,
+          8.932835,
+          9.009222000000001
         ],
         "openblas": [
-          23.214352,
-          23.882783,
-          23.877022
+          23.667459,
+          23.594245,
+          23.484886
         ],
         "nvpl": [
-          11.825602000000002,
-          11.919744000000001,
-          11.802467
+          12.101674000000001,
+          12.066635000000002,
+          12.154888000000001
         ]
       },
       "medians_ms": {
-        "camblas": 9.073933,
-        "openblas": 23.877022,
-        "nvpl": 11.825602000000002
+        "camblas": 8.932835,
+        "openblas": 23.594245,
+        "nvpl": 12.101674000000001
       },
       "max_scaled_sample_error": 6.581819296635286e-16
     },
@@ -1990,25 +1991,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          6.221241000000001,
-          6.180602,
-          6.165690000000001
+          6.339536000000001,
+          6.17074,
+          6.053272
         ],
         "openblas": [
-          6.292215000000001,
-          6.325942,
-          6.34031
+          6.484972,
+          6.422094,
+          6.384207
         ],
         "nvpl": [
-          6.211833,
-          6.233081,
-          6.201049
+          6.331473000000001,
+          6.175925,
+          6.299505000000001
         ]
       },
       "medians_ms": {
-        "camblas": 6.180602,
-        "openblas": 6.325942,
-        "nvpl": 6.211833
+        "camblas": 6.17074,
+        "openblas": 6.422094,
+        "nvpl": 6.299505000000001
       },
       "max_scaled_sample_error": 1.5169688345526306e-15
     },
@@ -2020,25 +2021,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.383034,
-          1.384922,
-          1.378011
+          1.414296,
+          1.4025210000000001,
+          1.4000890000000001
         ],
         "openblas": [
-          1.6309010000000002,
-          1.6190930000000001,
-          1.6344200000000002
+          1.636595,
+          1.635251,
+          2.547993
         ],
         "nvpl": [
-          1.438393,
-          1.437721,
-          1.4393860000000003
+          1.4661680000000001,
+          1.461943,
+          1.4717990000000003
         ]
       },
       "medians_ms": {
-        "camblas": 1.383034,
-        "openblas": 1.6309010000000002,
-        "nvpl": 1.438393
+        "camblas": 1.4025210000000001,
+        "openblas": 1.636595,
+        "nvpl": 1.4661680000000001
       },
       "max_scaled_sample_error": 8.926318057864597e-07
     },
@@ -2050,25 +2051,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          83.691607,
-          83.63954400000001,
-          83.70363800000001
+          84.440445,
+          84.482717,
+          84.52633200000001
         ],
         "openblas": [
-          103.11124500000001,
-          103.30906300000001,
-          103.27127100000001
+          103.910658,
+          104.237453,
+          104.16203
         ],
         "nvpl": [
-          92.465323,
-          92.54176900000002,
-          92.593607
+          93.278856,
+          93.30045000000001,
+          92.763377
         ]
       },
       "medians_ms": {
-        "camblas": 83.691607,
-        "openblas": 103.27127100000001,
-        "nvpl": 92.54176900000002
+        "camblas": 84.482717,
+        "openblas": 104.16203,
+        "nvpl": 93.278856
       },
       "max_scaled_sample_error": 5.851871701657536e-07
     },
@@ -2080,25 +2081,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          647.8835750000001,
-          643.2100700000001,
-          641.417404
+          654.4202050000001,
+          653.574469,
+          653.7882529999999
         ],
         "openblas": [
-          799.5064120000001,
-          800.5612960000001,
-          804.5952940000001
+          813.0835320000001,
+          812.926609,
+          807.215091
         ],
         "nvpl": [
-          702.222467,
-          712.1102970000001,
-          709.2224070000001
+          717.535306,
+          719.976453,
+          712.074743
         ]
       },
       "medians_ms": {
-        "camblas": 643.2100700000001,
-        "openblas": 800.5612960000001,
-        "nvpl": 709.2224070000001
+        "camblas": 653.7882529999999,
+        "openblas": 812.926609,
+        "nvpl": 717.535306
       },
       "max_scaled_sample_error": 5.201160667898378e-07
     },
@@ -2110,25 +2111,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.5203440000000001,
-          1.484249,
-          1.452377
+          1.4634140000000002,
+          1.481109,
+          1.461686
         ],
         "openblas": [
-          2.396224,
-          2.5192930000000002,
-          2.527196
+          2.453849,
+          2.472474,
+          2.495288
         ],
         "nvpl": [
-          1.584022,
-          1.596214,
-          1.584822
+          1.598674,
+          1.612242,
+          1.617906
         ]
       },
       "medians_ms": {
-        "camblas": 1.484249,
-        "openblas": 2.5192930000000002,
-        "nvpl": 1.584822
+        "camblas": 1.4634140000000002,
+        "openblas": 2.472474,
+        "nvpl": 1.612242
       },
       "max_scaled_sample_error": 1.1100948301773664e-06
     },
@@ -2140,25 +2141,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.990886,
-          0.9968380000000001,
-          1.004261
+          0.991139,
+          0.994371,
+          1.016931
         ],
         "openblas": [
-          1.6767560000000001,
-          1.682803,
-          1.680339
+          1.6999830000000002,
+          1.698959,
+          1.786253
         ],
         "nvpl": [
-          1.5032230000000002,
-          1.504696,
-          1.5085670000000002
+          1.527892,
+          1.530548,
+          1.5241170000000002
         ]
       },
       "medians_ms": {
-        "camblas": 0.9968380000000001,
-        "openblas": 1.680339,
-        "nvpl": 1.504696
+        "camblas": 0.994371,
+        "openblas": 1.6999830000000002,
+        "nvpl": 1.527892
       },
       "max_scaled_sample_error": 2.2455562967138867e-07
     },
@@ -2170,25 +2171,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          8.681177,
-          8.682012,
-          8.638718
+          8.567723,
+          8.611972000000002,
+          8.606404
         ],
         "openblas": [
-          17.69604,
-          14.633754,
-          15.447690000000001
+          14.756186000000001,
+          15.381288000000001,
+          17.904723
         ],
         "nvpl": [
-          8.744695,
-          8.72473,
-          8.733146000000001
+          8.823523,
+          8.796926000000001,
+          8.839261
         ]
       },
       "medians_ms": {
-        "camblas": 8.681177,
-        "openblas": 15.447690000000001,
-        "nvpl": 8.733146000000001
+        "camblas": 8.606404,
+        "openblas": 15.381288000000001,
+        "nvpl": 8.823523
       },
       "max_scaled_sample_error": 4.711449623531618e-07
     },
@@ -2200,25 +2201,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.0456690000000002,
-          1.015365,
-          1.0191100000000002
+          1.0293780000000001,
+          1.0313940000000001,
+          1.030562
         ],
         "openblas": [
-          9.380265,
-          9.355882000000001,
-          9.338859000000001
+          9.828096000000002,
+          9.777441000000001,
+          9.763714000000002
         ],
         "nvpl": [
-          1.204896,
-          1.438266,
-          1.233664
+          1.22966,
+          1.24438,
+          1.2265240000000002
         ]
       },
       "medians_ms": {
-        "camblas": 1.0191100000000002,
-        "openblas": 9.355882000000001,
-        "nvpl": 1.233664
+        "camblas": 1.030562,
+        "openblas": 9.777441000000001,
+        "nvpl": 1.22966
       },
       "max_scaled_sample_error": 7.7563470769857e-07
     },
@@ -2230,25 +2231,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          22.160410000000002,
-          22.146607000000003,
-          22.112144999999998
+          22.111639000000004,
+          22.125701,
+          22.135813000000002
         ],
         "openblas": [
-          49.65223100000001,
-          51.887277000000005,
-          51.945202
+          52.882993000000006,
+          54.826619,
+          52.728951
         ],
         "nvpl": [
-          25.115532,
-          24.989539,
-          25.224317000000003
+          24.683391000000004,
+          25.195533,
+          25.000915000000003
         ]
       },
       "medians_ms": {
-        "camblas": 22.146607000000003,
-        "openblas": 51.887277000000005,
-        "nvpl": 25.115532
+        "camblas": 22.125701,
+        "openblas": 52.882993000000006,
+        "nvpl": 25.000915000000003
       },
       "max_scaled_sample_error": 4.711449623531618e-07
     },
@@ -2260,25 +2261,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          2.851252,
-          2.8778430000000004,
-          2.873107
+          2.8620940000000004,
+          2.8594380000000004,
+          2.868013
         ],
         "openblas": [
-          3.37191,
-          3.360678,
-          3.366438
+          3.4079020000000004,
+          3.420126,
+          3.413726
         ],
         "nvpl": [
-          2.890547,
-          2.8940980000000005,
-          2.9047860000000005
+          2.9325560000000004,
+          2.937388,
+          2.9365560000000004
         ]
       },
       "medians_ms": {
-        "camblas": 2.873107,
-        "openblas": 3.366438,
-        "nvpl": 2.8940980000000005
+        "camblas": 2.8620940000000004,
+        "openblas": 3.413726,
+        "nvpl": 2.9365560000000004
       },
       "max_scaled_sample_error": 1.2417310022109174e-15
     },
@@ -2290,25 +2291,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          176.574957,
-          178.301605,
-          176.46059900000003
+          178.67221800000002,
+          178.872253,
+          177.959223
         ],
         "openblas": [
-          216.588478,
-          216.53577700000002,
-          213.473396
+          218.988696,
+          218.79881400000002,
+          218.43876
         ],
         "nvpl": [
-          193.05372100000002,
-          189.19654500000001,
-          194.07574200000002
+          193.74750400000002,
+          194.099334,
+          194.58578500000002
         ]
       },
       "medians_ms": {
-        "camblas": 176.574957,
-        "openblas": 216.53577700000002,
-        "nvpl": 193.05372100000002
+        "camblas": 178.67221800000002,
+        "openblas": 218.79881400000002,
+        "nvpl": 194.099334
       },
       "max_scaled_sample_error": 1.0899958722021164e-15
     },
@@ -2320,25 +2321,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1386.7079290000001,
-          1385.595561,
-          1385.713678
+          1397.475468,
+          1396.580253,
+          1395.8240500000002
         ],
         "openblas": [
-          1697.7512140000001,
-          1700.71072,
-          1694.3335450000002
+          1716.651774,
+          1729.0643870000001,
+          1726.001367
         ],
         "nvpl": [
-          1443.0742220000002,
-          1441.7499710000002,
-          1439.477842
+          1479.8432380000002,
+          1482.940457,
+          1479.4321060000002
         ]
       },
       "medians_ms": {
-        "camblas": 1385.713678,
-        "openblas": 1697.7512140000001,
-        "nvpl": 1441.7499710000002
+        "camblas": 1396.580253,
+        "openblas": 1726.001367,
+        "nvpl": 1479.8432380000002
       },
       "max_scaled_sample_error": 1.022613369484984e-15
     },
@@ -2350,25 +2351,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          3.0249400000000004,
-          3.009901,
-          3.021164
+          3.0545370000000003,
+          3.003242,
+          3.003978
         ],
         "openblas": [
-          5.111346,
-          5.085459,
-          5.177105
+          5.011217,
+          4.97909,
+          5.020208
         ],
         "nvpl": [
-          4.182764000000001,
-          4.100494,
-          3.9518270000000006
+          4.127498,
+          3.9934870000000005,
+          4.0993390000000005
         ]
       },
       "medians_ms": {
-        "camblas": 3.021164,
-        "openblas": 5.111346,
-        "nvpl": 4.100494
+        "camblas": 3.003978,
+        "openblas": 5.011217,
+        "nvpl": 4.0993390000000005
       },
       "max_scaled_sample_error": 1.520377344587375e-15
     },
@@ -2380,25 +2381,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.9734170000000004,
-          1.961449,
-          1.9496740000000001
+          1.947721,
+          1.9933190000000003,
+          1.957449
         ],
         "openblas": [
-          3.5918680000000003,
-          3.650234,
-          3.589757
+          3.660504,
+          3.6803110000000006,
+          3.6588400000000005
         ],
         "nvpl": [
-          3.105418,
-          3.1087780000000005,
-          3.102571
+          3.141478,
+          3.1530620000000003,
+          3.142086
         ]
       },
       "medians_ms": {
-        "camblas": 1.961449,
-        "openblas": 3.5918680000000003,
-        "nvpl": 3.105418
+        "camblas": 1.957449,
+        "openblas": 3.660504,
+        "nvpl": 3.142086
       },
       "max_scaled_sample_error": 4.1826755907577287e-16
     },
@@ -2410,25 +2411,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          18.593597,
-          18.645025000000004,
-          18.630753
+          18.741864,
+          18.780651000000002,
+          18.723117000000002
         ],
         "openblas": [
-          31.722648999999997,
-          32.525668,
-          33.683460000000004
+          34.311089,
+          33.457705000000004,
+          32.733246
         ],
         "nvpl": [
-          19.636357,
-          20.183127000000002,
-          20.238069
+          20.402843999999998,
+          20.343422,
+          20.658581
         ]
       },
       "medians_ms": {
-        "camblas": 18.630753,
-        "openblas": 32.525668,
-        "nvpl": 20.183127000000002
+        "camblas": 18.741864,
+        "openblas": 33.457705000000004,
+        "nvpl": 20.402843999999998
       },
       "max_scaled_sample_error": 1.2797981965679722e-15
     },
@@ -2440,25 +2441,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          2.094791,
-          2.036136,
-          2.0364560000000003
+          2.05351,
+          2.058757,
+          2.02087
         ],
         "openblas": [
-          8.286493,
-          14.627279000000001,
-          6.027356
+          8.418161,
+          14.883162,
+          9.02771
         ],
         "nvpl": [
-          2.610873,
-          2.408702,
-          2.5192270000000003
+          2.475194,
+          2.3943000000000003,
+          2.365948
         ]
       },
       "medians_ms": {
-        "camblas": 2.0364560000000003,
-        "openblas": 8.286493,
-        "nvpl": 2.5192270000000003
+        "camblas": 2.05351,
+        "openblas": 9.02771,
+        "nvpl": 2.3943000000000003
       },
       "max_scaled_sample_error": 2.7449912244285727e-15
     },
@@ -2470,25 +2471,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          47.165534,
-          46.92695500000001,
-          47.012073
+          47.028258,
+          46.940674,
+          46.849188
         ],
         "openblas": [
-          102.38390600000001,
-          100.838379,
-          106.069291
+          100.711462,
+          106.486433,
+          98.169275
         ],
         "nvpl": [
-          51.06962,
-          51.350195,
-          50.317167000000005
+          51.48694700000001,
+          51.790551,
+          52.19431600000001
         ]
       },
       "medians_ms": {
-        "camblas": 47.012073,
-        "openblas": 102.38390600000001,
-        "nvpl": 51.06962
+        "camblas": 46.940674,
+        "openblas": 100.711462,
+        "nvpl": 51.790551
       },
       "max_scaled_sample_error": 1.2797981965679722e-15
     },
@@ -2500,25 +2501,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.6484310000000001,
-          0.397238,
-          0.3943900000000001
+          0.38939700000000005,
+          0.39067700000000005,
+          0.396725
         ],
         "openblas": [
-          0.47867600000000005,
-          0.5027710000000001,
-          0.5054270000000001
+          0.507954,
+          0.48488200000000004,
+          0.4874740000000001
         ],
         "nvpl": [
-          0.39327,
-          0.394037,
-          0.39183
+          0.39915700000000004,
+          0.394932,
+          0.395925
         ]
       },
       "medians_ms": {
-        "camblas": 0.397238,
-        "openblas": 0.5027710000000001,
-        "nvpl": 0.39327
+        "camblas": 0.39067700000000005,
+        "openblas": 0.4874740000000001,
+        "nvpl": 0.395925
       },
       "max_scaled_sample_error": 4.519654712842834e-07
     },
@@ -2530,25 +2531,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          25.889411000000003,
-          26.139485,
-          25.879555000000003
+          28.235669,
+          28.411440000000002,
+          28.345713
         ],
         "openblas": [
-          34.392807000000005,
-          34.273035,
-          34.693344
+          35.888281,
+          37.903743000000006,
+          37.242098
         ],
         "nvpl": [
-          35.437004,
-          37.311228,
-          37.380601999999996
+          38.798214,
+          39.43905900000001,
+          39.217465
         ]
       },
       "medians_ms": {
-        "camblas": 25.889411000000003,
-        "openblas": 34.392807000000005,
-        "nvpl": 37.311228
+        "camblas": 28.345713,
+        "openblas": 37.242098,
+        "nvpl": 39.217465
       },
       "max_scaled_sample_error": 3.684511812154745e-07
     },
@@ -2560,25 +2561,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          182.60936,
-          182.694317,
-          184.109672
+          194.559467,
+          198.869826,
+          198.365777
         ],
         "openblas": [
-          245.30535800000004,
-          245.05992500000002,
-          237.36395000000002
+          259.604125,
+          264.819079,
+          248.988967
         ],
         "nvpl": [
-          242.97543700000003,
-          241.98541600000001,
-          242.263851
+          245.28245700000002,
+          259.994444,
+          258.61944400000004
         ]
       },
       "medians_ms": {
-        "camblas": 182.694317,
-        "openblas": 245.05992500000002,
-        "nvpl": 242.263851
+        "camblas": 198.365777,
+        "openblas": 259.604125,
+        "nvpl": 258.61944400000004
       },
       "max_scaled_sample_error": 5.201160667898378e-07
     },
@@ -2590,25 +2591,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.520306,
-          0.49451500000000004,
-          0.49931500000000006
+          0.48027400000000003,
+          0.507442,
+          0.511121
         ],
         "openblas": [
-          1.8137110000000003,
-          1.871982,
-          1.8809420000000001
+          1.804332,
+          2.3595800000000002,
+          1.8399470000000002
         ],
         "nvpl": [
-          0.537554,
-          0.536081,
-          0.532881
+          0.508497,
+          0.5339370000000001,
+          0.5611360000000001
         ]
       },
       "medians_ms": {
-        "camblas": 0.49931500000000006,
-        "openblas": 1.871982,
-        "nvpl": 0.536081
+        "camblas": 0.507442,
+        "openblas": 1.8399470000000002,
+        "nvpl": 0.5339370000000001
       },
       "max_scaled_sample_error": 7.182966548206488e-07
     },
@@ -2620,25 +2621,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.321431,
-          0.309687,
-          0.30204
+          0.304215,
+          0.891495,
+          0.30962300000000004
         ],
         "openblas": [
-          0.906472,
-          0.9109200000000001,
-          0.906344
+          0.91607,
+          0.915654,
+          0.9212210000000001
         ],
         "nvpl": [
-          0.48529800000000006,
-          0.487667,
-          0.48881800000000003
+          0.486451,
+          0.48680200000000007,
+          0.48917000000000005
         ]
       },
       "medians_ms": {
-        "camblas": 0.309687,
-        "openblas": 0.906472,
-        "nvpl": 0.487667
+        "camblas": 0.30962300000000004,
+        "openblas": 0.91607,
+        "nvpl": 0.48680200000000007
       },
       "max_scaled_sample_error": 2.2455562967138867e-07
     },
@@ -2650,25 +2651,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          2.3914560000000002,
-          2.385602,
-          2.3941450000000004
+          2.4695940000000003,
+          2.477145,
+          2.4893370000000004
         ],
         "openblas": [
-          8.874833,
-          19.133597,
-          8.831736
+          15.810139000000001,
+          8.814627,
+          8.666024000000002
         ],
         "nvpl": [
-          2.460766,
-          2.4552620000000003,
-          2.4532160000000003
+          2.5723110000000005,
+          2.575159,
+          2.573334
         ]
       },
       "medians_ms": {
-        "camblas": 2.3914560000000002,
-        "openblas": 8.874833,
-        "nvpl": 2.4552620000000003
+        "camblas": 2.477145,
+        "openblas": 8.814627,
+        "nvpl": 2.573334
       },
       "max_scaled_sample_error": 3.9262080196096817e-07
     },
@@ -2680,25 +2681,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.1800009999999999,
-          0.8432740000000001,
-          0.852105
+          0.993444,
+          0.932677,
+          1.2463330000000001
         ],
         "openblas": [
-          2.441952,
-          2.313603,
-          2.4301120000000003
+          2.477529,
+          2.4628410000000005,
+          2.517816
         ],
         "nvpl": [
-          1.4122830000000002,
-          1.402171,
-          1.412379
+          1.4623580000000003,
+          1.481365,
+          1.473046
         ]
       },
       "medians_ms": {
-        "camblas": 0.852105,
-        "openblas": 2.4301120000000003,
-        "nvpl": 1.4122830000000002
+        "camblas": 0.993444,
+        "openblas": 2.477529,
+        "nvpl": 1.473046
       },
       "max_scaled_sample_error": 8.144164430834985e-07
     },
@@ -2710,25 +2711,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          8.623741,
-          8.775222000000001,
-          8.526429
+          8.657512,
+          8.837571,
+          8.606826
         ],
         "openblas": [
-          53.65903800000001,
-          51.940139,
-          54.84116100000001
+          54.724291,
+          52.730940000000004,
+          54.370898000000004
         ],
         "nvpl": [
-          17.614481,
-          17.708431,
-          18.041822000000003
+          17.999645,
+          18.390738,
+          18.084764
         ]
       },
       "medians_ms": {
-        "camblas": 8.623741,
-        "openblas": 53.65903800000001,
-        "nvpl": 17.708431
+        "camblas": 8.657512,
+        "openblas": 54.370898000000004,
+        "nvpl": 18.084764
       },
       "max_scaled_sample_error": 3.9262080196096817e-07
     },
@@ -2740,25 +2741,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.7588280000000001,
-          0.770059,
-          0.7593390000000001
+          0.77185,
+          0.764874,
+          0.76705
         ],
         "openblas": [
-          0.9575100000000001,
-          0.963879,
-          0.9662780000000001
+          0.994275,
+          0.962949,
+          0.96314
         ],
         "nvpl": [
-          0.7841720000000001,
-          0.782155,
-          0.783659
+          0.790185,
+          0.7884890000000001,
+          0.791274
         ]
       },
       "medians_ms": {
-        "camblas": 0.7593390000000001,
-        "openblas": 0.963879,
-        "nvpl": 0.783659
+        "camblas": 0.76705,
+        "openblas": 0.96314,
+        "nvpl": 0.790185
       },
       "max_scaled_sample_error": 1.80998078288371e-15
     },
@@ -2770,25 +2771,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          55.073634000000006,
-          55.06633800000001,
-          55.910988
+          60.075951,
+          59.865334000000004,
+          60.394885
         ],
         "openblas": [
-          72.457939,
-          72.93187800000001,
-          73.206142
+          78.11882800000001,
+          78.05137500000001,
+          78.141323
         ],
         "nvpl": [
-          79.631027,
-          78.05055700000001,
-          78.903239
+          84.16112100000001,
+          73.613389,
+          85.910158
         ]
       },
       "medians_ms": {
-        "camblas": 55.073634000000006,
-        "openblas": 72.93187800000001,
-        "nvpl": 78.903239
+        "camblas": 60.075951,
+        "openblas": 78.11882800000001,
+        "nvpl": 84.16112100000001
       },
       "max_scaled_sample_error": 7.670341322903783e-16
     },
@@ -2800,25 +2801,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          385.529161,
-          387.57691500000004,
-          386.429872
+          418.224778,
+          413.10413800000003,
+          412.53832900000003
         ],
         "openblas": [
-          529.0159100000001,
-          509.077244,
-          527.0237710000001
+          562.7536940000001,
+          562.4487100000001,
+          547.147412
         ],
         "nvpl": [
-          467.49899700000003,
-          477.366125,
-          475.56434900000005
+          497.93858700000004,
+          484.6033770000001,
+          522.229457
         ]
       },
       "medians_ms": {
-        "camblas": 386.429872,
-        "openblas": 527.0237710000001,
-        "nvpl": 475.56434900000005
+        "camblas": 413.10413800000003,
+        "openblas": 562.4487100000001,
+        "nvpl": 497.93858700000004
       },
       "max_scaled_sample_error": 1.022613369484984e-15
     },
@@ -2830,25 +2831,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.031557,
-          0.9867250000000002,
-          1.013573
+          0.9929650000000002,
+          0.980676,
+          0.968262
         ],
         "openblas": [
-          4.216303,
-          4.175664,
-          3.9833160000000007
+          4.003311,
+          4.017839,
+          4.1139660000000005
         ],
         "nvpl": [
-          1.8715020000000002,
-          1.753073,
-          2.0737680000000003
+          1.9039460000000001,
+          1.9502500000000003,
+          2.003944
         ]
       },
       "medians_ms": {
-        "camblas": 1.013573,
-        "openblas": 4.175664,
-        "nvpl": 1.8715020000000002
+        "camblas": 0.980676,
+        "openblas": 4.017839,
+        "nvpl": 1.9502500000000003
       },
       "max_scaled_sample_error": 1.520377344587375e-15
     },
@@ -2860,25 +2861,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          0.557937,
-          0.5715359999999999,
-          0.580272
+          0.569521,
+          0.569905,
+          0.5774239999999999
         ],
         "openblas": [
-          2.3045780000000002,
-          2.3095380000000003,
-          2.311553
+          2.334399,
+          2.3240320000000003,
+          2.3335030000000003
         ],
         "nvpl": [
-          0.8743770000000001,
-          0.872009,
-          0.874313
+          0.886503,
+          0.8848400000000001,
+          0.88292
         ]
       },
       "medians_ms": {
-        "camblas": 0.5715359999999999,
-        "openblas": 2.3095380000000003,
-        "nvpl": 0.874313
+        "camblas": 0.569905,
+        "openblas": 2.3335030000000003,
+        "nvpl": 0.8848400000000001
       },
       "max_scaled_sample_error": 4.1826755907577287e-16
     },
@@ -2890,25 +2891,25 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          7.363546,
-          7.338170000000001,
-          7.375225000000001
+          7.189433,
+          7.155513000000001,
+          7.192889
         ],
         "openblas": [
-          30.134485,
-          29.028722000000002,
-          47.772345
+          29.679402,
+          29.582860000000004,
+          30.004480000000004
         ],
         "nvpl": [
-          9.719066,
-          10.092368,
-          10.272172000000001
+          10.349889000000001,
+          10.308098,
+          10.261348
         ]
       },
       "medians_ms": {
-        "camblas": 7.363546,
-        "openblas": 30.134485,
-        "nvpl": 10.092368
+        "camblas": 7.189433,
+        "openblas": 29.679402,
+        "nvpl": 10.308098
       },
       "max_scaled_sample_error": 6.581819296635286e-16
     },
@@ -2920,25 +2921,25 @@
       "calls_per_round": 5,
       "round_medians_ms": {
         "camblas": [
-          1.65602,
-          1.3470350000000002,
-          1.58831
+          1.5964680000000002,
+          1.6309950000000002,
+          1.4295920000000002
         ],
         "openblas": [
-          6.183609000000001,
-          6.626510000000001,
-          13.523700000000002
+          5.439690000000001,
+          5.949692000000001,
+          28.797348
         ],
         "nvpl": [
-          2.363904,
-          2.525564,
-          2.25002
+          2.2169630000000002,
+          2.1814760000000004,
+          2.320768
         ]
       },
       "medians_ms": {
-        "camblas": 1.58831,
-        "openblas": 6.626510000000001,
-        "nvpl": 2.363904
+        "camblas": 1.5964680000000002,
+        "openblas": 5.949692000000001,
+        "nvpl": 2.2169630000000002
       },
       "max_scaled_sample_error": 1.7336786680601512e-15
     },
@@ -2950,32 +2951,32 @@
       "calls_per_round": 201,
       "round_medians_ms": {
         "camblas": [
-          18.120695,
-          17.814658,
-          17.638022
+          17.935312000000003,
+          17.97482,
+          18.196510000000004
         ],
         "openblas": [
-          78.01002400000002,
-          80.405063,
-          91.023635
+          84.367842,
+          87.76349300000001,
+          98.74732100000001
         ],
         "nvpl": [
-          31.888644,
-          32.098561000000004,
-          31.775146000000003
+          30.665840000000003,
+          32.520521,
+          33.132056
         ]
       },
       "medians_ms": {
-        "camblas": 17.814658,
-        "openblas": 80.405063,
-        "nvpl": 31.888644
+        "camblas": 17.97482,
+        "openblas": 87.76349300000001,
+        "nvpl": 32.520521
       },
       "max_scaled_sample_error": 6.581819296635286e-16
     }
   ],
   "correctness_checks": {
     "status": "passed",
-    "completed_utc": "2026-10-02T03:17:51.519593+00:00",
+    "completed_utc": "2026-10-02T07:16:55.951059+00:00",
     "bridge": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/camblas/lib/libframework_blas.so",
     "source_identity": {
       "src/amicro_transpose.h": "6af633e1aea5fc659111ad9117aa0f8b0d58bb1ea5cc7ae67c94f9e4b066dce6",
@@ -2999,9 +3000,9 @@
       "src/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
       "src/planner.c": "f6ad3af3d350818d8963de27382a7fd60e9da01901a5a4fc406aff21744af9e8",
       "src/pthread_pool.c": "50df372878e8d77e726dba97e29e311b45b39951a0ecfef0ad659cb34b7d651b",
-      "src/rectangular32.c": "77d32650bb19004db525cc62b44fe9417c56e961358e77d12689d731067f8aa1",
+      "src/rectangular32.c": "d16d4cc7fcb84fffc8df7bb0e6b90d30a9ab18a1e67c39fb633ca908d59a7a67",
       "src/rectangular32.h": "ca46d780ee0672a311f708540bb6e2164d29ba6dae329bd488cd15f147c8cf38",
-      "src/rectangular64.c": "901b9564eb4e50fb4b341ad1bef3371cfa441ece0585cdbb275db0b6beb8e3b4",
+      "src/rectangular64.c": "eec8e8e68af9d6f574b1209f0cee38366bec20edbfb9e0846873c66ed356efa1",
       "src/rectangular64.h": "3abd0424db264d9db9b18c40724b83aaf9eb56af479b7a0480dd75c4833c38aa",
       "src/scalar.c": "3b3a6b57b970299150fd4966766b5b6d91a2748eee22ebcedd90fca6a624386e",
       "src/sve.c": "974a148b59b6674bdd802086a259696b9f7fcf21065d4f4c62e47927e6f15364",
@@ -3038,44 +3039,219 @@
       "framework/output_page_touch.h": "d98888c6cfa77d40cab450dddbfce669a267c2337d73a8d2014b1acec681ce57",
       "framework/rectangular32_policy.h": "1132c0f302feef8798428f61835d62d685132c7358b8e1bbb28fc8d5df0db2d5",
       "framework/rectangular32_range.h": "7e7bd175448561d40fb1de86b2a5c89bd68d4d40b3375613fa9c39f819626e6d",
-      "framework/rectangular64_policy.h": "d6e534e028007233a483dd6967346fd834d1beb01496446961e0140284115308",
+      "framework/rectangular64_policy.h": "c478a6960ebc6a749ac532fd7f9a8dd7b4170bb7994db2f730ab18c152120472",
       "framework/rectangular64_range.h": "97bf3a867931c7daf05be6dab55b90b939539cc8bc1d98b0b151bc6217d91a16",
-      "framework/shared_grid32.h": "d6c343ac4f848df036f0c01d54087e730a76a94f79560a699012f6de4b797e06",
+      "framework/shared_grid32.h": "48b42a2a5d670851b113428c1033508c2e820d9d699ae6c762d654cec562b1ba",
       "framework/strassen_one_level.h": "53516df103e0df79a549c14783a2d51c0c2d5f37ac752541dff6212c60892d96",
       "configs/build-requirements.txt": "6df362c6b84bd65af99010bbdb6b2f199af37e2a65e921f5789575e6ba048b42",
-      "configs/grace.json": "81769fedcc575be89e6e99cc436a6aac7d43ad64e84c36e4fffbf686e092cb23",
+      "configs/grace.json": "2b280cac0f0cd62a7777d6f6c5fad7f2b9baf24b684e9c02208d0a2cbee0d760",
       "configs/runtime-requirements.txt": "ff6eae8ab1bb4faf369954aa662d43f57ee6f40849549bf2225b4ebb4e79002b",
       "configs/style-requirements.txt": "3a0a5b5699e15b5e0857538bfd652c74ed6f2ab27ba0f1b70b602d917f7afcbf"
     },
-    "binary_sha256": {
-      "libframework_blas.so": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4",
-      "libcamblas_sve_nr4.so": "29f10ccf49ad89f82b3878b134686dd6fcd6781d343af9dfbb6cdc719eb1ef25"
+    "test_identity": {
+      "tests/amicro_transpose_test.c": "378ba68d878d2f172b5ff348a43cbe08cad5f5dc97f4808eac695460d5989157",
+      "tests/batch_nested_test.c": "dd8ebb4acf522d21f713e0c66feb4ea76fe1bff151e11a6f25b8672a1cca2a9b",
+      "tests/cblas_semantics_test.c": "bdcab0b8f86ed6d64b9a031c38a3a3d8c5fbf5eb37da57746e2ace22860396f7",
+      "tests/check_batch.py": "cacad22b794f689b1cb86d563f417ee9306f5689003a7e2ee432e30991d8862c",
+      "tests/check_bridge_build.py": "46e6c98f6e1b1d4d978d93094e1af3bf99722561d836dab005f463be6121adf8",
+      "tests/check_pool_idle.py": "3ac9e3f741dc9b07ece4d37dc3cc57ff8974bafa4080c1be2cd7dfc53b14649b",
+      "tests/check_shared_grid32.py": "c189f8c6880d779bbf19738b41932141342089cf01abdb369903a587aa4ff933",
+      "tests/counter_contract_test.c": "f30251acd20108e6afd22809d363266d666cd994a62079f7b0e1914a539fd00d",
+      "tests/external_input_contract_test.c": "5dcd90bc31e63f846cb2c03e9fa828eab21b3e9d85251f6709af20d7f4ad4bda",
+      "tests/guardpage_test.c": "cffca5b918fa8a04b15252cbf2855beb5c674124a9c4617def7e9e29b6d4b7ff",
+      "tests/packed_gemm_test.c": "8ae2e5ad262c4621a62dcc51497e5edd26024d5b1e8aeadcc128b979a9968979",
+      "tests/packing_test.c": "4813442636a61ba40ef8705d41ef8af7b2a18ca44cdd4da2632d2d400505bc5e",
+      "tests/planner_test.c": "ad6e70dc8093d06174749d889e77e749e1bb51a2d468aece9dc2d4a0bac44a8c",
+      "tests/rectangular32_test.c": "1e9ca775541f31b7ee30618debeb072d8e281d3d2c420cc0aac8663c9bc4a73b",
+      "tests/rectangular64_test.c": "bc96ef72ce5e67fa43a0dd244393cf3bceaa8ff0aa3348d534f380f264b728c6",
+      "tests/shared_grid32_test.c": "75187361fc00b512854a90f7d75cd6e084a6185e35ee89e212052d1572931ffd",
+      "tests/test_batch_policy.py": "1ebfc6726866fc74b70964c927fff22a1e8383c0c799d727ae94328db99988cf",
+      "tests/test_framework_bridge.py": "7aff8705b512d6900a1d860df924a11a8884bd3abad47d43cff3f5d451ea2157",
+      "tests/test_framework_smoke.py": "f02394d09b2613253e986d70de30bc29149ab642c468c1389cf51b4488c4073b",
+      "tests/test_mlp_packing.py": "22058c3acb827518cd6681f1b2164c8610aeefbc9d57266614a574753ab3c740",
+      "tests/test_tools.py": "548aad3d59fff8255159f1498dcbfd2e20e2687aa98b1fb95a4bd5b3efe71fee",
+      "tests/topology_test.c": "c66462da689337859b10e95a51bfe803618ec70431cc3376e8d17304d485dbd3",
+      "tests/workspace_test.c": "725219f30b0bfc25bf6995992e04ef17e684f84385a6c7dbf15b79943d83a242"
     },
-    "transposed_a_check": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/neon6-transposed32-check.log",
-    "neon64_full_output_tails": {
-      "status": "passed",
-      "completed_utc": "2026-10-02T03:55:17.103984+00:00",
-      "source": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/check_square64.py",
-      "source_sha256": "7d0f3aac632b0b1f347b6cd0808de48543e2605a292147e585cfe82c7337075a",
-      "dimensions": [
-        512,
-        516,
-        520,
-        524,
-        528,
-        1024
-      ],
-      "trials_per_dimension": 2,
-      "threads": 64,
-      "checks": [
-        "complete compensated scalar oracle",
-        "route counter",
-        "row and column tails",
-        "changed inputs",
-        "input/output misalignment",
-        "padded output sentinels"
-      ],
-      "output": "Complete FP64 scalar-oracle products passed with route, tails, changed inputs and padding"
+    "supplemental_checks": {
+      "check_square64_threads_16": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_square64_threads_16.log",
+        "checker_sha256": "7d0f3aac632b0b1f347b6cd0808de48543e2605a292147e585cfe82c7337075a"
+      },
+      "check_square64_threads_64": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_square64_threads_64.log",
+        "checker_sha256": "7d0f3aac632b0b1f347b6cd0808de48543e2605a292147e585cfe82c7337075a"
+      },
+      "check_square64_threads_64_transpose-a": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_square64_threads_64_transpose-a.log",
+        "checker_sha256": "7d0f3aac632b0b1f347b6cd0808de48543e2605a292147e585cfe82c7337075a"
+      },
+      "check_tb64_neon_threads_64": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_tb64_neon_threads_64.log",
+        "checker_sha256": "d036a00b205c9312306b4ec5085085e30f7b2c2726b5c0a3fe5ce62b64727b9d"
+      },
+      "check_deep32_neon_threads_16": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_deep32_neon_threads_16.log",
+        "checker_sha256": "d8dd56ecfab9342bb905580b3e77d123f01bd16076d403e452c62cb52d3623e7"
+      },
+      "check_square32_grid_64": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-check_square32_grid_64.log",
+        "checker_sha256": "a44445b15170da911671b5f0fa2d2dfa694dc116af8192dbb373c64c331e5e37"
+      },
+      "policy64": {
+        "log": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/final-policy64.log",
+        "full_output_cases": 20,
+        "checker_sha256": "457c29e5e41e7a6f7e6614dcea999ab008e37e4b57aeaf25823799c370bfa9dd"
+      }
+    },
+    "binary_sha256": {
+      "libframework_blas.so": "63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f",
+      "libcamblas_sve_nr4.so": "c33a09db9534f06d6a151262270e2814a7356356c2b57e83df9f964d08852f4b"
+    },
+    "transposed_a_check": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/release-transposed32-check.log",
+    "validation_logs": {
+      "final-16-float32-deep.log": {
+        "sha256": "ec911569907a35b8dc37b3b6bd93f6aaf932dd5fa49b0db17a3eadc24dc38eb2",
+        "text": "{\"shape\": [4096, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4096], \"status\": \"passed\"}\n{\"shape\": [4097, 513, 1025], \"status\": \"passed\"}\n{\"shape\": [2049, 511, 4095], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4097], \"status\": \"passed\"}\n{\"shape\": [8193, 129, 1025], \"status\": \"passed\"}\n{\"shape\": [2056, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 1024], \"status\": \"passed\"}\n{\"shape\": [520, 256, 1025], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 216, \"dtype\": \"float32\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-16-float32-shallow.log": {
+        "sha256": "107b71d9a2caf54e72a617de69991174ff3a62c0267f2449f7030f0b5468ead5",
+        "text": "{\"shape\": [1024, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [2048, 1024, 512], \"status\": \"passed\"}\n{\"shape\": [256, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 1024, 256], \"status\": \"passed\"}\n{\"shape\": [127, 513, 257], \"status\": \"passed\"}\n{\"shape\": [128, 129, 128], \"status\": \"passed\"}\n{\"shape\": [2049, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [513, 513, 127], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float32\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-16-float64-deep.log": {
+        "sha256": "1f30dd6abe6aef397cd81755cd9e7d1daff73d2c4f8d096cc8704f18ebeea310",
+        "text": "{\"shape\": [1024, 512, 4096], \"status\": \"passed\"}\n{\"shape\": [2048, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [2049, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [1025, 513, 1025], \"status\": \"passed\"}\n{\"shape\": [4096, 1024, 2048], \"status\": \"passed\"}\n{\"shape\": [8192, 2048, 1025], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4097], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float64\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-16-float64-shallow.log": {
+        "sha256": "e2d5b1e8aba9b7b228e62f1af68a075c18ed3d87a11d4d3ac06e1e4a92b862a9",
+        "text": "{\"shape\": [1024, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [2048, 1024, 512], \"status\": \"passed\"}\n{\"shape\": [256, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 1024, 256], \"status\": \"passed\"}\n{\"shape\": [127, 513, 257], \"status\": \"passed\"}\n{\"shape\": [128, 129, 128], \"status\": \"passed\"}\n{\"shape\": [2049, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [513, 513, 127], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float64\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-64-float32-deep.log": {
+        "sha256": "ec911569907a35b8dc37b3b6bd93f6aaf932dd5fa49b0db17a3eadc24dc38eb2",
+        "text": "{\"shape\": [4096, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4096], \"status\": \"passed\"}\n{\"shape\": [4097, 513, 1025], \"status\": \"passed\"}\n{\"shape\": [2049, 511, 4095], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4097], \"status\": \"passed\"}\n{\"shape\": [8193, 129, 1025], \"status\": \"passed\"}\n{\"shape\": [2056, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 1024], \"status\": \"passed\"}\n{\"shape\": [520, 256, 1025], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 216, \"dtype\": \"float32\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-64-float32-shallow.log": {
+        "sha256": "107b71d9a2caf54e72a617de69991174ff3a62c0267f2449f7030f0b5468ead5",
+        "text": "{\"shape\": [1024, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [2048, 1024, 512], \"status\": \"passed\"}\n{\"shape\": [256, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 1024, 256], \"status\": \"passed\"}\n{\"shape\": [127, 513, 257], \"status\": \"passed\"}\n{\"shape\": [128, 129, 128], \"status\": \"passed\"}\n{\"shape\": [2049, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [513, 513, 127], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float32\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-64-float64-deep.log": {
+        "sha256": "1f30dd6abe6aef397cd81755cd9e7d1daff73d2c4f8d096cc8704f18ebeea310",
+        "text": "{\"shape\": [1024, 512, 4096], \"status\": \"passed\"}\n{\"shape\": [2048, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [2049, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [1025, 513, 1025], \"status\": \"passed\"}\n{\"shape\": [4096, 1024, 2048], \"status\": \"passed\"}\n{\"shape\": [8192, 2048, 1025], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4097], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float64\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-64-float64-shallow.log": {
+        "sha256": "e2d5b1e8aba9b7b228e62f1af68a075c18ed3d87a11d4d3ac06e1e4a92b862a9",
+        "text": "{\"shape\": [1024, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [2048, 1024, 512], \"status\": \"passed\"}\n{\"shape\": [256, 1024, 1024], \"status\": \"passed\"}\n{\"shape\": [1024, 1024, 256], \"status\": \"passed\"}\n{\"shape\": [127, 513, 257], \"status\": \"passed\"}\n{\"shape\": [128, 129, 128], \"status\": \"passed\"}\n{\"shape\": [2049, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [513, 513, 127], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 192, \"dtype\": \"float64\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-batch-checks.log": {
+        "sha256": "3524161633f60888741c33ad98de66c49047c41f3d72f2b7793d98cdb191f26d",
+        "text": "1200 FP32 finite-range and overflow-preflight checks passed\n10 late-depth FP32 range-preflight and untouched-output checks passed\n10 late-depth FP32 range-preflight and untouched-output checks passed\n76 contiguous/segmented full-output scalar-oracle cases passed; max absolute-product-scaled error 5.33213379e-07\n1200 FP64 finite-range and overflow-preflight checks passed\n20 late-depth FP64 range-preflight and untouched-output checks passed\n102 full-output scalar-oracle cases passed; max absolute-product-scaled error 8.42218945e-16\n8 complete transposed-A scalar-oracle FP32 products passed with route, tails and padding checks\n32 full-output FP32/FP64 products passed from concurrent outer callers\n{\"full_output_policy_cases\": 20, \"status\": \"passed\"}\n"
+      },
+      "final-camblas-test_framework_bridge.py.log": {
+        "sha256": "1e70620d44a9f1023058d0d202d1a5c844811df8a525ae7bd90f82f9ded8ce6d",
+        "text": "{\"backend\": \"camblas\", \"cases\": 324, \"fortran_cases\": 162, \"counters\": [243, 243, 0, 0, 0, 0, 324, 0, 0, 0, 324, 162], \"status\": \"passed\"}\n"
+      },
+      "final-camblas-test_framework_smoke.py.log": {
+        "sha256": "3c8e3be6d9cec5c004df65c7aea4ba61924f41823176484702929cd6c709f6d9",
+        "text": "{\n  \"status\": \"passed\",\n  \"backend\": \"camblas+openblas-compatibility\",\n  \"checks\": [\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    }\n  ]\n}\n"
+      },
+      "final-check_deep32_neon_threads_16.log": {
+        "sha256": "9484c957e342a44ab3d790c9d17c1256338f60f17468d5d4f7201c5a97ffc374",
+        "text": "Complete deep FP32 Strassen scalar-oracle products passed with route, tails, changed inputs and padding\n"
+      },
+      "final-check_square32_grid_64.log": {
+        "sha256": "a44eb11e5d3c9ba06130181bdc0fc16ad8ffeed9e67aadbd1665f163685e6d98",
+        "text": "FRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=512 n=512 k=512 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=512 n=512 k=512 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=512 n=512 k=512 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=512 n=512 k=512 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=528 n=528 k=528 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=528 n=528 k=528 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=528 n=528 k=528 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=528 n=528 k=528 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=1024 n=1024 k=1024 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=1024 n=1024 k=1024 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=1024 n=1024 k=1024 threads=64\nFRAMEWORK_BLAS backend=camblas operation=gemm precision=fp32 algorithm=shared-packed m=1024 n=1024 k=1024 threads=64\nFRAMEWORK_BLAS backend=camblas+openblas-compatibility operation=gemm precision=fp32 algorithm=classical kernel=2 m=263 n=256 k=257 threads=64\nFRAMEWORK_BLAS backend=camblas+openblas-compatibility operation=gemm precision=fp32 algorithm=classical kernel=2 m=256 n=512 k=257 threads=64\nActual PyTorch-loaded complete FP32 scalar oracles passed\n14 complete scalar-oracle FP32 products passed with route, tail and padding checks\n\n"
+      },
+      "final-check_square64_threads_16.log": {
+        "sha256": "fe7768ebc6d6a75401feec2a146b19f54254740e7f6a4514ac749abf00c68526",
+        "text": "Complete FP64 scalar-oracle products passed with route, tails, changed inputs and padding\n"
+      },
+      "final-check_square64_threads_64.log": {
+        "sha256": "fe7768ebc6d6a75401feec2a146b19f54254740e7f6a4514ac749abf00c68526",
+        "text": "Complete FP64 scalar-oracle products passed with route, tails, changed inputs and padding\n"
+      },
+      "final-check_square64_threads_64_transpose-a.log": {
+        "sha256": "fe7768ebc6d6a75401feec2a146b19f54254740e7f6a4514ac749abf00c68526",
+        "text": "Complete FP64 scalar-oracle products passed with route, tails, changed inputs and padding\n"
+      },
+      "final-check_tb64_neon_threads_64.log": {
+        "sha256": "36208cf9a3c53bdffe7afe0c2e4379bd29164b660da121ad29037bcf2cc1e717",
+        "text": "Complete transposed-B FP64 scalar-oracle products passed with route, tails, changed inputs and padding\n"
+      },
+      "final-compileall.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "final-diff-check.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "final-format-check.log": {
+        "sha256": "14bd1ce2e814bc6480530ed3631a301c6295834ba98784e2bc9fad0d1a358f2e",
+        "text": "All checks passed!\n14 files already formatted\n"
+      },
+      "final-grid-checks.log": {
+        "sha256": "fb5fa89faef4b2bd7ba8737f50919c093260c34a533ac55651f133ddd363faa4",
+        "text": "18 complete scalar-oracle FP32 products passed with route, tail and padding checks\n14 complete NN square scalar-oracle products passed with grid, tails, changed inputs and padding checks\n6 complete deep scalar-oracle FP32 products passed with depth-panel and padding checks\n32 full-output FP32/FP64 products passed from concurrent outer callers\n6 complete deep scalar-oracle FP32 products passed with depth-panel and padding checks\n14 complete NN square scalar-oracle products passed with grid, tails, changed inputs and padding checks\n{\"shape\": [4096, 512, 2048], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4096], \"status\": \"passed\"}\n{\"shape\": [4097, 513, 1025], \"status\": \"passed\"}\n{\"shape\": [2049, 511, 4095], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 4097], \"status\": \"passed\"}\n{\"shape\": [8193, 129, 1025], \"status\": \"passed\"}\n{\"shape\": [2056, 2049, 1025], \"status\": \"passed\"}\n{\"shape\": [1024, 512, 1024], \"status\": \"passed\"}\n{\"shape\": [520, 256, 1025], \"status\": \"passed\"}\n{\"status\": \"passed\", \"cases\": 216, \"dtype\": \"float32\", \"bridge_sha256\": \"63b06f2c91e276004b307b75280beea929e0f1800e35535c7a2ec84bbff6335f\", \"checks\": \"Full exact rank-two products without BLAS reference; changed values, both orders, all transposes, alpha/beta, NaN beta-zero C, padding/input preservation and dispatch boundaries\"}\n"
+      },
+      "final-idle-16.log": {
+        "sha256": "846111c3321e78d9ab211fa8e151651ed7e112ef2d6ef1a795374ebd6d628ae3",
+        "text": "Idle timeout and changed-input checks passed at 16 threads\n"
+      },
+      "final-idle-64.log": {
+        "sha256": "ba902096fb22c701b920070020f9a3421b91772bb99ebcb1f864dad50d066250",
+        "text": "Idle timeout and changed-input checks passed at 64 threads\n"
+      },
+      "final-make-test.log": {
+        "sha256": "4c7ef3d062e3c4f538d3d985534b039054b91d37a8693db26226844b3b08f2bb",
+        "text": "python3.11 scripts/build.py --target reference --cc \"gcc-14\" --test\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/scalar.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/scalar.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/cblas_shim.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/cblas_shim.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/topology.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/topology.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/executor.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/executor.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/packing.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packing.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/packed.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packed.o\ngcc-14 -O3 -std=gnu11 -Wall -Wextra -Wpedantic -fPIC -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src/planner.c -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/planner.o\ngcc-14 -shared /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/scalar.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/cblas_shim.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/topology.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/executor.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packing.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packed.o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/planner.o -Wl,-z,defs -pthread -lm -Wl,-soname,libcamblas.so -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/libcamblas.so\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/packing_test.c /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packing.o -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packing_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packing_test\npacked-panel tests: PASS (fp32/fp64, N/T, padding, failure gates)\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/amicro_transpose_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/amicro_transpose_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/amicro_transpose_test\n{\"status\":\"passed\",\"cases\":2508}\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/packed_gemm_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packed_gemm_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/packed_gemm_test\nCAMBLAS_PACKED_TRACE precision=fp32 executor=serial pack_a_panels=4 pack_b_panels=4 pack_a_elements=17544 pack_b_elements=35088 compute_tiles=578 edge_tiles=66 sve_tiles=0 ordinary_tiles=578 require_sve=1 required_failure=1\npacked GEMM tests: PASS (blocked fp32/fp64, N/T, padding, alpha/beta gates)\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/cblas_semantics_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/cblas_semantics_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/cblas_semantics_test\n=== CAMBLAS CBLAS ABI-0 semantic contract test ===\nChecks: 476 passed, 0 failed\nCBLAS SEMANTICS CHECK PASSED (development ABI 0 is unstable)\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/counter_contract_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/counter_contract_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/counter_contract_test\ncounter normalization contract PASS: positive per-call cycles/instructions\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/external_input_contract_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/external_input_contract_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/external_input_contract_test\nexternal input contract PASS: stream errors/truncation/hostname boundaries\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/topology_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/topology_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/topology_test\n=== CAMBLAS Topology Unit Tests (v2) ===\n\n--- Cpulist parser: valid ---\n\n--- Cpulist parser: overflow ---\n\n--- Cpulist parser: strict grammar rejections ---\n\n--- Cpulist parser: empty/null ---\n\n--- Cpuset operations ---\n\n--- Status string (immutable/reentrant) ---\n\n--- Topology discovery ---\n\n  --- Topology discovery ---\n  Status: 0 (OK)\n=== CAMBLAS Topology ===\nCPU model:           ARM Neoverse-V2\nOnline CPUs:         288\nAllowed CPUs:        288  [0-287]\nSVE vector length:   128 bits\nNUMA nodes (allowed):4\n  Node 0: 72 allowed CPUs [0-71] (physical: 72 CPUs, 117.3 GiB)\n  Node 1: 72 allowed CPUs [72-143] (physical: 72 CPUs, 119.8 GiB)\n  Node 2: 72 allowed CPUs [144-215] (physical: 72 CPUs, 119.8 GiB)\n  Node 3: 72 allowed CPUs [216-287] (physical: 72 CPUs, 119.6 GiB)\n\n=== Summary: 37 run, 37 pass, 0 fail ===\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/planner_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/planner_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/planner_test\n=== CAMBLAS planner unit tests ===\n\n--- test_null_args ---\n  PASS\n\n--- test_invalid_op ---\n  PASS\n\n--- test_mode_none ---\n  PASS\n\n--- test_mode_fixed ---\n  PASS\n\n--- test_thread_request_bounds ---\n  PASS\n\n--- test_shape_aware_small ---\n  PASS\n\n--- test_shape_aware_medium ---\n  PASS\n\n--- test_shape_aware_large ---\n  PASS\n\n--- test_shape_aware_batch ---\n  PASS\n\n--- test_single_cpu ---\n  PASS\n\n--- test_bitwise_repro ---\n  PASS\n\n--- test_topo_fatal ---\n  PASS\n\n--- test_topo_scalar_metadata ---\n  PASS\n\n--- test_topo_set_and_numa_consistency ---\n  PASS\n\n--- test_unknown_mode ---\n  PASS\n\n--- test_transpose_variants ---\n  PASS\n\n--- test_overflow ---\n  PASS\n\n--- test_format ---\n  PASS\n\n--- test_name_functions ---\n  PASS\n\n--- test_rationale ---\n  PASS\n\n--- test_ablation_mode ---\n  PASS\n\n--- test_sve_mode ---\n  PASS\n\n--- test_reentrancy ---\n  PASS\n\n=== Summary: 23/23 passed ===\ngcc-14 -O2 -std=gnu11 -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/include -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/src -I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/tests/guardpage_test.c -L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -lcamblas -Wl,-rpath,/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference -Wl,-E -pthread -ldl -lm -o /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/guardpage_test\n/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/guardpage_test\n=== CAMBLAS Guard-Page Memory-Safety Test ===\npage size: 65536 bytes\nEach operand buffer ends flush against a PROT_NONE guard page;\na 1-byte forward overrun traps as SIGSEGV.\n\n\nShape-aware planner path (topology: 288 CPUs, SVE VL=128 bits):\n\n=== Summary ===\nConfigurations run: 704\nFailures: 0\nResult: ALL CONFIGS PASSED (no guard-page trap, no mismatch)\nBuilt /lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/build/reference/libcamblas.so\npython3.11 tests/check_bridge_build.py --cc \"gcc-14\"\nFramework bridge executor configurations passed: 5\npython3.11 -m unittest discover -s tests -p test_tools.py\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.030s\n\nOK\n"
+      },
+      "final-nvpl-test_framework_bridge.py.log": {
+        "sha256": "bdbb1cef700a9f5984eed581d39ce6d90acbdbbf234f149f590ded89d9ce1abc",
+        "text": "{\"backend\": \"nvpl\", \"cases\": 324, \"fortran_cases\": 162, \"counters\": [243, 243, 0, 0, 0, 0, 0, 0, 0, 0, 324, 162], \"status\": \"passed\"}\n"
+      },
+      "final-nvpl-test_framework_smoke.py.log": {
+        "sha256": "8ad5860ef813bf82e9bdfb8f1bb93aeec8f14a844bf225e2cf7d98c8475d4734",
+        "text": "{\n  \"status\": \"passed\",\n  \"backend\": \"nvpl\",\n  \"checks\": [\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    }\n  ]\n}\n"
+      },
+      "final-openblas-test_framework_bridge.py.log": {
+        "sha256": "ae7fc7d973a8d47c1bcff04dfa57a36d234880e4ee126fbdb9717d3acc5e2330",
+        "text": "{\"backend\": \"openblas\", \"cases\": 324, \"fortran_cases\": 162, \"counters\": [243, 243, 0, 0, 0, 0, 0, 0, 0, 0, 324, 162], \"status\": \"passed\"}\n"
+      },
+      "final-openblas-test_framework_smoke.py.log": {
+        "sha256": "f9620b1253b115df8a70ce42be2b814c5dacd4495f8a6a71c7c226ce7a89175c",
+        "text": "{\n  \"status\": \"passed\",\n  \"backend\": \"openblas\",\n  \"checks\": [\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 0,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float32\",\n      \"changed_input\": 1,\n      \"counters\": [\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 0,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    },\n    {\n      \"framework\": \"numpy\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        1,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        1,\n        0\n      ]\n    },\n    {\n      \"framework\": \"pytorch\",\n      \"dtype\": \"float64\",\n      \"changed_input\": 1,\n      \"counters\": [\n        0,\n        3,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        0,\n        3\n      ]\n    }\n  ]\n}\n"
+      },
+      "final-policy64.log": {
+        "sha256": "a66c68cf045f88e94d5bfcc0c13a045720ed0b30ed49174c417b4248d502c66f",
+        "text": "{\"full_output_policy_cases\": 20, \"status\": \"passed\"}\n"
+      },
+      "release-transposed32-check.log": {
+        "sha256": "8529282611639ee2bb09c40de50ed38421a89f6321bf5cbecd5e3b51122a8201",
+        "text": "8 complete transposed-A scalar-oracle FP32 products passed with route, tails and padding checks\n"
+      }
+    },
+    "supplemental_checker_sources": {
+      "check_square64.py": {
+        "sha256": "7d0f3aac632b0b1f347b6cd0808de48543e2605a292147e585cfe82c7337075a",
+        "text": "from pathlib import Path\nimport argparse\nimport os\nimport subprocess as sp\nimport tempfile\n\nroot=Path.cwd()\np=argparse.ArgumentParser()\np.add_argument('snapshot',type=Path)\np.add_argument('--transpose-a',action='store_true')\np.add_argument('--threads',type=int,choices=(16,64),default=64)\nargs=p.parse_args()\nsnapshot=args.snapshot.resolve(strict=True)\nsource=(root/'tests/shared_grid32_test.c').read_text()\nsource=source.replace('float','double').replace('<double.h>','<float.h>')\nsource=source.replace('FLT_EPSILON','DBL_EPSILON').replace('cblas_sgemm','cblas_dgemm')\nsource=source.replace('return stats[4];','return stats[5];')\nsource=source.replace('    transpose_a = deep == 2;', '    (void)deep;\\n    transpose_a = '+str(int(args.transpose_a))+';')\nstart=source.index('    void *s =')\nend=source.index('    void *r = dlsym(',start)\nsource=source[:start]+'    void *s = dlsym(library,\"framework_blas_stats\");\\n'+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&gemm,'))\nend=source.index('    memcpy(&reset,',start)\nsource=source[:start]+'''    memcpy(&route_stats,&s,sizeof(route_stats));\n    counter=rectangular_counter;\n'''+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&reset,'))\nend=source.index('\\nint main(',start)\nshapes='{{512,512,256},{528,528,260},{1024,1024,256},{1032,1032,258}}' if args.transpose_a else '{{512,512,512},{516,516,516},{520,520,520},{524,524,524},{528,528,528},{1024,1024,1024}}'\nsource=source[:start]+'    const int shapes[][3]='+shapes+''';\n    int failures=0;\n    for(size_t i=0;i<sizeof(shapes)/sizeof(shapes[0]);++i)\n        for(int trial=0;trial<2;++trial)\n            failures+=check(gemm,counter,reset,shapes[i][0],shapes[i][1],shapes[i][2],0,1,trial);\n    dlclose(library);\n    if(failures)return 1;\n    puts(\"Complete FP64 scalar-oracle products passed with route, tails, changed inputs and padding\");\n    return 0;\n}\n'''+source[end:]\ncpus=sorted(os.sched_getaffinity(0))\nassert len(cpus)>=args.threads\nos.sched_setaffinity(0,cpus[:args.threads])\nenv=dict(os.environ,CAMBLAS_FRAMEWORK_THREADS=str(args.threads),OMP_NUM_THREADS=str(args.threads),\n         OPENBLAS_NUM_THREADS=str(args.threads),OMP_DYNAMIC='FALSE')\nwith tempfile.TemporaryDirectory(prefix='square64-',dir=root/'build') as temporary:\n    temporary=Path(temporary)\n    (temporary/'oracle.c').write_text(source)\n    sp.run(['gcc-14','-O2','-std=gnu11','-Wall','-Wextra','-Werror','-fopenmp',\n            str(temporary/'oracle.c'),'-ldl','-lm','-o',str(temporary/'oracle')],\n           env=env,check=True,timeout=120)\n    sp.run([str(temporary/'oracle'),str(snapshot/'libframework_blas.so')],\n           env=env,check=True,timeout=300)\n"
+      },
+      "check_tb64_neon.py": {
+        "sha256": "d036a00b205c9312306b4ec5085085e30f7b2c2726b5c0a3fe5ce62b64727b9d",
+        "text": "from pathlib import Path\nimport argparse\nimport os\nimport subprocess as sp\nimport tempfile\n\nroot=Path.cwd()\np=argparse.ArgumentParser()\np.add_argument('snapshot',type=Path)\np.add_argument('--transpose-a',action='store_true')\np.add_argument('--threads',type=int,choices=(16,64),default=64)\nargs=p.parse_args()\nsnapshot=args.snapshot.resolve(strict=True)\nsource=(root/'tests/shared_grid32_test.c').read_text()\nsource=source.replace('float','double').replace('<double.h>','<float.h>')\nsource=source.replace('FLT_EPSILON','DBL_EPSILON').replace('cblas_sgemm','cblas_dgemm')\nsource=source.replace('return stats[4];','return stats[5];')\nsource=source.replace('    transpose_a = deep == 2;', '    (void)deep;\\n    transpose_a = '+str(int(args.transpose_a))+';')\nstart=source.index('    void *s =')\nend=source.index('    void *r = dlsym(',start)\nsource=source[:start]+'    void *s = dlsym(library,\"framework_blas_stats\");\\n'+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&gemm,'))\nend=source.index('    memcpy(&reset,',start)\nsource=source[:start]+'''    memcpy(&route_stats,&s,sizeof(route_stats));\n    counter=rectangular_counter;\n'''+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&reset,'))\nend=source.index('\\nint main(',start)\nshapes='{{512,512,256},{528,528,260},{1024,1024,256},{1032,1032,258}}' if args.transpose_a else '{{2048,1024,512},{1040,520,258},{1032,516,260},{1024,1024,256}}'\nsource=source[:start]+'    const int shapes[][3]='+shapes+''';\n    int failures=0;\n    for(size_t i=0;i<sizeof(shapes)/sizeof(shapes[0]);++i)\n        for(int trial=0;trial<2;++trial)\n            failures+=check(gemm,counter,reset,shapes[i][0],shapes[i][1],shapes[i][2],1,1,trial);\n    dlclose(library);\n    if(failures)return 1;\n    puts(\"Complete transposed-B FP64 scalar-oracle products passed with route, tails, changed inputs and padding\");\n    return 0;\n}\n'''+source[end:]\ncpus=sorted(os.sched_getaffinity(0))\nassert len(cpus)>=args.threads\nos.sched_setaffinity(0,cpus[:args.threads])\nenv=dict(os.environ,CAMBLAS_FRAMEWORK_THREADS=str(args.threads),OMP_NUM_THREADS=str(args.threads),\n         OPENBLAS_NUM_THREADS=str(args.threads),OMP_DYNAMIC='FALSE')\nwith tempfile.TemporaryDirectory(prefix='square64-',dir=root/'build') as temporary:\n    temporary=Path(temporary)\n    (temporary/'oracle.c').write_text(source)\n    sp.run(['gcc-14','-O2','-std=gnu11','-Wall','-Wextra','-Werror','-fopenmp',\n            str(temporary/'oracle.c'),'-ldl','-lm','-o',str(temporary/'oracle')],\n           env=env,check=True,timeout=120)\n    sp.run([str(temporary/'oracle'),str(snapshot/'libframework_blas.so')],\n           env=env,check=True,timeout=300)\n"
+      },
+      "check_deep32_neon.py": {
+        "sha256": "d8dd56ecfab9342bb905580b3e77d123f01bd16076d403e452c62cb52d3623e7",
+        "text": "from pathlib import Path\nimport argparse\nimport os\nimport subprocess as sp\nimport tempfile\n\nroot=Path.cwd()\np=argparse.ArgumentParser()\np.add_argument('snapshot',type=Path)\np.add_argument('--transpose-a',action='store_true')\np.add_argument('--threads',type=int,choices=(16,64),default=64)\nargs=p.parse_args()\nsnapshot=args.snapshot.resolve(strict=True)\nsource=(root/'tests/shared_grid32_test.c').read_text()\n\n\n\nsource=source.replace('    transpose_a = deep == 2;', '    (void)deep;\\n    transpose_a = '+str(int(args.transpose_a))+';')\nstart=source.index('    void *s =')\nend=source.index('    void *r = dlsym(',start)\nsource=source[:start]+'    void *s = dlsym(library,\"framework_blas_stats\");\\n'+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&gemm,'))\nend=source.index('    memcpy(&reset,',start)\nsource=source[:start]+'''    memcpy(&route_stats,&s,sizeof(route_stats));\n    counter=rectangular_counter;\n'''+source[end:]\nstart=source.index('    if (transpose_a) {',source.index('memcpy(&reset,'))\nend=source.index('\\nint main(',start)\nshapes='{{512,512,256},{528,528,260},{1024,1024,256},{1032,1032,258}}' if args.transpose_a else '{{4096,512,2048},{1056,264,1030},{1040,256,2050}}'\nsource=source[:start]+'    const int shapes[][3]='+shapes+''';\n    int failures=0;\n    for(size_t i=0;i<sizeof(shapes)/sizeof(shapes[0]);++i)\n        for(int trial=0;trial<2;++trial)\n            failures+=check(gemm,counter,reset,shapes[i][0],shapes[i][1],shapes[i][2],0,1,trial);\n    dlclose(library);\n    if(failures)return 1;\n    puts(\"Complete deep FP32 Strassen scalar-oracle products passed with route, tails, changed inputs and padding\");\n    return 0;\n}\n'''+source[end:]\ncpus=sorted(os.sched_getaffinity(0))\nassert len(cpus)>=args.threads\nos.sched_setaffinity(0,cpus[:args.threads])\nenv=dict(os.environ,CAMBLAS_FRAMEWORK_THREADS=str(args.threads),OMP_NUM_THREADS=str(args.threads),\n         OPENBLAS_NUM_THREADS=str(args.threads),OMP_DYNAMIC='FALSE')\nwith tempfile.TemporaryDirectory(prefix='square32-strassen-',dir=root/'build') as temporary:\n    temporary=Path(temporary)\n    (temporary/'oracle.c').write_text(source)\n    sp.run(['gcc-14','-O2','-std=gnu11','-Wall','-Wextra','-Werror','-fopenmp',\n            str(temporary/'oracle.c'),'-ldl','-lm','-o',str(temporary/'oracle')],\n           env=env,check=True,timeout=120)\n    sp.run([str(temporary/'oracle'),str(snapshot/'libframework_blas.so')],\n           env=env,check=True,timeout=300)\n"
+      },
+      "check_square32_grid.py": {
+        "sha256": "a44445b15170da911671b5f0fa2d2dfa694dc116af8192dbb373c64c331e5e37",
+        "text": "from pathlib import Path\nimport argparse\nimport ctypes as ct\nimport os\nimport subprocess as sp\nimport tempfile\n\nroot=Path.cwd()\np=argparse.ArgumentParser()\np.add_argument('snapshot',type=Path)\nargs=p.parse_args()\nsnapshot=args.snapshot.resolve(strict=True)\ncpus=sorted(os.sched_getaffinity(0));assert len(cpus)>=64\nos.sched_setaffinity(0,cpus[:64])\nsource=(root/'tests/shared_grid32_test.c').read_text()\nold='''    const int shapes[][3] = {\n        {256, 128, 129}, {264, 256, 257}, {512, 256, 513}, {1024, 512, 1024}, {2048, 1024, 512}};'''\nassert old in source\nsource=source.replace(old,'    const int shapes[][3] = {{512,512,512},{528,528,528},{1024,1024,1024}};')\nenvironment=dict(os.environ,LD_PRELOAD=str(snapshot/'libframework_blas.so'),\n                 CAMBLAS_FRAMEWORK_THREADS='64',OMP_NUM_THREADS='64',\n                 OPENBLAS_NUM_THREADS='64',OMP_DYNAMIC='FALSE',CAMBLAS_FRAMEWORK_TRACE='1')\nwith tempfile.TemporaryDirectory(prefix='torch-square32-',dir=root/'build') as tmp:\n    tmp=Path(tmp)\n    (tmp/'oracle.c').write_text(source)\n    sp.run(['gcc-14','-O2','-std=gnu11','-Wall','-Wextra','-Werror','-fPIC','-shared',\n            '-fopenmp',str(tmp/'oracle.c'),'-ldl','-lm','-o',str(tmp/'oracle.so')],check=True)\n    launcher=tmp/'check.py'\n    launcher.write_text('''import ctypes as ct,sys,torch\ntorch.set_num_threads(64)\ntorch.set_num_interop_threads(1)\nlibrary=ct.CDLL(sys.argv[1])\nlibrary.shared_grid32_check.argtypes=[ct.c_char_p,ct.c_int]\nlibrary.shared_grid32_check.restype=ct.c_int\nassert library.shared_grid32_check(sys.argv[2].encode(),0)==0\nprint('Actual PyTorch-loaded complete FP32 scalar oracles passed')\n''')\n    completed=sp.run([str(root/'.frameworks/envs/camblas/bin/python'),str(launcher),\n                      str(tmp/'oracle.so'),str(snapshot/'libframework_blas.so')],\n                     env=environment,stdout=sp.PIPE,stderr=sp.STDOUT,text=True,\n                     check=True,timeout=300)\n    print(completed.stdout,flush=True)\n\n"
+      },
+      "check_policy64.py": {
+        "sha256": "457c29e5e41e7a6f7e6614dcea999ab008e37e4b57aeaf25823799c370bfa9dd",
+        "text": "\"\"\"Check batched-route selection and exceptional-input classical fallbacks.\"\"\"\n\nimport argparse\nimport ctypes as ct\nimport json\nfrom pathlib import Path\n\n\ndef check_precision(library, dtype_name, rect32_square):\n    \"\"\"Check full outputs and routing for finite, overflowing and nonfinite inputs.\n\n    Parameters\n    ----------\n    library : ctypes.CDLL\n        Isolated CAMBLAS bridge loaded by the validation runner.\n    dtype_name : str\n        Either ``float32`` or ``float64``.\n\n    Returns\n    -------\n    int\n        Number of complete matrix products checked without a BLAS oracle.\n    \"\"\"\n    # Import after main loads the candidate: a BLAS-linked NumPy must not\n    # resolve the core SONAME to an installed control before this check.\n    import numpy as np\n\n    dtype = np.dtype(dtype_name)\n    scalar = ct.c_float if dtype_name == \"float32\" else ct.c_double\n    pointer = ct.POINTER(scalar)\n    gemm = getattr(library, \"cblas_sgemm\" if dtype_name == \"float32\" else \"cblas_dgemm\")\n    gemm.argtypes = [ct.c_int] * 6 + [\n        scalar,\n        pointer,\n        ct.c_int,\n        pointer,\n        ct.c_int,\n        scalar,\n        pointer,\n        ct.c_int,\n    ]\n    gemm.restype = None\n    library.framework_blas_stats.argtypes = [ct.POINTER(ct.c_uint64), ct.c_size_t]\n    library.framework_blas_stats.restype = ct.c_int\n    library.framework_blas_reset_stats.restype = None\n    n = 512\n    cases = 0\n    for transpose in (111, 112):\n        for scenario in (\"finite\", \"large_a\", \"large_b\", \"nan_a\", \"infinite_b\"):\n            a = np.eye(n, dtype=dtype, order=\"F\")\n            logical_b = np.eye(n, dtype=dtype, order=\"F\")\n            expected = np.eye(n, dtype=dtype)\n            if scenario == \"finite\":\n                a *= 2\n                logical_b.fill(3)\n                expected.fill(6)\n            elif scenario == \"large_a\":\n                a *= np.finfo(dtype).max / 2\n                expected *= np.finfo(dtype).max / 2\n            elif scenario == \"large_b\":\n                logical_b *= np.finfo(dtype).max / 2\n                expected *= np.finfo(dtype).max / 2\n            elif scenario == \"nan_a\":\n                a[0, 0] = np.nan\n                expected[0, :] = np.nan\n            else:\n                logical_b[0, 0] = np.inf\n                expected[:, 0] = np.nan\n                expected[0, 0] = np.inf\n            b = np.array(logical_b if transpose == 111 else logical_b.T, order=\"F\")\n            saved_a, saved_b = a.copy(), b.copy()\n            c = np.full((n, n), np.nan, dtype=dtype, order=\"F\")\n            library.framework_blas_reset_stats()\n            gemm(\n                102,\n                111,\n                transpose,\n                n,\n                n,\n                n,\n                1,\n                a.ctypes.data_as(pointer),\n                n,\n                b.ctypes.data_as(pointer),\n                n,\n                0,\n                c.ctypes.data_as(pointer),\n                n,\n            )\n            np.testing.assert_array_equal(c, expected)\n            np.testing.assert_array_equal(a, saved_a)\n            np.testing.assert_array_equal(b, saved_b)\n            counters = (ct.c_uint64 * 12)()\n            assert library.framework_blas_stats(counters, 12) == 12\n            route = 4 if dtype_name == \"float32\" else 5\n            expected_route = scenario == \"finite\" and (\n                dtype_name == \"float64\" or (rect32_square and transpose == 111)\n            )\n            assert counters[route] == expected_route, (scenario, transpose, list(counters))\n            cases += 1\n    return cases\n\n\ndef main():\n    \"\"\"Run on allocated CPUs; this is a correctness test, never a timing source.\"\"\"\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"library\", type=Path)\n    parser.add_argument(\"--rect32-square\", action=\"store_true\")\n    args = parser.parse_args()\n    library = ct.CDLL(str(args.library.resolve(strict=True)), mode=ct.RTLD_GLOBAL)\n    count = sum(check_precision(library, dtype, args.rect32_square) for dtype in (\"float32\", \"float64\"))\n    print(json.dumps({\"full_output_policy_cases\": count, \"status\": \"passed\"}))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+      }
     }
   }
 }
