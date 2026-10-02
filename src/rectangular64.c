@@ -929,8 +929,11 @@ static int rectangular64_execute(int ta, int tb, const camblas_executor_t *execu
                             .depth_blocks = (hk + kc - 1) / kc,
                             .kc = kc,
                             .c = c};
-    work.neon_kernel = CAMBLAS_RECT64_NEON6 && workers == 64 && !ta && !tb && m == n && n == k &&
-                       m >= 512 && m <= 1024 && !(m % 4);
+    work.neon_kernel = CAMBLAS_RECT64_NEON6 && !ta &&
+                       ((!tb && workers >= 16 && workers <= 64 && m == n && n == k && m >= 512 &&
+                         m <= 1024 && !(m % 4)) ||
+                        (tb && workers == 64 && m >= n && m >= 512 && m <= 2048 && n >= 512 &&
+                         n <= 2048 && k >= 256 && k <= 1024 && !(m % 4) && !(n % 4)));
     work.fused_b = workers <= 32 && (m != n || k < 512);
     int stream = workers >= 16 && workers <= 32 && m > n && k > 1024;
     int packed_k = stream && hk > kc ? kc : hk;

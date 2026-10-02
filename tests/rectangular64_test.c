@@ -213,12 +213,24 @@ int main(void)
                                          application_shapes[i][2], application_workers[j], 0, 0));
             ++cases;
         }
-    /* The 64-worker FP64 NEON route uses the existing Strassen panel layout.
+    /* The 16/64-worker FP64 NEON route uses the existing Strassen panel layout.
      * These squares exercise short rows, full rows and column tail stores. */
-    const int neon_squares[] = {512, 528, 1024};
-    for (size_t i = 0; i < sizeof(neon_squares) / sizeof(neon_squares[0]); ++i) {
-        int dimension = neon_squares[i];
-        peak = fmax(peak, check_case(dimension, dimension, dimension, 64, 0, 0));
+    const int neon_squares[] = {512, 516, 520, 524, 528, 1024};
+    const int neon_workers[] = {16, 64};
+    for (size_t i = 0; i < sizeof(neon_squares) / sizeof(neon_squares[0]); ++i)
+        for (size_t t = 0; t < sizeof(neon_workers) / sizeof(neon_workers[0]); ++t) {
+            int dimension = neon_squares[i];
+            peak = fmax(peak, check_case(dimension, dimension, dimension, neon_workers[t], 0, 0));
+            ++cases;
+        }
+    /* The transposed-B 64-worker route uses the same packed input layout.
+     * Check complete outputs, short rows/columns and odd half-depths. */
+    const int neon_transposed_shapes[][3] = {
+        {2048, 1024, 512}, {1040, 520, 258}, {1032, 516, 260}, {1024, 1024, 256}};
+    for (size_t i = 0; i < sizeof(neon_transposed_shapes) / sizeof(neon_transposed_shapes[0]);
+         ++i) {
+        peak = fmax(peak, check_case(neon_transposed_shapes[i][0], neon_transposed_shapes[i][1],
+                                     neon_transposed_shapes[i][2], 64, 1, 0));
         ++cases;
     }
     const int short_transposed_shapes[][3] = {{1024, 1024, 256}, {1032, 1032, 258}};

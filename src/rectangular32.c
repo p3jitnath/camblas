@@ -6,6 +6,9 @@
 #include "camblas.h"
 #include "camblas_executor.h"
 #include "rectangular32.h"
+#ifndef CAMBLAS_RECT32_NEON12
+#define CAMBLAS_RECT32_NEON12 0
+#endif
 #include "packed.h"
 #include "kernels.h"
 #include "gemm_bounds.h"
@@ -73,7 +76,8 @@ int camblas_experimental_rectangular32_segment_bytes(int workers, int m, int n, 
 }
 
 typedef struct {
-    int tb, hm, hn, hk, source_pc, lda, ldb, ldc, workers, row_groups, column_groups, depth_blocks;
+    int tb, hm, hn, hk, source_pc, lda, ldb, ldc, workers, row_groups, column_groups, depth_blocks,
+        neon_kernel;
     size_t a_plane, b_plane, product_plane;
     const float *a[7], *a2[7], *b[7], *b2[7];
     float *packed_a, *packed_b, *products, *c;
@@ -284,6 +288,376 @@ static void rectangular32_pack(const camblas_task_t *task, void *opaque)
     w->b_max[worker] = b_max;
 }
 
+#if CAMBLAS_RECT32_NEON12
+/* Independent NEON 12x8 kernel matching existing binary32 Strassen panels. */
+static inline void rectangular32_neon12_kernel(int depth, const float *a, const float *b, float *c,
+                                               int ldc, int first, int rows, int columns)
+{
+    const float *ap = a, *bp = b;
+    float *cp = c;
+    uintptr_t stride = (uintptr_t)ldc * sizeof(float);
+    __asm__ volatile(
+        "movi v8.16b, #0\n\t"
+        "movi v9.16b, #0\n\t"
+        "movi v10.16b, #0\n\t"
+        "movi v11.16b, #0\n\t"
+        "movi v12.16b, #0\n\t"
+        "movi v13.16b, #0\n\t"
+        "movi v14.16b, #0\n\t"
+        "movi v15.16b, #0\n\t"
+        "movi v16.16b, #0\n\t"
+        "movi v17.16b, #0\n\t"
+        "movi v18.16b, #0\n\t"
+        "movi v19.16b, #0\n\t"
+        "movi v20.16b, #0\n\t"
+        "movi v21.16b, #0\n\t"
+        "movi v22.16b, #0\n\t"
+        "movi v23.16b, #0\n\t"
+        "movi v24.16b, #0\n\t"
+        "movi v25.16b, #0\n\t"
+        "movi v26.16b, #0\n\t"
+        "movi v27.16b, #0\n\t"
+        "movi v28.16b, #0\n\t"
+        "movi v29.16b, #0\n\t"
+        "movi v30.16b, #0\n\t"
+        "movi v31.16b, #0\n\t"
+        "cmp %w[depth], #4\n\t"
+        "b.lt 2f\n\t"
+        "1:\n\t"
+        "cmp %w[depth], #36\n\t"
+        "b.lt 7f\n\t"
+        "prfm pldl1keep, [%[ap], #1536]\n\t"
+        "prfm pldl1keep, [%[ap], #1600]\n\t"
+        "prfm pldl1keep, [%[ap], #1664]\n\t"
+        "prfm pldl1keep, [%[bp], #1024]\n\t"
+        "prfm pldl1keep, [%[bp], #1088]\n\t"
+        "7:\n\t"
+        "ld1 {v0.4s-v2.4s}, [%[ap]], #48\n\t"
+        "ld1 {v3.4s-v4.4s}, [%[bp]], #32\n\t"
+        "fmla v8.4s, v0.4s, v3.s[0]\n\t"
+        "fmla v9.4s, v1.4s, v3.s[0]\n\t"
+        "fmla v10.4s, v2.4s, v3.s[0]\n\t"
+        "fmla v11.4s, v0.4s, v3.s[1]\n\t"
+        "fmla v12.4s, v1.4s, v3.s[1]\n\t"
+        "fmla v13.4s, v2.4s, v3.s[1]\n\t"
+        "fmla v14.4s, v0.4s, v3.s[2]\n\t"
+        "fmla v15.4s, v1.4s, v3.s[2]\n\t"
+        "fmla v16.4s, v2.4s, v3.s[2]\n\t"
+        "fmla v17.4s, v0.4s, v3.s[3]\n\t"
+        "fmla v18.4s, v1.4s, v3.s[3]\n\t"
+        "fmla v19.4s, v2.4s, v3.s[3]\n\t"
+        "fmla v20.4s, v0.4s, v4.s[0]\n\t"
+        "fmla v21.4s, v1.4s, v4.s[0]\n\t"
+        "fmla v22.4s, v2.4s, v4.s[0]\n\t"
+        "fmla v23.4s, v0.4s, v4.s[1]\n\t"
+        "fmla v24.4s, v1.4s, v4.s[1]\n\t"
+        "fmla v25.4s, v2.4s, v4.s[1]\n\t"
+        "fmla v26.4s, v0.4s, v4.s[2]\n\t"
+        "fmla v27.4s, v1.4s, v4.s[2]\n\t"
+        "fmla v28.4s, v2.4s, v4.s[2]\n\t"
+        "fmla v29.4s, v0.4s, v4.s[3]\n\t"
+        "fmla v30.4s, v1.4s, v4.s[3]\n\t"
+        "fmla v31.4s, v2.4s, v4.s[3]\n\t"
+        "ld1 {v0.4s-v2.4s}, [%[ap]], #48\n\t"
+        "ld1 {v3.4s-v4.4s}, [%[bp]], #32\n\t"
+        "fmla v8.4s, v0.4s, v3.s[0]\n\t"
+        "fmla v9.4s, v1.4s, v3.s[0]\n\t"
+        "fmla v10.4s, v2.4s, v3.s[0]\n\t"
+        "fmla v11.4s, v0.4s, v3.s[1]\n\t"
+        "fmla v12.4s, v1.4s, v3.s[1]\n\t"
+        "fmla v13.4s, v2.4s, v3.s[1]\n\t"
+        "fmla v14.4s, v0.4s, v3.s[2]\n\t"
+        "fmla v15.4s, v1.4s, v3.s[2]\n\t"
+        "fmla v16.4s, v2.4s, v3.s[2]\n\t"
+        "fmla v17.4s, v0.4s, v3.s[3]\n\t"
+        "fmla v18.4s, v1.4s, v3.s[3]\n\t"
+        "fmla v19.4s, v2.4s, v3.s[3]\n\t"
+        "fmla v20.4s, v0.4s, v4.s[0]\n\t"
+        "fmla v21.4s, v1.4s, v4.s[0]\n\t"
+        "fmla v22.4s, v2.4s, v4.s[0]\n\t"
+        "fmla v23.4s, v0.4s, v4.s[1]\n\t"
+        "fmla v24.4s, v1.4s, v4.s[1]\n\t"
+        "fmla v25.4s, v2.4s, v4.s[1]\n\t"
+        "fmla v26.4s, v0.4s, v4.s[2]\n\t"
+        "fmla v27.4s, v1.4s, v4.s[2]\n\t"
+        "fmla v28.4s, v2.4s, v4.s[2]\n\t"
+        "fmla v29.4s, v0.4s, v4.s[3]\n\t"
+        "fmla v30.4s, v1.4s, v4.s[3]\n\t"
+        "fmla v31.4s, v2.4s, v4.s[3]\n\t"
+        "ld1 {v0.4s-v2.4s}, [%[ap]], #48\n\t"
+        "ld1 {v3.4s-v4.4s}, [%[bp]], #32\n\t"
+        "fmla v8.4s, v0.4s, v3.s[0]\n\t"
+        "fmla v9.4s, v1.4s, v3.s[0]\n\t"
+        "fmla v10.4s, v2.4s, v3.s[0]\n\t"
+        "fmla v11.4s, v0.4s, v3.s[1]\n\t"
+        "fmla v12.4s, v1.4s, v3.s[1]\n\t"
+        "fmla v13.4s, v2.4s, v3.s[1]\n\t"
+        "fmla v14.4s, v0.4s, v3.s[2]\n\t"
+        "fmla v15.4s, v1.4s, v3.s[2]\n\t"
+        "fmla v16.4s, v2.4s, v3.s[2]\n\t"
+        "fmla v17.4s, v0.4s, v3.s[3]\n\t"
+        "fmla v18.4s, v1.4s, v3.s[3]\n\t"
+        "fmla v19.4s, v2.4s, v3.s[3]\n\t"
+        "fmla v20.4s, v0.4s, v4.s[0]\n\t"
+        "fmla v21.4s, v1.4s, v4.s[0]\n\t"
+        "fmla v22.4s, v2.4s, v4.s[0]\n\t"
+        "fmla v23.4s, v0.4s, v4.s[1]\n\t"
+        "fmla v24.4s, v1.4s, v4.s[1]\n\t"
+        "fmla v25.4s, v2.4s, v4.s[1]\n\t"
+        "fmla v26.4s, v0.4s, v4.s[2]\n\t"
+        "fmla v27.4s, v1.4s, v4.s[2]\n\t"
+        "fmla v28.4s, v2.4s, v4.s[2]\n\t"
+        "fmla v29.4s, v0.4s, v4.s[3]\n\t"
+        "fmla v30.4s, v1.4s, v4.s[3]\n\t"
+        "fmla v31.4s, v2.4s, v4.s[3]\n\t"
+        "ld1 {v0.4s-v2.4s}, [%[ap]], #48\n\t"
+        "ld1 {v3.4s-v4.4s}, [%[bp]], #32\n\t"
+        "fmla v8.4s, v0.4s, v3.s[0]\n\t"
+        "fmla v9.4s, v1.4s, v3.s[0]\n\t"
+        "fmla v10.4s, v2.4s, v3.s[0]\n\t"
+        "fmla v11.4s, v0.4s, v3.s[1]\n\t"
+        "fmla v12.4s, v1.4s, v3.s[1]\n\t"
+        "fmla v13.4s, v2.4s, v3.s[1]\n\t"
+        "fmla v14.4s, v0.4s, v3.s[2]\n\t"
+        "fmla v15.4s, v1.4s, v3.s[2]\n\t"
+        "fmla v16.4s, v2.4s, v3.s[2]\n\t"
+        "fmla v17.4s, v0.4s, v3.s[3]\n\t"
+        "fmla v18.4s, v1.4s, v3.s[3]\n\t"
+        "fmla v19.4s, v2.4s, v3.s[3]\n\t"
+        "fmla v20.4s, v0.4s, v4.s[0]\n\t"
+        "fmla v21.4s, v1.4s, v4.s[0]\n\t"
+        "fmla v22.4s, v2.4s, v4.s[0]\n\t"
+        "fmla v23.4s, v0.4s, v4.s[1]\n\t"
+        "fmla v24.4s, v1.4s, v4.s[1]\n\t"
+        "fmla v25.4s, v2.4s, v4.s[1]\n\t"
+        "fmla v26.4s, v0.4s, v4.s[2]\n\t"
+        "fmla v27.4s, v1.4s, v4.s[2]\n\t"
+        "fmla v28.4s, v2.4s, v4.s[2]\n\t"
+        "fmla v29.4s, v0.4s, v4.s[3]\n\t"
+        "fmla v30.4s, v1.4s, v4.s[3]\n\t"
+        "fmla v31.4s, v2.4s, v4.s[3]\n\t"
+        "sub %w[depth], %w[depth], #4\n\t"
+        "cmp %w[depth], #4\n\t"
+        "b.ge 1b\n\t"
+        "2:\n\t"
+        "cbz %w[depth], 4f\n\t"
+        "3:\n\t"
+        "ld1 {v0.4s-v2.4s}, [%[ap]], #48\n\t"
+        "ld1 {v3.4s-v4.4s}, [%[bp]], #32\n\t"
+        "fmla v8.4s, v0.4s, v3.s[0]\n\t"
+        "fmla v9.4s, v1.4s, v3.s[0]\n\t"
+        "fmla v10.4s, v2.4s, v3.s[0]\n\t"
+        "fmla v11.4s, v0.4s, v3.s[1]\n\t"
+        "fmla v12.4s, v1.4s, v3.s[1]\n\t"
+        "fmla v13.4s, v2.4s, v3.s[1]\n\t"
+        "fmla v14.4s, v0.4s, v3.s[2]\n\t"
+        "fmla v15.4s, v1.4s, v3.s[2]\n\t"
+        "fmla v16.4s, v2.4s, v3.s[2]\n\t"
+        "fmla v17.4s, v0.4s, v3.s[3]\n\t"
+        "fmla v18.4s, v1.4s, v3.s[3]\n\t"
+        "fmla v19.4s, v2.4s, v3.s[3]\n\t"
+        "fmla v20.4s, v0.4s, v4.s[0]\n\t"
+        "fmla v21.4s, v1.4s, v4.s[0]\n\t"
+        "fmla v22.4s, v2.4s, v4.s[0]\n\t"
+        "fmla v23.4s, v0.4s, v4.s[1]\n\t"
+        "fmla v24.4s, v1.4s, v4.s[1]\n\t"
+        "fmla v25.4s, v2.4s, v4.s[1]\n\t"
+        "fmla v26.4s, v0.4s, v4.s[2]\n\t"
+        "fmla v27.4s, v1.4s, v4.s[2]\n\t"
+        "fmla v28.4s, v2.4s, v4.s[2]\n\t"
+        "fmla v29.4s, v0.4s, v4.s[3]\n\t"
+        "fmla v30.4s, v1.4s, v4.s[3]\n\t"
+        "fmla v31.4s, v2.4s, v4.s[3]\n\t"
+        "subs %w[depth], %w[depth], #1\n\t"
+        "b.ne 3b\n\t"
+        "4:\n\t"
+        "cbnz %w[first], 10f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v8.4s, v8.4s, v7.4s\n\t"
+        "10:\n\t"
+        "str q8, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 50f\n\t"
+        "cbnz %w[first], 11f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v9.4s, v9.4s, v7.4s\n\t"
+        "11:\n\t"
+        "str q9, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 50f\n\t"
+        "cbnz %w[first], 12f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v10.4s, v10.4s, v7.4s\n\t"
+        "12:\n\t"
+        "str q10, [%[cp], #32]\n\t"
+        "50:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 13f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v11.4s, v11.4s, v7.4s\n\t"
+        "13:\n\t"
+        "str q11, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 51f\n\t"
+        "cbnz %w[first], 14f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v12.4s, v12.4s, v7.4s\n\t"
+        "14:\n\t"
+        "str q12, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 51f\n\t"
+        "cbnz %w[first], 15f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v13.4s, v13.4s, v7.4s\n\t"
+        "15:\n\t"
+        "str q13, [%[cp], #32]\n\t"
+        "51:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 16f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v14.4s, v14.4s, v7.4s\n\t"
+        "16:\n\t"
+        "str q14, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 52f\n\t"
+        "cbnz %w[first], 17f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v15.4s, v15.4s, v7.4s\n\t"
+        "17:\n\t"
+        "str q15, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 52f\n\t"
+        "cbnz %w[first], 18f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v16.4s, v16.4s, v7.4s\n\t"
+        "18:\n\t"
+        "str q16, [%[cp], #32]\n\t"
+        "52:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 19f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v17.4s, v17.4s, v7.4s\n\t"
+        "19:\n\t"
+        "str q17, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 53f\n\t"
+        "cbnz %w[first], 20f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v18.4s, v18.4s, v7.4s\n\t"
+        "20:\n\t"
+        "str q18, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 53f\n\t"
+        "cbnz %w[first], 21f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v19.4s, v19.4s, v7.4s\n\t"
+        "21:\n\t"
+        "str q19, [%[cp], #32]\n\t"
+        "53:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cmp %w[columns], #4\n\t"
+        "b.le 6f\n\t"
+        "cbnz %w[first], 22f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v20.4s, v20.4s, v7.4s\n\t"
+        "22:\n\t"
+        "str q20, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 54f\n\t"
+        "cbnz %w[first], 23f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v21.4s, v21.4s, v7.4s\n\t"
+        "23:\n\t"
+        "str q21, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 54f\n\t"
+        "cbnz %w[first], 24f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v22.4s, v22.4s, v7.4s\n\t"
+        "24:\n\t"
+        "str q22, [%[cp], #32]\n\t"
+        "54:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 25f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v23.4s, v23.4s, v7.4s\n\t"
+        "25:\n\t"
+        "str q23, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 55f\n\t"
+        "cbnz %w[first], 26f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v24.4s, v24.4s, v7.4s\n\t"
+        "26:\n\t"
+        "str q24, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 55f\n\t"
+        "cbnz %w[first], 27f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v25.4s, v25.4s, v7.4s\n\t"
+        "27:\n\t"
+        "str q25, [%[cp], #32]\n\t"
+        "55:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 28f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v26.4s, v26.4s, v7.4s\n\t"
+        "28:\n\t"
+        "str q26, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 56f\n\t"
+        "cbnz %w[first], 29f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v27.4s, v27.4s, v7.4s\n\t"
+        "29:\n\t"
+        "str q27, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 56f\n\t"
+        "cbnz %w[first], 30f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v28.4s, v28.4s, v7.4s\n\t"
+        "30:\n\t"
+        "str q28, [%[cp], #32]\n\t"
+        "56:\n\t"
+        "add %[cp], %[cp], %[stride]\n\t"
+        "cbnz %w[first], 31f\n\t"
+        "ldr q7, [%[cp], #0]\n\t"
+        "fadd v29.4s, v29.4s, v7.4s\n\t"
+        "31:\n\t"
+        "str q29, [%[cp], #0]\n\t"
+        "cmp %w[rows], #8\n\t"
+        "b.lt 57f\n\t"
+        "cbnz %w[first], 32f\n\t"
+        "ldr q7, [%[cp], #16]\n\t"
+        "fadd v30.4s, v30.4s, v7.4s\n\t"
+        "32:\n\t"
+        "str q30, [%[cp], #16]\n\t"
+        "cmp %w[rows], #12\n\t"
+        "b.lt 57f\n\t"
+        "cbnz %w[first], 33f\n\t"
+        "ldr q7, [%[cp], #32]\n\t"
+        "fadd v31.4s, v31.4s, v7.4s\n\t"
+        "33:\n\t"
+        "str q31, [%[cp], #32]\n\t"
+        "57:\n\t"
+        "6:\n\t"
+        : [ap] "+&r"(ap), [bp] "+&r"(bp), [cp] "+&r"(cp), [depth] "+&r"(depth)
+        : [stride] "r"(stride), [first] "r"(first), [rows] "r"(rows), [columns] "r"(columns)
+        : "cc", "memory", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11",
+          "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24",
+          "v25", "v26", "v27", "v28", "v29", "v30", "v31");
+}
+static void rectangular32_neon12_tile(int m, int n, int k, const float *a, const float *b, float *c,
+                                      int ldc, int first)
+{
+    for (int j = 0; j < n; j += 8)
+        for (int i = 0; i < m; i += 12)
+            rectangular32_neon12_kernel(k, a + (size_t)i * k, b + (size_t)j * k,
+                                        c + i + (size_t)j * ldc, ldc, first,
+                                        m - i < 12 ? m - i : 12, n - j < 8 ? n - j : 8);
+}
+#endif
+
 static void rectangular32_product(const camblas_task_t *task, void *opaque)
 {
     rectangular32_t *w = opaque;
@@ -299,6 +673,12 @@ static void rectangular32_product(const camblas_task_t *task, void *opaque)
         const float *b = w->packed_b + (size_t)product * w->b_plane +
                          (size_t)pc * w->column_groups * 8 + (size_t)column * bk;
         float *c = w->products + (size_t)product * w->product_plane + row + (size_t)column * w->hm;
+#if CAMBLAS_RECT32_NEON12
+        if (w->neon_kernel) {
+            rectangular32_neon12_tile(bm, bn, bk, a, b, c, w->hm, pc == 0 && w->source_pc == 0);
+            continue;
+        }
+#endif
         if (camblas_sgemm_sve_amicro12_tile(bm, bn, bk, 1.0f, a, bk, b, bk, c, w->hm,
                                             pc == 0 && w->source_pc == 0)) {
             atomic_store_explicit(&w->failed, 1, memory_order_relaxed);
@@ -371,6 +751,8 @@ static int rectangular32_execute(int tb, const camblas_executor_t *executor, int
                             .column_groups = (hn + 7) / 8,
                             .depth_blocks = (hk + CAMBLAS_RECT_KC - 1) / CAMBLAS_RECT_KC,
                             .c = c};
+    work.neon_kernel = CAMBLAS_RECT32_NEON12 && workers >= 16 && workers <= 32 && !tb &&
+                       m >= (int64_t)n * 4 && k > 1024 && !(m % 8) && !(n % 8);
     int stream = workers >= 16 && workers <= 32 && m >= (int64_t)n * 4 && k > 1024;
     int packed_k = stream && hk > CAMBLAS_RECT_KC ? CAMBLAS_RECT_KC : hk;
     work.a_plane = (size_t)work.row_groups * 12 * packed_k;
@@ -420,19 +802,36 @@ static int rectangular32_execute(int tb, const camblas_executor_t *executor, int
     }
     int columns = work.column_groups < column_grid ? work.column_groups : column_grid;
     int count = 0;
-    for (int p = 0; p < 7; ++p)
+    if (work.neon_kernel) {
         for (int rb = 0; rb < rows; ++rb)
-            for (int cb = 0; cb < columns; ++cb) {
-                int i0 = work.row_groups * rb / rows * 12;
-                int i1 = work.row_groups * (rb + 1) / rows * 12;
-                int j0 = work.column_groups * cb / columns * 8;
-                int j1 = work.column_groups * (cb + 1) / columns * 8;
-                if (i1 > hm)
-                    i1 = hm;
-                if (j1 > hn)
-                    j1 = hn;
-                product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
-            }
+            for (int cb = 0; cb < columns; ++cb)
+                for (int p = 0; p < 7; ++p) {
+                    int r = (rb + p) % rows, cc = (cb + p) % columns;
+                    int i0 = work.row_groups * r / rows * 12;
+                    int i1 = work.row_groups * (r + 1) / rows * 12;
+                    int j0 = work.column_groups * cc / columns * 8;
+                    int j1 = work.column_groups * (cc + 1) / columns * 8;
+                    if (i1 > hm)
+                        i1 = hm;
+                    if (j1 > hn)
+                        j1 = hn;
+                    product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
+                }
+    } else {
+        for (int p = 0; p < 7; ++p)
+            for (int rb = 0; rb < rows; ++rb)
+                for (int cb = 0; cb < columns; ++cb) {
+                    int i0 = work.row_groups * rb / rows * 12;
+                    int i1 = work.row_groups * (rb + 1) / rows * 12;
+                    int j0 = work.column_groups * cb / columns * 8;
+                    int j1 = work.column_groups * (cb + 1) / columns * 8;
+                    if (i1 > hm)
+                        i1 = hm;
+                    if (j1 > hn)
+                        j1 = hn;
+                    product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
+                }
+    }
     if (!stream) {
         /* Each synchronous stage completes before its outputs are consumed. The
      * pack pass also produces the per-worker operand maxima, so the range

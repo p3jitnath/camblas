@@ -19,8 +19,12 @@ static int try_rect64_d(camblas_ctx_t *ctx, char ta, char tb, int m, int n, int 
                n <= 2048 && k > 1024 && k <= 4096;
     int wide = ctx->num_threads <= 32 && tb == 'N' && ta == 'N' && m < n && m >= 128 && m <= 2048 &&
                n <= 2048 && k >= 256 && k <= 1024;
-    int copy_a = ctx->num_threads <= 32 && ta == 'T' && tb == 'N' && m == n && m >= 512 &&
-                 m <= 2048 && k >= 256 && k <= 1024;
+    int short64_numpy = 0;
+#if CAMBLAS_FRAMEWORK_SPIN_POOL
+    short64_numpy = ctx->num_threads == 64 && !app_torch;
+#endif
+    int copy_a = (ctx->num_threads <= 32 || short64_numpy) && ta == 'T' && tb == 'N' && m == n &&
+                 m >= 512 && m <= 2048 && k >= 256 && k <= 1024;
     if ((ta != 'N' && !copy_a) || alpha != 1 || beta != 0 || ctx->num_threads < 16 ||
         ctx->num_threads > 64 || (!square && !transposed && !wide && !deep && !copy_a) || m % 2 ||
         n % 2 || k % 2)

@@ -72,6 +72,9 @@ def main():
             subprocess.run([executable, bridge], env=env, check=True, timeout=300)
             if name == "shared_grid32":
                 subprocess.run(
+                    [executable, bridge, "--square"], env=env, check=True, timeout=300
+                )
+                subprocess.run(
                     [executable, bridge, "--deep"], env=env, check=True, timeout=300
                 )
         if args.torch_context:
@@ -105,7 +108,7 @@ def main():
                     "torch.set_num_threads(64); torch.set_num_interop_threads(1); "
                     "f = c.CDLL(sys.argv[1]).shared_grid32_check; "
                     "f.argtypes = [c.c_char_p, c.c_int]; f.restype = c.c_int; "
-                    "sys.exit(f(sys.argv[2].encode(), 1))",
+                    "sys.exit(f(sys.argv[2].encode(), 1) or f(sys.argv[2].encode(), 3))",
                     oracle,
                     bridge,
                 ],

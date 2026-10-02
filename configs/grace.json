@@ -389,7 +389,8 @@
       "-Wextra",
       "-Werror",
       "-mcpu=neoverse-v2",
-      "-fPIC"
+      "-fPIC",
+      "-DCAMBLAS_RECT32_NEON12=1"
     ],
     "batch_amicro64": [
       "-O3",

@@ -141,6 +141,22 @@ int shared_grid32_check(const char *library_path, int deep)
             "8 complete transposed-A scalar-oracle FP32 products passed with route, tails and padding checks");
         return 0;
     }
+    if (deep == 3) {
+        /* NN squares exercise the eight-row worker grid, all output-column
+         * tails, and the existing grid when the column split is ineligible. */
+        const int dimensions[] = {128, 256, 512, 528, 544, 576, 1024};
+        int failures = 0;
+        for (size_t i = 0; i < sizeof(dimensions) / sizeof(dimensions[0]); ++i)
+            for (int trial = 0; trial < 2; ++trial)
+                failures += check(gemm, counter, reset, dimensions[i], dimensions[i], dimensions[i],
+                                  0, 1, trial);
+        dlclose(library);
+        if (failures)
+            return 1;
+        puts(
+            "14 complete NN square scalar-oracle products passed with grid, tails, changed inputs and padding checks");
+        return 0;
+    }
     if (deep == 1) {
         const int shapes[][3] = {{264, 128, 1025}, {520, 256, 1537}, {1032, 512, 2049}};
         int failures = 0;
@@ -186,6 +202,8 @@ int main(int argc, char **argv)
         return shared_grid32_check(argv[1], 0);
     if (argc == 3 && !strcmp(argv[2], "--deep"))
         return shared_grid32_check(argv[1], 1);
+    if (argc == 3 && !strcmp(argv[2], "--square"))
+        return shared_grid32_check(argv[1], 3);
     if (argc == 3 && !strcmp(argv[2], "--transpose-a"))
         return shared_grid32_check(argv[1], 2);
     return 2;

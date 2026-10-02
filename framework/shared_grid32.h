@@ -510,7 +510,7 @@ static inline void shared32_tail8(int depth, const float *a, const float *b, flo
 typedef struct {
     const float *a, *b;
     float *c, *workspace;
-    int m, n, k, lda, ldb, ldc, tb, bstride, used;
+    int m, n, k, lda, ldb, ldc, tb, bstride, used, rows, columns;
     const camblas_executor_t *executor;
     _Alignas(64) atomic_int ready;
 } shared32_work_t;
@@ -519,8 +519,8 @@ static size_t shared32_capacity;
 static void shared32_task(const camblas_task_t *task, void *opaque)
 {
     shared32_work_t *w = opaque;
-    int id = task->i0, row = id % 16, col = id / 16;
-    int agroups = w->m / 8, j0 = w->n * col / 4, je = w->n * (col + 1) / 4,
+    int id = task->i0, row = id % w->rows, col = id / w->rows;
+    int agroups = w->m / 8, j0 = w->n * col / w->columns, je = w->n * (col + 1) / w->columns,
         bgroups = (je - j0 + 11) / 12;
     float *ap = w->workspace, *bp = ap + (size_t)w->m * w->k + (size_t)col * w->bstride;
     /* Deep products keep all micro-panels for one 512-depth block adjacent.
@@ -536,7 +536,7 @@ static void shared32_task(const camblas_task_t *task, void *opaque)
                                     : (size_t)g * 8 * w->k + p * 8;
                 memcpy(ap + offset, w->a + g * 8 + (size_t)p * w->lda, 8 * sizeof(float));
             }
-        for (int g = bgroups * row / 16; g < bgroups * (row + 1) / 16; g++) {
+        for (int g = bgroups * row / w->rows; g < bgroups * (row + 1) / w->rows; g++) {
             int j = g * 12;
             for (int p = p0; p < pe; p++) {
                 int pc = p / 512 * 512, depth = w->k - pc < 512 ? w->k - pc : 512;
@@ -557,7 +557,7 @@ static void shared32_task(const camblas_task_t *task, void *opaque)
     atomic_fetch_add_explicit(&w->ready, 1, memory_order_acq_rel);
     while (atomic_load_explicit(&w->ready, memory_order_acquire) != 64)
         spin_pause();
-    int i0 = agroups * row / 16 * 8, ie = agroups * (row + 1) / 16 * 8;
+    int i0 = agroups * row / w->rows * 8, ie = agroups * (row + 1) / w->rows * 8;
     for (int pc = 0; pc < w->k; pc += 512) {
         int depth = w->k - pc < 512 ? w->k - pc : 512;
         for (int j = 0; j < je - j0; j += 12)
@@ -627,9 +627,11 @@ static int try_base_shared32_s(camblas_ctx_t *ctx, char ta, char tb, int m, int 
                             .ldb = ldb,
                             .ldc = ldc,
                             .tb = tb == 'T'};
+    work.rows = (tb == 'N' && m == n && n == k && k <= 1024 && !(n % 32)) ? 8 : 16;
+    work.columns = 64 / work.rows;
     work.executor = ctx->executor;
-    work.bstride = ((n / 4 + 11) / 12 * 12) * k;
-    size_t bytes = ((size_t)m * k + 4 * (size_t)work.bstride) * sizeof(float);
+    work.bstride = ((n / work.columns + 11) / 12 * 12) * k;
+    size_t bytes = ((size_t)m * k + work.columns * (size_t)work.bstride) * sizeof(float);
     if (bytes > shared32_capacity) {
         void *next = benchmark_alloc(bytes);
         if (!next)
