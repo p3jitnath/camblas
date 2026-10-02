@@ -1,0 +1,3055 @@
+{
+  "description": "Complete Grace application comparison; median of three fresh-process medians. Wins use unrounded values.",
+  "versions": {
+    "gcc": "14.3.0",
+    "openblas": "0.3.33",
+    "nvpl_blas": "0.3.0 (HPC SDK 24.11)"
+  },
+  "scores": {
+    "openblas": 60,
+    "nvpl": 57,
+    "within_2_percent_of_nvpl": 59
+  },
+  "manifest": {
+    "case_count": 60,
+    "rounds": 3,
+    "affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127,
+      128,
+      129,
+      130,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      168,
+      169,
+      170,
+      171,
+      172,
+      173,
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207,
+      208,
+      209,
+      210,
+      211,
+      212,
+      213,
+      214,
+      215,
+      216,
+      217,
+      218,
+      219,
+      220,
+      221,
+      222,
+      223,
+      224,
+      225,
+      226,
+      227,
+      228,
+      229,
+      230,
+      231,
+      232,
+      233,
+      234,
+      235,
+      236,
+      237,
+      238,
+      239,
+      240,
+      241,
+      242,
+      243,
+      244,
+      245,
+      246,
+      247,
+      248,
+      249,
+      250,
+      251,
+      252,
+      253,
+      254,
+      255,
+      256,
+      257,
+      258,
+      259,
+      260,
+      261,
+      262,
+      263,
+      264,
+      265,
+      266,
+      267,
+      268,
+      269,
+      270,
+      271,
+      272,
+      273,
+      274,
+      275,
+      276,
+      277,
+      278,
+      279,
+      280,
+      281,
+      282,
+      283,
+      284,
+      285,
+      286,
+      287
+    ],
+    "hostname": "nid010267",
+    "slurm_job_id": "7002579",
+    "command": [
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/compare.py",
+      "--full",
+      "--rounds",
+      "3",
+      "--output",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/full60_20261002_target60"
+    ],
+    "backends": {
+      "camblas": {
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/camblas/lib/libframework_blas.so",
+        "sha256": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4",
+        "core_sha256": "c54370c43f44e055fd985c9f2c588ccad0eaca28ab5f48e0188bf09a1c8a9144"
+      },
+      "openblas": {
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/openblas/lib/libframework_blas.so",
+        "sha256": "d9736b1ec38832d3623a787f3548376087f7471d042ff7b26942185214db3493"
+      },
+      "nvpl": {
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/nvpl/lib/libframework_blas.so",
+        "sha256": "227fdcd289179f13416cfffbdcb2f7131f04c2d99fdb4a5d85df4107df81ae05"
+      }
+    }
+  },
+  "complete": {
+    "status": "passed",
+    "cases": 60,
+    "wins": {
+      "openblas": 60,
+      "nvpl": 57
+    }
+  },
+  "source_identity": {
+    "status": "build only; numerical and performance validation pending",
+    "overrides": {
+      "packed": [],
+      "packing": [],
+      "planner": [],
+      "bridge": [],
+      "deep_amicro": [],
+      "deep_amicro64": [],
+      "shallow64": [],
+      "batch_amicro64": [],
+      "rectangular64": [],
+      "rectangular32": [],
+      "rectangular_batch": [],
+      "deep_direct": [],
+      "wide8x12": [],
+      "stream12": []
+    },
+    "fixed_sve128": false,
+    "shallow64": false,
+    "shallow_fixed128": false,
+    "rect32": false,
+    "rectangular_batch": false,
+    "direct_a": false,
+    "wide8x12": false,
+    "stream12": false,
+    "deep64": false,
+    "rect64": false,
+    "source_tree": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas",
+    "build_hostname": "nid010267",
+    "build_allocation": "7002579",
+    "source_commit": "4d78588134c32dab216fed52d12791896f7c1186",
+    "source_sha256": {
+      "configs/build-requirements.txt": "6df362c6b84bd65af99010bbdb6b2f199af37e2a65e921f5789575e6ba048b42",
+      "configs/grace.json": "d503e1f5a1b14f983522a8b9d1d3e0a854c3f53938dab50521b1741f9d703d9f",
+      "configs/runtime-requirements.txt": "ff6eae8ab1bb4faf369954aa662d43f57ee6f40849549bf2225b4ebb4e79002b",
+      "configs/style-requirements.txt": "3a0a5b5699e15b5e0857538bfd652c74ed6f2ab27ba0f1b70b602d917f7afcbf",
+      "framework/benchmark_alloc.h": "90b7a06c40125ff934b2590b91d92d7a71acc47e3c59e4e17cfe5139128290e4",
+      "framework/framework_blas_bridge.c": "c4f98392c7fd4bb97c4e8f9a857d5399b62330bef9b25252dcb9e85dbd5a8fe4",
+      "framework/fused_sum_api.h": "0355bea996c2117586b339185e71bdf2ce4679a24c5271a94bd59a5f69768e30",
+      "framework/output_page_touch.h": "d98888c6cfa77d40cab450dddbfce669a267c2337d73a8d2014b1acec681ce57",
+      "framework/rectangular32_policy.h": "1132c0f302feef8798428f61835d62d685132c7358b8e1bbb28fc8d5df0db2d5",
+      "framework/rectangular32_range.h": "7e7bd175448561d40fb1de86b2a5c89bd68d4d40b3375613fa9c39f819626e6d",
+      "framework/rectangular64_policy.h": "d6e534e028007233a483dd6967346fd834d1beb01496446961e0140284115308",
+      "framework/rectangular64_range.h": "97bf3a867931c7daf05be6dab55b90b939539cc8bc1d98b0b151bc6217d91a16",
+      "framework/shared_grid32.h": "d6c343ac4f848df036f0c01d54087e730a76a94f79560a699012f6de4b797e06",
+      "framework/strassen_one_level.h": "53516df103e0df79a549c14783a2d51c0c2d5f37ac752541dff6212c60892d96",
+      "include/camblas.h": "0f23791fd4e8946512eb143c726234686555dd6cc156a73503952e42114cf9b8",
+      "include/camblas_cblas.h": "ee4c6ba99ba0294c7cca986cc231c668849e7e0f37455be13d351f3370858798",
+      "include/camblas_executor.h": "c5de255ebb75c97130aff25d9e831be8f16b6614b8ada9b439cbd4764cdd1830",
+      "include/camblas_planner.h": "03f5a7ff1882e3f9a51a4f7ad3d9b332cde6dad1a93646ba4fccff71c3e9d076",
+      "include/camblas_pthread.h": "4f78f1322ab75847cdece73ae71b9ab6db68635c4e71475047d3118d1615092b",
+      "include/camblas_topology.h": "87ba9238381ae83f45e62623ce12a9d9982a5fe5f27ae626b42b5105874126b6",
+      "include/camblas_version.h": "52512b05e2f596ac34ed9c4b2231787c27d893b524c5bb54f6c754ff70f3681c",
+      "include/camblas_workspace.h": "587f6e9ace41e565a04620a179dd8a8bfd3e9ed74bec7b66fba9d73f49da2b57",
+      "src/amicro_transpose.h": "6af633e1aea5fc659111ad9117aa0f8b0d58bb1ea5cc7ae67c94f9e4b066dce6",
+      "src/batch_amicro64.c": "4fcb5ed82f740d22ce8c92b88d8a1a8d94cd0e8d21fe878fca12dab04569c1e3",
+      "src/bilinear.h": "db1a284bc2b54ccd56bda0267916647eb732c15d133c6a8eacaa96537f2c3602",
+      "src/cblas_shim.c": "40e7f5d289d717babb8d7dc45b7f316e1d3f45968329dad41a9e22356f12c93b",
+      "src/compact.h": "7b044e2256a6c85906c3497880f8e5992e3b63daf1873b8dd7a4afb44b22eb15",
+      "src/cpuset_bits.h": "fad892f756fc4012bd3332e43b2b327cde654e932435b4e4cad31550af23f03d",
+      "src/deep_amicro.c": "93250b1b6d073c52109af78a20772c459105aedc250eedb771352f2134a84349",
+      "src/deep_amicro64.c": "53753502379887678a5d7c876398c9f86ad2b376c38859f33c2e68e7ef90236a",
+      "src/dot_product.h": "0739f4686bc81aaa9bec9c2275375c9086f253842e21c163824b6a7c81e8b2ad",
+      "src/executor.c": "c6c8d864e3193fb8ca08a3166a9b71a2c2950c9f5faece851bfbef9b14dd1755",
+      "src/gemm_bounds.h": "177076d264b079ced16fba2f13ad4f3e57a9b7b7cbe2c72b7f5d3ff7d27d80d6",
+      "src/kernels.h": "6dfb3e615f5dde16b16c4cfc54287149fd9de96a7a119042f391721d8841ae75",
+      "src/neon_micro8.h": "ae0362e30d81a19a2b7553bf10edeb8ccf034d9cc2bb396f97191fa52af1a7da",
+      "src/packed.c": "297f44cac5ff957b59a25cd66b2392ef3d9207a84b0f62fa7ff95fb64ceb650a",
+      "src/packed.h": "404d792dd6fc87ad19532ac39fd081892d28ed284613fde380a0ea37ebbfd077",
+      "src/packed_grid.h": "93a13d78831c51ea01364ea8938e93d6d6df773266c56ab95b5ca1afd8d8c5a7",
+      "src/packing.c": "9a7d679dc6537d44c6530244fdf6a6c2bbd9ece3e8e58d50510d19a01763fb28",
+      "src/packing.h": "effebdab99b3c36035b5172073e9103ebe8490d98c2e44abc8d826235ba6835a",
+      "src/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
+      "src/planner.c": "f6ad3af3d350818d8963de27382a7fd60e9da01901a5a4fc406aff21744af9e8",
+      "src/pthread_pool.c": "50df372878e8d77e726dba97e29e311b45b39951a0ecfef0ad659cb34b7d651b",
+      "src/rectangular32.c": "77d32650bb19004db525cc62b44fe9417c56e961358e77d12689d731067f8aa1",
+      "src/rectangular32.h": "ca46d780ee0672a311f708540bb6e2164d29ba6dae329bd488cd15f147c8cf38",
+      "src/rectangular64.c": "8f3e23dbe14eabb3f4adee8de0b71694a642297cfd2e03fa4e5fa1bb63e11694",
+      "src/rectangular64.h": "3abd0424db264d9db9b18c40724b83aaf9eb56af479b7a0480dd75c4833c38aa",
+      "src/scalar.c": "3b3a6b57b970299150fd4966766b5b6d91a2748eee22ebcedd90fca6a624386e",
+      "src/sve.c": "974a148b59b6674bdd802086a259696b9f7fcf21065d4f4c62e47927e6f15364",
+      "src/sve_block4x6.h": "d2d8f504854f5316afcc3522cc13a97dcf9d5b499cb1636de48f3c9131aa491a",
+      "src/sve_block_balanced.h": "8a279819b18c83043f56cc3dd968a26dcd935881cdce025d4c3cfb45f7e84712",
+      "src/sve_interleaved.h": "eb69b129415e55b864fbace6882e5ae54709e352735da54e4578a9a6b76718ff",
+      "src/sve_lane_ops.h": "0de4935a40a44b107bea8fb4bcb29f3c8d81264e43611c7766b1921d615ff416",
+      "src/sve_micro6.h": "4df6e747d3f27318c56f6a23c976c8d53559bb659c853d8b9c1b86b52e96a8b6",
+      "src/sve_pipe_b.h": "9b57644787eaa020247d1b89816c780224a7ec2a88be5a1909f15162b9b004d5",
+      "src/sve_register_block.h": "b2e750a3fb55bf262a1270c5fb7c7d2c078a0e8aaea4064354c455d85187107f",
+      "src/sve_runtime.h": "293322da77e3401d615a57a640184bd663141b2f2d5c56f76ab38409768f92b9",
+      "src/symmetric/neon_micro12.h": "e0a599854fd113ffa1a97bbe1386ce85cc60dd7d9da92a82a39e2eac3b16e3b4",
+      "src/symmetric/neon_micro8.h": "ae0362e30d81a19a2b7553bf10edeb8ccf034d9cc2bb396f97191fa52af1a7da",
+      "src/symmetric/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
+      "src/symmetric/sve_interleaved.h": "919a5989929e22701f70e6624769869da94fbe461e4b7f45c67eed40293f66dd",
+      "src/symmetric/sve_lane_ops.h": "0de4935a40a44b107bea8fb4bcb29f3c8d81264e43611c7766b1921d615ff416",
+      "src/symmetric/sve_pipe_b.h": "9b57644787eaa020247d1b89816c780224a7ec2a88be5a1909f15162b9b004d5",
+      "src/symmetric/sve_runtime.h": "293322da77e3401d615a57a640184bd663141b2f2d5c56f76ab38409768f92b9",
+      "src/symmetric/symmetric.c": "23acd9f40b06d2fef8d155badef1c24ebcbc758b410625e569d77256907f9309",
+      "src/symmetric/symmetric.h": "70803de287da617bf70605e2cd53f9a47c60b3d735bfbf92140d56d57c8dc60b",
+      "src/symmetric.h": "70803de287da617bf70605e2cd53f9a47c60b3d735bfbf92140d56d57c8dc60b",
+      "src/topology.c": "e21b84f2a6c4e9c2d413808e52aded85cb9968b0dd78e9ec164e3039d23907b2"
+    },
+    "libraries": {
+      "libcamblas_sve_nr4.so": {
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/libcamblas_sve_nr4.so",
+        "sha256": "c54370c43f44e055fd985c9f2c588ccad0eaca28ab5f48e0188bf09a1c8a9144"
+      },
+      "libframework_blas.so": {
+        "path": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/libframework_blas.so",
+        "sha256": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4"
+      },
+      "libopenblas.so": {
+        "path": "/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so",
+        "sha256": "e1e42ea8e4daa421b7d819eb8e2423ac37442cfc62b5db7428402da3dc8e447f"
+      }
+    }
+  },
+  "build_commands": [
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/scalar.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/scalar.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/cblas_shim.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/cblas_shim.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/topology.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/topology.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/executor.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/executor.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/packing.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/packing.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-DCAMBLAS_SHARED_B_MIN_WIDTH=16",
+      "-DCAMBLAS_SHARED_B_DEEP_WIDTH=64",
+      "-DCAMBLAS_PACKED_FUSED_PREP=1",
+      "-DCAMBLAS_SHARED_B_DEEP_KBLOCKS=1",
+      "-DCAMBLAS_PACKED_DEEP_AMICRO32=2",
+      "-DCAMBLAS_PACKED_DEEP_ALLOC_FREE=0",
+      "-DCAMBLAS_PACKED_DEEP_VECTOR_B=1",
+      "-DCAMBLAS_PACKED_DEEP_MIN_TASKS=16",
+      "-DCAMBLAS_PACKED_DEEP_AMICRO64=2",
+      "-DCAMBLAS_PACKED_DEEP64_MAX_TASKS=32",
+      "-DCAMBLAS_PACKED_DEEP64_MAX_ASPECT=4",
+      "-DCAMBLAS_PACKED_SHALLOW_AMICRO32=1",
+      "-DCAMBLAS_PACKED_SHALLOW_AMICRO32_WIDE=1",
+      "-DCAMBLAS_PACKED_SHALLOW_AMICRO32_TRANSPOSE=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/packed.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/packed.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-DCAMBLAS_DEEP_KC_MIN_THREADS=64",
+      "-DCAMBLAS_DEEP_KC_CACHE_BYTES=524288",
+      "-DCAMBLAS_DEEP_ROW_BLOCK=256",
+      "-DCAMBLAS_DEEP_ROW_BLOCK_FP64=256",
+      "-DCAMBLAS_DEEP_ROW_BLOCK_MAX_THREADS=32",
+      "-DCAMBLAS_SHALLOW_ASPECT_GRID_FP32=1",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/planner.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/planner.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-mcpu=neoverse-v2",
+      "-msve-vector-bits=scalable",
+      "-DCAMBLAS_SVE_BLOCK6=1",
+      "-DCAMBLAS_SVE_COLS6=1",
+      "-DCAMBLAS_SVE_LANE_FMA=1",
+      "-DCAMBLAS_SVE_ORDERED_LANE=1",
+      "-DCAMBLAS_MICRO8_ALTERNATE=1",
+      "-DCAMBLAS_MICRO8_WIDE_TAIL=1",
+      "-DCAMBLAS_MICRO8_UNROLL2=1",
+      "-DCAMBLAS_MICRO8_ROWS=3",
+      "-DCAMBLAS_MICRO8_PIPE_A=2",
+      "-DCAMBLAS_MICRO8_UNROLL_FACTOR=2",
+      "-DCAMBLAS_MICRO8_BASE_LOADS=0",
+      "-DCAMBLAS_MICRO8_PIPE_B=0",
+      "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
+      "-DCAMBLAS_MICRO8_NEON=0",
+      "-DCAMBLAS_MICRO8_PREFETCH_K=0",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/sve.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/sve.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-mcpu=neoverse-v2",
+      "-msve-vector-bits=scalable",
+      "-DCAMBLAS_SVE_BLOCK6=1",
+      "-DCAMBLAS_SVE_COLS6=1",
+      "-DCAMBLAS_SVE_LANE_FMA=1",
+      "-DCAMBLAS_SVE_ORDERED_LANE=1",
+      "-DCAMBLAS_MICRO8_ALTERNATE=1",
+      "-DCAMBLAS_MICRO8_WIDE_TAIL=1",
+      "-DCAMBLAS_MICRO8_UNROLL2=1",
+      "-DCAMBLAS_MICRO8_ROWS=3",
+      "-DCAMBLAS_MICRO8_PIPE_A=2",
+      "-DCAMBLAS_MICRO8_UNROLL_FACTOR=2",
+      "-DCAMBLAS_MICRO8_BASE_LOADS=0",
+      "-DCAMBLAS_MICRO8_PIPE_B=0",
+      "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
+      "-DCAMBLAS_MICRO8_NEON=0",
+      "-DCAMBLAS_MICRO8_PREFETCH_K=0",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/deep_amicro.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/deep_amicro.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-mcpu=neoverse-v2",
+      "-msve-vector-bits=scalable",
+      "-DCAMBLAS_SVE_BLOCK6=1",
+      "-DCAMBLAS_SVE_COLS6=1",
+      "-DCAMBLAS_SVE_LANE_FMA=1",
+      "-DCAMBLAS_SVE_ORDERED_LANE=1",
+      "-DCAMBLAS_MICRO8_ALTERNATE=1",
+      "-DCAMBLAS_MICRO8_WIDE_TAIL=1",
+      "-DCAMBLAS_MICRO8_UNROLL2=1",
+      "-DCAMBLAS_MICRO8_ROWS=3",
+      "-DCAMBLAS_MICRO8_PIPE_A=2",
+      "-DCAMBLAS_MICRO8_UNROLL_FACTOR=2",
+      "-DCAMBLAS_MICRO8_BASE_LOADS=0",
+      "-DCAMBLAS_MICRO8_PIPE_B=0",
+      "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
+      "-DCAMBLAS_MICRO8_NEON=0",
+      "-DCAMBLAS_MICRO8_PREFETCH_K=0",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/deep_amicro64.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/deep_amicro64.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-mcpu=neoverse-v2",
+      "-fPIC",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/rectangular64.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/rectangular64.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-mcpu=neoverse-v2",
+      "-fPIC",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/rectangular32.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/rectangular32.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-fPIC",
+      "-DCAMBLAS_SVE_NR=4",
+      "-DCAMBLAS_PACKED_ADAPTIVE_A=2",
+      "-DCAMBLAS_PACKED_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_SHARED_B_GUARD=1",
+      "-mcpu=neoverse-v2",
+      "-msve-vector-bits=scalable",
+      "-DCAMBLAS_SVE_BLOCK6=1",
+      "-DCAMBLAS_SVE_COLS6=1",
+      "-DCAMBLAS_SVE_LANE_FMA=1",
+      "-DCAMBLAS_SVE_ORDERED_LANE=1",
+      "-DCAMBLAS_MICRO8_ALTERNATE=1",
+      "-DCAMBLAS_MICRO8_WIDE_TAIL=1",
+      "-DCAMBLAS_MICRO8_UNROLL2=1",
+      "-DCAMBLAS_MICRO8_ROWS=3",
+      "-DCAMBLAS_MICRO8_PIPE_A=2",
+      "-DCAMBLAS_MICRO8_UNROLL_FACTOR=2",
+      "-DCAMBLAS_MICRO8_BASE_LOADS=1",
+      "-DCAMBLAS_MICRO8_PIPE_B=0",
+      "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
+      "-DCAMBLAS_MICRO8_NEON=0",
+      "-DCAMBLAS_MICRO8_PREFETCH_K=0",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/batch_amicro64.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/batch_amicro64.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-shared",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/scalar.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/cblas_shim.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/topology.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/executor.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/packing.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/packed.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/planner.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/sve.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/deep_amicro.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/deep_amicro64.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/rectangular64.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/rectangular32.o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/batch_amicro64.o",
+      "-Wl,-z,defs",
+      "-pthread",
+      "-lm",
+      "-Wl,-soname,libcamblas_sve_nr4.so",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/libcamblas_sve_nr4.so"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fPIC",
+      "-mcpu=neoverse-v2",
+      "-msve-vector-bits=scalable",
+      "-DCAMBLAS_SVE_BLOCK6=1",
+      "-DCAMBLAS_SVE_COLS6=1",
+      "-DCAMBLAS_SVE_LANE_FMA=1",
+      "-DCAMBLAS_SVE_ORDERED_LANE=1",
+      "-DCAMBLAS_PACKED_PAD_CACHELINE=1",
+      "-DCAMBLAS_PACKED_INTERLEAVED=1",
+      "-DDEFAULT_MC=256",
+      "-DDEFAULT_KC=256",
+      "-DCAMBLAS_MICRO8_ALTERNATE=1",
+      "-DCAMBLAS_PACKED_REUSE_B=1",
+      "-DCAMBLAS_MICRO8_WIDE_TAIL=1",
+      "-DCAMBLAS_MICRO8_UNROLL2=1",
+      "-DCAMBLAS_MICRO8_ROWS=3",
+      "-DCAMBLAS_MICRO8_PIPE_A=2",
+      "-DCAMBLAS_MICRO8_UNROLL_FACTOR=2",
+      "-DCAMBLAS_MICRO8_BASE_LOADS=0",
+      "-DCAMBLAS_MICRO8_PIPE_B=0",
+      "-DCAMBLAS_PACKED_A_MICRO64=0",
+      "-DCAMBLAS_MICRO8_ALPHA_ONE=0",
+      "-DDEFAULT_NC=512",
+      "-DCAMBLAS_PACKED_INIT_C=1",
+      "-DCAMBLAS_PACKED_PAD_SET8=1",
+      "-DCAMBLAS_PACK_B_FULL8=1",
+      "-DCAMBLAS_PACKED_SHARED_B=1",
+      "-DCAMBLAS_PACKED_SHARED_B_CHUNKS=0",
+      "-DCAMBLAS_MICRO8_NEON=0",
+      "-DCAMBLAS_MICRO8_PREFETCH_K=0",
+      "-DCAMBLAS_PACKED_FILL_GRID=1",
+      "-DCAMBLAS_PACKED_BALANCE_WAVES=1",
+      "-DCAMBLAS_PACKED_SHORT_PRIVATE=1",
+      "-DCAMBLAS_EXPERIMENTAL_SUM_PACK=0",
+      "-DCAMBLAS_SUM_PACK_ONE_PASS=0",
+      "-DCAMBLAS_PACKED_SHARED_A=1",
+      "-DCAMBLAS_SYMMETRIC_BALANCE=1",
+      "-DCAMBLAS_SYMMETRIC_VECTOR_PACK=1",
+      "-DCAMBLAS_SYMMETRIC_MICRO12=2",
+      "-DCAMBLAS_SYMMETRIC_DIAGONAL=1",
+      "-DCAMBLAS_SYMMETRIC_K64=64",
+      "-DCAMBLAS_FRAMEWORK_PRETOUCH=3",
+      "-DCAMBLAS_FRAMEWORK_TOUCH_WIDE=1",
+      "-DCAMBLAS_FRAMEWORK_REUSE_WIDE_A=1",
+      "-DCAMBLAS_FRAMEWORK_TOUCH_MAX_BYTES=134217728",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/symmetric/symmetric.c",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/symmetric.o"
+    ],
+    [
+      "taskset",
+      "-c",
+      "287",
+      "gcc-14",
+      "-O3",
+      "-std=gnu11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-mcpu=neoverse-v2",
+      "-fPIC",
+      "-DFRAMEWORK_BACKEND=0",
+      "-DCAMBLAS_FRAMEWORK_PRIVATE_SHORT=0",
+      "-DCAMBLAS_PRIVATE_K_LIMIT=1024",
+      "-DCAMBLAS_FRAMEWORK_OPENMP=1",
+      "-DCAMBLAS_FRAMEWORK_SPIN_POOL=1",
+      "-DCAMBLAS_FRAMEWORK_TEAM_REUSE=1",
+      "-DCAMBLAS_BENCH_MEMORY_POLICY=1",
+      "-fopenmp",
+      "-DCAMBLAS_FRAMEWORK_NATIVE_SYRK=3",
+      "-DCAMBLAS_FRAMEWORK_SMALL_THREADS=0",
+      "-DCAMBLAS_FRAMEWORK_SYMMETRIC=1",
+      "-DCAMBLAS_SYMMETRIC_BALANCE=1",
+      "-DCAMBLAS_SYMMETRIC_VECTOR_PACK=1",
+      "-DCAMBLAS_SYMMETRIC_MICRO12=2",
+      "-DCAMBLAS_SYMMETRIC_DIAGONAL=1",
+      "-DCAMBLAS_SYMMETRIC_K64=64",
+      "-DCAMBLAS_FRAMEWORK_PRETOUCH=3",
+      "-DCAMBLAS_FRAMEWORK_TOUCH_WIDE=1",
+      "-DCAMBLAS_FRAMEWORK_REUSE_WIDE_A=1",
+      "-DCAMBLAS_FRAMEWORK_TOUCH_MAX_BYTES=134217728",
+      "-DCAMBLAS_FRAMEWORK_RECT32=1",
+      "-DCAMBLAS_FRAMEWORK_RECT64=1",
+      "-DCAMBLAS_FRAMEWORK_SHARED_GRID32=1",
+      "-DFRAMEWORK_VENDOR_LIBRARY=\"/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so\"",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/include",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/framework",
+      "-I/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/symmetric",
+      "-shared",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/framework/framework_blas_bridge.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/source/src/pthread_pool.c",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/symmetric.o",
+      "-L/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60",
+      "-lcamblas_sve_nr4",
+      "-Wl,--no-as-needed",
+      "/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib/libopenblas.so",
+      "-Wl,--as-needed",
+      "-Wl,-soname,libframework_blas.so",
+      "-Wl,-rpath,$ORIGIN",
+      "-Wl,-rpath,/home/u6yq/p3jitnath.u6yq/spack/opt/spack/linux-neoverse_v2/openblas-0.3.33-xpls35yd3i7ikzz7idp7ih7bqpz3mfwo/lib",
+      "-Wl,-z,defs",
+      "-pthread",
+      "-fopenmp",
+      "-ldl",
+      "-lm",
+      "-o",
+      "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/bench/results/final60_20261002T015139_304867Z_retained_target60/libframework_blas.so"
+    ]
+  ],
+  "summary": [
+    {
+      "framework": "numpy",
+      "workload": "square1024",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.3844750000000001,
+          1.369436,
+          1.370523
+        ],
+        "openblas": [
+          1.6369160000000003,
+          1.626005,
+          1.631828
+        ],
+        "nvpl": [
+          1.443257,
+          1.446298,
+          1.443321
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.370523,
+        "openblas": 1.631828,
+        "nvpl": 1.443321
+      },
+      "max_scaled_sample_error": 8.926318057864597e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square4096",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          83.94699400000002,
+          84.22973900000001,
+          83.657019
+        ],
+        "openblas": [
+          103.18759800000001,
+          104.23432100000001,
+          103.45546300000001
+        ],
+        "nvpl": [
+          92.49281300000001,
+          93.12089200000001,
+          92.864996
+        ]
+      },
+      "medians_ms": {
+        "camblas": 83.94699400000002,
+        "openblas": 103.45546300000001,
+        "nvpl": 92.864996
+      },
+      "max_scaled_sample_error": 5.851871701657536e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square8192",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          650.216179,
+          649.927482,
+          649.2977710000001
+        ],
+        "openblas": [
+          811.2276320000001,
+          805.4538670000001,
+          807.094271
+        ],
+        "nvpl": [
+          719.36869,
+          714.578738,
+          716.910995
+        ]
+      },
+      "medians_ms": {
+        "camblas": 649.927482,
+        "openblas": 807.094271,
+        "nvpl": 716.910995
+      },
+      "max_scaled_sample_error": 5.201160667898378e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "transpose",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.333084,
+          1.3333730000000001,
+          1.321116
+        ],
+        "openblas": [
+          1.630357,
+          1.6199560000000002,
+          1.6103570000000003
+        ],
+        "nvpl": [
+          1.435929,
+          1.43273,
+          1.429369
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.333084,
+        "openblas": 1.6199560000000002,
+        "nvpl": 1.43273
+      },
+      "max_scaled_sample_error": 1.1100948301773664e-06
+    },
+    {
+      "framework": "numpy",
+      "workload": "gram",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.114018,
+          1.1155540000000002,
+          1.0956830000000002
+        ],
+        "openblas": [
+          1.7426730000000001,
+          1.7508970000000001,
+          1.7574250000000002
+        ],
+        "nvpl": [
+          1.148481,
+          1.162305,
+          1.157601
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.114018,
+        "openblas": 1.7508970000000001,
+        "nvpl": 1.157601
+      },
+      "max_scaled_sample_error": 2.2455562967138867e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "mlp",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 1001,
+      "round_medians_ms": {
+        "camblas": [
+          9.849719,
+          9.829176,
+          9.849624000000002
+        ],
+        "openblas": [
+          10.673025,
+          10.653922000000001,
+          10.678978
+        ],
+        "nvpl": [
+          9.904278000000001,
+          9.920662,
+          9.964756
+        ]
+      },
+      "medians_ms": {
+        "camblas": 9.849624000000002,
+        "openblas": 10.673025,
+        "nvpl": 9.920662
+      },
+      "max_scaled_sample_error": 4.711449623531618e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "attention",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          3.737019,
+          3.762331,
+          3.736156
+        ],
+        "openblas": [
+          4.280333,
+          4.270926,
+          4.205455000000001
+        ],
+        "nvpl": [
+          4.123953,
+          4.167824,
+          4.206607
+        ]
+      },
+      "medians_ms": {
+        "camblas": 3.737019,
+        "openblas": 4.270926,
+        "nvpl": 4.167824
+      },
+      "max_scaled_sample_error": 9.695433094220683e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square1024",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.852371,
+          2.834099,
+          2.822101
+        ],
+        "openblas": [
+          3.354662,
+          3.3555260000000002,
+          3.3524540000000003
+        ],
+        "nvpl": [
+          2.907218,
+          2.890035,
+          2.90261
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.834099,
+        "openblas": 3.354662,
+        "nvpl": 2.90261
+      },
+      "max_scaled_sample_error": 1.2417310022109174e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "square4096",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          179.099928,
+          176.14189600000003,
+          176.44604800000002
+        ],
+        "openblas": [
+          215.53507900000002,
+          217.76897,
+          217.51256100000003
+        ],
+        "nvpl": [
+          189.29427800000002,
+          190.605732,
+          193.154303
+        ]
+      },
+      "medians_ms": {
+        "camblas": 176.44604800000002,
+        "openblas": 217.51256100000003,
+        "nvpl": 190.605732
+      },
+      "max_scaled_sample_error": 1.0899958722021164e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "square8192",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1387.700669,
+          1387.254765,
+          1385.6950940000002
+        ],
+        "openblas": [
+          1717.026421,
+          1711.8565440000002,
+          1718.364368
+        ],
+        "nvpl": [
+          1469.450699,
+          1480.889361,
+          1466.5532030000002
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1387.254765,
+        "openblas": 1717.026421,
+        "nvpl": 1469.450699
+      },
+      "max_scaled_sample_error": 1.022613369484984e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "transpose",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.776437,
+          2.7437020000000003,
+          2.741271
+        ],
+        "openblas": [
+          3.366309,
+          3.360805,
+          3.356806
+        ],
+        "nvpl": [
+          2.879058,
+          2.860179,
+          2.880627
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.7437020000000003,
+        "openblas": 3.360805,
+        "nvpl": 2.879058
+      },
+      "max_scaled_sample_error": 1.520377344587375e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "gram",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.134214,
+          2.145702,
+          2.157382
+        ],
+        "openblas": [
+          2.8127240000000002,
+          2.887026,
+          2.926161
+        ],
+        "nvpl": [
+          2.319265,
+          2.2863700000000002,
+          2.335873
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.145702,
+        "openblas": 2.887026,
+        "nvpl": 2.319265
+      },
+      "max_scaled_sample_error": 4.1826755907577287e-16
+    },
+    {
+      "framework": "numpy",
+      "workload": "mlp",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 1001,
+      "round_medians_ms": {
+        "camblas": [
+          20.886893,
+          20.846158,
+          20.793584
+        ],
+        "openblas": [
+          26.507765000000003,
+          26.530069000000005,
+          26.313989000000003
+        ],
+        "nvpl": [
+          21.309218,
+          21.427039,
+          21.388736
+        ]
+      },
+      "medians_ms": {
+        "camblas": 20.846158,
+        "openblas": 26.507765000000003,
+        "nvpl": 21.388736
+      },
+      "max_scaled_sample_error": 1.2797981965679722e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "attention",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          6.52789,
+          6.296153,
+          6.295033
+        ],
+        "openblas": [
+          7.290366000000001,
+          7.3374690000000005,
+          7.302206
+        ],
+        "nvpl": [
+          6.758732000000001,
+          6.799435000000001,
+          6.823883
+        ]
+      },
+      "medians_ms": {
+        "camblas": 6.296153,
+        "openblas": 7.302206,
+        "nvpl": 6.799435000000001
+      },
+      "max_scaled_sample_error": 3.178410891443607e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "square1024",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.42670900000000006,
+          0.38383000000000006,
+          0.382678
+        ],
+        "openblas": [
+          0.49797100000000005,
+          0.4964990000000001,
+          0.5003070000000001
+        ],
+        "nvpl": [
+          0.38677400000000006,
+          0.384406,
+          0.38498200000000005
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.38383000000000006,
+        "openblas": 0.49797100000000005,
+        "nvpl": 0.38498200000000005
+      },
+      "max_scaled_sample_error": 4.519654712842834e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square4096",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          25.623511,
+          25.906959,
+          25.715796
+        ],
+        "openblas": [
+          34.339696,
+          34.15858,
+          34.450412
+        ],
+        "nvpl": [
+          37.292225,
+          34.578025000000004,
+          36.659378
+        ]
+      },
+      "medians_ms": {
+        "camblas": 25.715796,
+        "openblas": 34.339696,
+        "nvpl": 36.659378
+      },
+      "max_scaled_sample_error": 3.684511812154745e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square8192",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          181.45457000000002,
+          182.318035,
+          179.96712200000002
+        ],
+        "openblas": [
+          238.44342500000002,
+          246.852289,
+          235.870437
+        ],
+        "nvpl": [
+          216.948923,
+          242.685808,
+          215.74674800000003
+        ]
+      },
+      "medians_ms": {
+        "camblas": 181.45457000000002,
+        "openblas": 238.44342500000002,
+        "nvpl": 216.948923
+      },
+      "max_scaled_sample_error": 5.201160667898378e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "transpose",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.36459800000000003,
+          0.36738200000000004,
+          0.367478
+        ],
+        "openblas": [
+          0.502259,
+          0.5045630000000001,
+          0.501715
+        ],
+        "nvpl": [
+          0.375062,
+          0.37631000000000003,
+          0.372566
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.36738200000000004,
+        "openblas": 0.502259,
+        "nvpl": 0.375062
+      },
+      "max_scaled_sample_error": 7.182966548206488e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "gram",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.40882100000000005,
+          0.40952500000000003,
+          0.4048530000000001
+        ],
+        "openblas": [
+          13.060869,
+          13.030502,
+          13.340318
+        ],
+        "nvpl": [
+          0.586705,
+          0.573905,
+          0.5823530000000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.40882100000000005,
+        "openblas": 13.060869,
+        "nvpl": 0.5823530000000001
+      },
+      "max_scaled_sample_error": 2.2455562967138867e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "mlp",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 1001,
+      "round_medians_ms": {
+        "camblas": [
+          3.5746890000000002,
+          3.5670410000000006,
+          3.59056
+        ],
+        "openblas": [
+          3.9126960000000004,
+          3.914392,
+          3.953047
+        ],
+        "nvpl": [
+          3.690078,
+          3.695102,
+          3.6668470000000006
+        ]
+      },
+      "medians_ms": {
+        "camblas": 3.5746890000000002,
+        "openblas": 3.914392,
+        "nvpl": 3.690078
+      },
+      "max_scaled_sample_error": 3.9262080196096817e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "attention",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          3.5773770000000003,
+          3.540418,
+          3.6085760000000002
+        ],
+        "openblas": [
+          3.9380070000000003,
+          3.942007,
+          4.058388000000001
+        ],
+        "nvpl": [
+          4.271407000000001,
+          4.171409,
+          4.2034400000000005
+        ]
+      },
+      "medians_ms": {
+        "camblas": 3.5773770000000003,
+        "openblas": 3.942007,
+        "nvpl": 4.2034400000000005
+      },
+      "max_scaled_sample_error": 9.695433094220683e-07
+    },
+    {
+      "framework": "numpy",
+      "workload": "square1024",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.052676,
+          0.7633710000000001,
+          0.767499
+        ],
+        "openblas": [
+          0.9609660000000001,
+          0.956327,
+          0.95879
+        ],
+        "nvpl": [
+          0.775499,
+          0.768427,
+          0.771884
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.767499,
+        "openblas": 0.95879,
+        "nvpl": 0.771884
+      },
+      "max_scaled_sample_error": 1.80998078288371e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "square4096",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          54.08496300000001,
+          54.146997,
+          54.968447000000005
+        ],
+        "openblas": [
+          72.63528600000001,
+          72.72136400000001,
+          73.335667
+        ],
+        "nvpl": [
+          79.48985499999999,
+          79.1842,
+          81.199808
+        ]
+      },
+      "medians_ms": {
+        "camblas": 54.146997,
+        "openblas": 72.72136400000001,
+        "nvpl": 79.48985499999999
+      },
+      "max_scaled_sample_error": 7.670341322903783e-16
+    },
+    {
+      "framework": "numpy",
+      "workload": "square8192",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          388.17478500000004,
+          385.87731,
+          386.07516000000004
+        ],
+        "openblas": [
+          526.381162,
+          530.569882,
+          532.181295
+        ],
+        "nvpl": [
+          472.29883500000005,
+          496.43377300000003,
+          479.36789400000004
+        ]
+      },
+      "medians_ms": {
+        "camblas": 386.07516000000004,
+        "openblas": 530.569882,
+        "nvpl": 479.36789400000004
+      },
+      "max_scaled_sample_error": 1.022613369484984e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "transpose",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.7985700000000001,
+          0.757708,
+          0.75086
+        ],
+        "openblas": [
+          0.9564230000000001,
+          0.9488700000000001,
+          0.9442950000000001
+        ],
+        "nvpl": [
+          0.7741870000000001,
+          0.771692,
+          0.766155
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.757708,
+        "openblas": 0.9488700000000001,
+        "nvpl": 0.771692
+      },
+      "max_scaled_sample_error": 1.520377344587375e-15
+    },
+    {
+      "framework": "numpy",
+      "workload": "gram",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.803787,
+          0.801131,
+          0.8142500000000001
+        ],
+        "openblas": [
+          26.944174,
+          27.161992,
+          27.591261000000003
+        ],
+        "nvpl": [
+          1.033092,
+          1.018501,
+          1.066275
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.803787,
+        "openblas": 27.161992,
+        "nvpl": 1.033092
+      },
+      "max_scaled_sample_error": 4.1826755907577287e-16
+    },
+    {
+      "framework": "numpy",
+      "workload": "mlp",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 1001,
+      "round_medians_ms": {
+        "camblas": [
+          8.940849,
+          9.013580000000001,
+          8.99262
+        ],
+        "openblas": [
+          23.591240000000003,
+          23.277584,
+          23.483652
+        ],
+        "nvpl": [
+          11.940416,
+          11.765410000000001,
+          11.651525000000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 8.99262,
+        "openblas": 23.483652,
+        "nvpl": 11.765410000000001
+      },
+      "max_scaled_sample_error": 6.581819296635286e-16
+    },
+    {
+      "framework": "numpy",
+      "workload": "attention",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          6.236151,
+          6.175033000000001,
+          6.061307
+        ],
+        "openblas": [
+          6.250135,
+          6.265718,
+          6.384659
+        ],
+        "nvpl": [
+          6.108186000000001,
+          6.134426,
+          6.519663
+        ]
+      },
+      "medians_ms": {
+        "camblas": 6.175033000000001,
+        "openblas": 6.265718,
+        "nvpl": 6.134426
+      },
+      "max_scaled_sample_error": 1.5169688345526306e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square1024",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.383194,
+          1.394202,
+          1.389307
+        ],
+        "openblas": [
+          1.6261320000000001,
+          1.624372,
+          1.625812
+        ],
+        "nvpl": [
+          1.4369530000000001,
+          1.4496250000000002,
+          1.436313
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.389307,
+        "openblas": 1.625812,
+        "nvpl": 1.4369530000000001
+      },
+      "max_scaled_sample_error": 8.926318057864597e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square4096",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          83.78131400000001,
+          83.97874900000001,
+          84.18040800000001
+        ],
+        "openblas": [
+          102.894333,
+          103.19886900000002,
+          103.16648500000001
+        ],
+        "nvpl": [
+          92.16630400000001,
+          92.54757300000001,
+          91.7099
+        ]
+      },
+      "medians_ms": {
+        "camblas": 83.97874900000001,
+        "openblas": 103.16648500000001,
+        "nvpl": 92.16630400000001
+      },
+      "max_scaled_sample_error": 5.851871701657536e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square8192",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          648.8185530000001,
+          641.652957,
+          644.8406790000001
+        ],
+        "openblas": [
+          798.028943,
+          799.486594,
+          804.146213
+        ],
+        "nvpl": [
+          703.099906,
+          703.787316,
+          705.0236980000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 644.8406790000001,
+        "openblas": 799.486594,
+        "nvpl": 703.787316
+      },
+      "max_scaled_sample_error": 5.201160667898378e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "transpose",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.479321,
+          1.468825,
+          1.4556080000000002
+        ],
+        "openblas": [
+          2.554523,
+          2.416287,
+          2.426367
+        ],
+        "nvpl": [
+          1.6069,
+          1.596181,
+          1.736337
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.468825,
+        "openblas": 2.426367,
+        "nvpl": 1.6069
+      },
+      "max_scaled_sample_error": 1.1100948301773664e-06
+    },
+    {
+      "framework": "pytorch",
+      "workload": "gram",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.0048050000000002,
+          0.998086,
+          1.0304680000000002
+        ],
+        "openblas": [
+          1.6755700000000002,
+          1.674963,
+          1.6726590000000001
+        ],
+        "nvpl": [
+          1.509591,
+          1.506839,
+          1.5035440000000002
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.0048050000000002,
+        "openblas": 1.674963,
+        "nvpl": 1.506839
+      },
+      "max_scaled_sample_error": 2.2455562967138867e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "mlp",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          8.673079,
+          8.702582,
+          8.638168
+        ],
+        "openblas": [
+          14.650453,
+          12.844997000000001,
+          14.222177
+        ],
+        "nvpl": [
+          8.728341,
+          8.729525,
+          8.73362
+        ]
+      },
+      "medians_ms": {
+        "camblas": 8.673079,
+        "openblas": 14.222177,
+        "nvpl": 8.729525
+      },
+      "max_scaled_sample_error": 4.711449623531618e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "attention",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.042116,
+          1.026661,
+          1.013093
+        ],
+        "openblas": [
+          9.473920999999999,
+          9.320773,
+          6.224472
+        ],
+        "nvpl": [
+          1.218911,
+          1.211232,
+          1.204671
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.026661,
+        "openblas": 9.320773,
+        "nvpl": 1.211232
+      },
+      "max_scaled_sample_error": 7.7563470769857e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "backward",
+      "dtype": "float32",
+      "threads": 16,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          22.144235000000002,
+          22.124245000000002,
+          22.060598000000002
+        ],
+        "openblas": [
+          46.42376,
+          47.334871,
+          49.627899000000006
+        ],
+        "nvpl": [
+          24.736719,
+          25.231778,
+          24.979497000000002
+        ]
+      },
+      "medians_ms": {
+        "camblas": 22.124245000000002,
+        "openblas": 47.334871,
+        "nvpl": 24.979497000000002
+      },
+      "max_scaled_sample_error": 4.711449623531618e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square1024",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.880627,
+          2.8884350000000003,
+          2.8728200000000004
+        ],
+        "openblas": [
+          3.365799,
+          3.3894140000000004,
+          3.367462
+        ],
+        "nvpl": [
+          2.8825790000000002,
+          2.8999870000000003,
+          2.891315
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.880627,
+        "openblas": 3.367462,
+        "nvpl": 2.891315
+      },
+      "max_scaled_sample_error": 1.2417310022109174e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square4096",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          177.13923300000002,
+          176.32773500000002,
+          176.458902
+        ],
+        "openblas": [
+          215.996857,
+          216.23576300000002,
+          216.13057100000003
+        ],
+        "nvpl": [
+          190.95413,
+          192.34372500000003,
+          192.09586000000002
+        ]
+      },
+      "medians_ms": {
+        "camblas": 176.458902,
+        "openblas": 216.13057100000003,
+        "nvpl": 192.09586000000002
+      },
+      "max_scaled_sample_error": 1.0899958722021164e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square8192",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1380.882157,
+          1383.3128530000001,
+          1386.7634170000001
+        ],
+        "openblas": [
+          1696.214541,
+          1703.659558,
+          1704.4558250000002
+        ],
+        "nvpl": [
+          1440.219967,
+          1443.717505,
+          1443.016788
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1383.3128530000001,
+        "openblas": 1703.659558,
+        "nvpl": 1443.016788
+      },
+      "max_scaled_sample_error": 1.022613369484984e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "transpose",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.994448,
+          3.0083990000000003,
+          2.990289
+        ],
+        "openblas": [
+          5.110871,
+          5.224884,
+          5.092793
+        ],
+        "nvpl": [
+          4.029588,
+          3.34567,
+          4.1107380000000004
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.994448,
+        "openblas": 5.110871,
+        "nvpl": 4.029588
+      },
+      "max_scaled_sample_error": 1.520377344587375e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "gram",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.9359490000000001,
+          1.9219650000000001,
+          1.929549
+        ],
+        "openblas": [
+          3.569313,
+          3.643104,
+          3.5350750000000004
+        ],
+        "nvpl": [
+          3.1107650000000002,
+          3.124014,
+          3.1099340000000004
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.929549,
+        "openblas": 3.569313,
+        "nvpl": 3.1107650000000002
+      },
+      "max_scaled_sample_error": 4.1826755907577287e-16
+    },
+    {
+      "framework": "pytorch",
+      "workload": "mlp",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          18.642803,
+          18.552565,
+          18.598836000000002
+        ],
+        "openblas": [
+          31.606716,
+          30.789746000000004,
+          30.832177
+        ],
+        "nvpl": [
+          20.378309,
+          20.444132,
+          20.206986
+        ]
+      },
+      "medians_ms": {
+        "camblas": 18.598836000000002,
+        "openblas": 30.832177,
+        "nvpl": 20.378309
+      },
+      "max_scaled_sample_error": 1.2797981965679722e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "attention",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          2.059082,
+          2.04753,
+          2.043626
+        ],
+        "openblas": [
+          7.354301,
+          14.915669000000001,
+          5.150231
+        ],
+        "nvpl": [
+          2.3848330000000004,
+          2.429536,
+          2.409088
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.04753,
+        "openblas": 7.354301,
+        "nvpl": 2.409088
+      },
+      "max_scaled_sample_error": 2.7449912244285727e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "backward",
+      "dtype": "float64",
+      "threads": 16,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          47.15773,
+          47.662658,
+          47.275692
+        ],
+        "openblas": [
+          88.02769,
+          98.471473,
+          94.42790000000001
+        ],
+        "nvpl": [
+          52.246027,
+          50.695825,
+          49.987715
+        ]
+      },
+      "medians_ms": {
+        "camblas": 47.275692,
+        "openblas": 94.42790000000001,
+        "nvpl": 50.695825
+      },
+      "max_scaled_sample_error": 1.2797981965679722e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square1024",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.399094,
+          0.398453,
+          0.396309
+        ],
+        "openblas": [
+          0.49806700000000004,
+          0.504051,
+          0.503347
+        ],
+        "nvpl": [
+          0.394774,
+          0.397046,
+          0.394453
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.398453,
+        "openblas": 0.503347,
+        "nvpl": 0.394774
+      },
+      "max_scaled_sample_error": 4.519654712842834e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square4096",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          26.145283000000003,
+          26.203938000000004,
+          26.018502
+        ],
+        "openblas": [
+          34.356007,
+          34.702365,
+          34.625792000000004
+        ],
+        "nvpl": [
+          36.837413,
+          36.492110000000004,
+          36.876995
+        ]
+      },
+      "medians_ms": {
+        "camblas": 26.145283000000003,
+        "openblas": 34.625792000000004,
+        "nvpl": 36.837413
+      },
+      "max_scaled_sample_error": 3.684511812154745e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square8192",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          182.179532,
+          184.01583200000002,
+          182.34349500000002
+        ],
+        "openblas": [
+          233.080202,
+          245.89827900000003,
+          244.44452700000002
+        ],
+        "nvpl": [
+          227.98616700000002,
+          231.492374,
+          243.93910100000002
+        ]
+      },
+      "medians_ms": {
+        "camblas": 182.34349500000002,
+        "openblas": 244.44452700000002,
+        "nvpl": 231.492374
+      },
+      "max_scaled_sample_error": 5.201160667898378e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "transpose",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.48312200000000005,
+          0.538705,
+          0.503858
+        ],
+        "openblas": [
+          1.879788,
+          1.862541,
+          1.8871480000000003
+        ],
+        "nvpl": [
+          0.536849,
+          0.5346730000000001,
+          0.530513
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.503858,
+        "openblas": 1.879788,
+        "nvpl": 0.5346730000000001
+      },
+      "max_scaled_sample_error": 7.182966548206488e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "gram",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.30351100000000003,
+          0.30747900000000006,
+          0.372854
+        ],
+        "openblas": [
+          0.903591,
+          0.9118470000000001,
+          0.910471
+        ],
+        "nvpl": [
+          0.507665,
+          0.48661,
+          0.48587400000000003
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.30747900000000006,
+        "openblas": 0.910471,
+        "nvpl": 0.48661
+      },
+      "max_scaled_sample_error": 2.2455562967138867e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "mlp",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          2.3967340000000004,
+          2.394013,
+          2.393117
+        ],
+        "openblas": [
+          8.776555,
+          6.42494,
+          23.704073
+        ],
+        "nvpl": [
+          2.4596430000000002,
+          2.454139,
+          2.4559960000000003
+        ]
+      },
+      "medians_ms": {
+        "camblas": 2.394013,
+        "openblas": 8.776555,
+        "nvpl": 2.4559960000000003
+      },
+      "max_scaled_sample_error": 3.9262080196096817e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "attention",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.9965800000000001,
+          1.221246,
+          1.195263
+        ],
+        "openblas": [
+          2.277056,
+          2.5243460000000004,
+          2.345727
+        ],
+        "nvpl": [
+          1.4611110000000003,
+          1.478455,
+          1.467126
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.195263,
+        "openblas": 2.345727,
+        "nvpl": 1.467126
+      },
+      "max_scaled_sample_error": 8.144164430834985e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "backward",
+      "dtype": "float32",
+      "threads": 64,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          8.752907,
+          8.660917000000001,
+          8.572407
+        ],
+        "openblas": [
+          48.737069,
+          55.59002900000001,
+          59.353333
+        ],
+        "nvpl": [
+          17.586005,
+          17.883835,
+          17.855164
+        ]
+      },
+      "medians_ms": {
+        "camblas": 8.660917000000001,
+        "openblas": 55.59002900000001,
+        "nvpl": 17.855164
+      },
+      "max_scaled_sample_error": 3.9262080196096817e-07
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square1024",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.796427,
+          0.789483,
+          0.794186
+        ],
+        "openblas": [
+          0.955014,
+          0.965446,
+          0.9988850000000001
+        ],
+        "nvpl": [
+          0.776491,
+          0.7794030000000001,
+          0.774316
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.794186,
+        "openblas": 0.965446,
+        "nvpl": 0.776491
+      },
+      "max_scaled_sample_error": 1.80998078288371e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square4096",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          54.857424,
+          55.338147000000006,
+          55.38033300000001
+        ],
+        "openblas": [
+          73.17766300000001,
+          66.013889,
+          73.211246
+        ],
+        "nvpl": [
+          80.46658500000001,
+          79.296089,
+          78.63837900000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 55.338147000000006,
+        "openblas": 73.17766300000001,
+        "nvpl": 79.296089
+      },
+      "max_scaled_sample_error": 7.670341322903783e-16
+    },
+    {
+      "framework": "pytorch",
+      "workload": "square8192",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          387.411268,
+          390.795433,
+          388.191119
+        ],
+        "openblas": [
+          526.057554,
+          527.761731,
+          533.255535
+        ],
+        "nvpl": [
+          463.83647600000006,
+          492.99261900000005,
+          463.001746
+        ]
+      },
+      "medians_ms": {
+        "camblas": 388.191119,
+        "openblas": 527.761731,
+        "nvpl": 463.83647600000006
+      },
+      "max_scaled_sample_error": 1.022613369484984e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "transpose",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.0251240000000001,
+          1.005287,
+          1.007943
+        ],
+        "openblas": [
+          3.895293,
+          4.110552,
+          3.981339
+        ],
+        "nvpl": [
+          1.9793100000000001,
+          1.93704,
+          2.0355010000000004
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.007943,
+        "openblas": 3.981339,
+        "nvpl": 1.9793100000000001
+      },
+      "max_scaled_sample_error": 1.520377344587375e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "gram",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          0.574258,
+          0.572689,
+          0.565746
+        ],
+        "openblas": [
+          2.3361330000000002,
+          2.3388530000000003,
+          2.337445
+        ],
+        "nvpl": [
+          0.8751460000000001,
+          0.876746,
+          0.8733860000000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 0.572689,
+        "openblas": 2.337445,
+        "nvpl": 0.8751460000000001
+      },
+      "max_scaled_sample_error": 4.1826755907577287e-16
+    },
+    {
+      "framework": "pytorch",
+      "workload": "mlp",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          6.988784000000001,
+          7.014499000000001,
+          7.00874
+        ],
+        "openblas": [
+          26.098092000000005,
+          26.442937000000004,
+          28.124174000000004
+        ],
+        "nvpl": [
+          10.168095000000001,
+          10.122480000000001,
+          9.971124000000001
+        ]
+      },
+      "medians_ms": {
+        "camblas": 7.00874,
+        "openblas": 26.442937000000004,
+        "nvpl": 10.122480000000001
+      },
+      "max_scaled_sample_error": 6.581819296635286e-16
+    },
+    {
+      "framework": "pytorch",
+      "workload": "attention",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 5,
+      "round_medians_ms": {
+        "camblas": [
+          1.600821,
+          1.393467,
+          1.404794
+        ],
+        "openblas": [
+          8.805748000000001,
+          4.2729740000000005,
+          7.746288000000001
+        ],
+        "nvpl": [
+          2.2263080000000004,
+          2.672729,
+          2.278435
+        ]
+      },
+      "medians_ms": {
+        "camblas": 1.404794,
+        "openblas": 7.746288000000001,
+        "nvpl": 2.278435
+      },
+      "max_scaled_sample_error": 1.7336786680601512e-15
+    },
+    {
+      "framework": "pytorch",
+      "workload": "backward",
+      "dtype": "float64",
+      "threads": 64,
+      "calls_per_round": 201,
+      "round_medians_ms": {
+        "camblas": [
+          17.458092,
+          17.657924,
+          17.533449
+        ],
+        "openblas": [
+          83.01275000000001,
+          78.22887800000001,
+          84.906963
+        ],
+        "nvpl": [
+          31.469620000000003,
+          32.635282000000004,
+          32.300571
+        ]
+      },
+      "medians_ms": {
+        "camblas": 17.533449,
+        "openblas": 83.01275000000001,
+        "nvpl": 32.300571
+      },
+      "max_scaled_sample_error": 6.581819296635286e-16
+    }
+  ],
+  "correctness_checks": {
+    "status": "passed",
+    "completed_utc": "2026-10-02T01:51:17.909486+00:00",
+    "bridge": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/prefix/camblas/lib/libframework_blas.so",
+    "source_identity": {
+      "src/amicro_transpose.h": "6af633e1aea5fc659111ad9117aa0f8b0d58bb1ea5cc7ae67c94f9e4b066dce6",
+      "src/batch_amicro64.c": "4fcb5ed82f740d22ce8c92b88d8a1a8d94cd0e8d21fe878fca12dab04569c1e3",
+      "src/bilinear.h": "db1a284bc2b54ccd56bda0267916647eb732c15d133c6a8eacaa96537f2c3602",
+      "src/cblas_shim.c": "40e7f5d289d717babb8d7dc45b7f316e1d3f45968329dad41a9e22356f12c93b",
+      "src/compact.h": "7b044e2256a6c85906c3497880f8e5992e3b63daf1873b8dd7a4afb44b22eb15",
+      "src/cpuset_bits.h": "fad892f756fc4012bd3332e43b2b327cde654e932435b4e4cad31550af23f03d",
+      "src/deep_amicro.c": "93250b1b6d073c52109af78a20772c459105aedc250eedb771352f2134a84349",
+      "src/deep_amicro64.c": "53753502379887678a5d7c876398c9f86ad2b376c38859f33c2e68e7ef90236a",
+      "src/dot_product.h": "0739f4686bc81aaa9bec9c2275375c9086f253842e21c163824b6a7c81e8b2ad",
+      "src/executor.c": "c6c8d864e3193fb8ca08a3166a9b71a2c2950c9f5faece851bfbef9b14dd1755",
+      "src/gemm_bounds.h": "177076d264b079ced16fba2f13ad4f3e57a9b7b7cbe2c72b7f5d3ff7d27d80d6",
+      "src/kernels.h": "6dfb3e615f5dde16b16c4cfc54287149fd9de96a7a119042f391721d8841ae75",
+      "src/neon_micro8.h": "ae0362e30d81a19a2b7553bf10edeb8ccf034d9cc2bb396f97191fa52af1a7da",
+      "src/packed.c": "297f44cac5ff957b59a25cd66b2392ef3d9207a84b0f62fa7ff95fb64ceb650a",
+      "src/packed.h": "404d792dd6fc87ad19532ac39fd081892d28ed284613fde380a0ea37ebbfd077",
+      "src/packed_grid.h": "93a13d78831c51ea01364ea8938e93d6d6df773266c56ab95b5ca1afd8d8c5a7",
+      "src/packing.c": "9a7d679dc6537d44c6530244fdf6a6c2bbd9ece3e8e58d50510d19a01763fb28",
+      "src/packing.h": "effebdab99b3c36035b5172073e9103ebe8490d98c2e44abc8d826235ba6835a",
+      "src/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
+      "src/planner.c": "f6ad3af3d350818d8963de27382a7fd60e9da01901a5a4fc406aff21744af9e8",
+      "src/pthread_pool.c": "50df372878e8d77e726dba97e29e311b45b39951a0ecfef0ad659cb34b7d651b",
+      "src/rectangular32.c": "77d32650bb19004db525cc62b44fe9417c56e961358e77d12689d731067f8aa1",
+      "src/rectangular32.h": "ca46d780ee0672a311f708540bb6e2164d29ba6dae329bd488cd15f147c8cf38",
+      "src/rectangular64.c": "8f3e23dbe14eabb3f4adee8de0b71694a642297cfd2e03fa4e5fa1bb63e11694",
+      "src/rectangular64.h": "3abd0424db264d9db9b18c40724b83aaf9eb56af479b7a0480dd75c4833c38aa",
+      "src/scalar.c": "3b3a6b57b970299150fd4966766b5b6d91a2748eee22ebcedd90fca6a624386e",
+      "src/sve.c": "974a148b59b6674bdd802086a259696b9f7fcf21065d4f4c62e47927e6f15364",
+      "src/sve_block4x6.h": "d2d8f504854f5316afcc3522cc13a97dcf9d5b499cb1636de48f3c9131aa491a",
+      "src/sve_block_balanced.h": "8a279819b18c83043f56cc3dd968a26dcd935881cdce025d4c3cfb45f7e84712",
+      "src/sve_interleaved.h": "eb69b129415e55b864fbace6882e5ae54709e352735da54e4578a9a6b76718ff",
+      "src/sve_lane_ops.h": "0de4935a40a44b107bea8fb4bcb29f3c8d81264e43611c7766b1921d615ff416",
+      "src/sve_micro6.h": "4df6e747d3f27318c56f6a23c976c8d53559bb659c853d8b9c1b86b52e96a8b6",
+      "src/sve_pipe_b.h": "9b57644787eaa020247d1b89816c780224a7ec2a88be5a1909f15162b9b004d5",
+      "src/sve_register_block.h": "b2e750a3fb55bf262a1270c5fb7c7d2c078a0e8aaea4064354c455d85187107f",
+      "src/sve_runtime.h": "293322da77e3401d615a57a640184bd663141b2f2d5c56f76ab38409768f92b9",
+      "src/symmetric/neon_micro12.h": "e0a599854fd113ffa1a97bbe1386ce85cc60dd7d9da92a82a39e2eac3b16e3b4",
+      "src/symmetric/neon_micro8.h": "ae0362e30d81a19a2b7553bf10edeb8ccf034d9cc2bb396f97191fa52af1a7da",
+      "src/symmetric/paired_micro8.h": "744ff6130654db7d2609c41d0bb32b6fa94a108e018b1d1bc4e1317f5c0ade95",
+      "src/symmetric/sve_interleaved.h": "919a5989929e22701f70e6624769869da94fbe461e4b7f45c67eed40293f66dd",
+      "src/symmetric/sve_lane_ops.h": "0de4935a40a44b107bea8fb4bcb29f3c8d81264e43611c7766b1921d615ff416",
+      "src/symmetric/sve_pipe_b.h": "9b57644787eaa020247d1b89816c780224a7ec2a88be5a1909f15162b9b004d5",
+      "src/symmetric/sve_runtime.h": "293322da77e3401d615a57a640184bd663141b2f2d5c56f76ab38409768f92b9",
+      "src/symmetric/symmetric.c": "23acd9f40b06d2fef8d155badef1c24ebcbc758b410625e569d77256907f9309",
+      "src/symmetric/symmetric.h": "70803de287da617bf70605e2cd53f9a47c60b3d735bfbf92140d56d57c8dc60b",
+      "src/symmetric.h": "70803de287da617bf70605e2cd53f9a47c60b3d735bfbf92140d56d57c8dc60b",
+      "src/topology.c": "e21b84f2a6c4e9c2d413808e52aded85cb9968b0dd78e9ec164e3039d23907b2",
+      "include/camblas.h": "0f23791fd4e8946512eb143c726234686555dd6cc156a73503952e42114cf9b8",
+      "include/camblas_cblas.h": "ee4c6ba99ba0294c7cca986cc231c668849e7e0f37455be13d351f3370858798",
+      "include/camblas_executor.h": "c5de255ebb75c97130aff25d9e831be8f16b6614b8ada9b439cbd4764cdd1830",
+      "include/camblas_planner.h": "03f5a7ff1882e3f9a51a4f7ad3d9b332cde6dad1a93646ba4fccff71c3e9d076",
+      "include/camblas_pthread.h": "4f78f1322ab75847cdece73ae71b9ab6db68635c4e71475047d3118d1615092b",
+      "include/camblas_topology.h": "87ba9238381ae83f45e62623ce12a9d9982a5fe5f27ae626b42b5105874126b6",
+      "include/camblas_version.h": "52512b05e2f596ac34ed9c4b2231787c27d893b524c5bb54f6c754ff70f3681c",
+      "include/camblas_workspace.h": "587f6e9ace41e565a04620a179dd8a8bfd3e9ed74bec7b66fba9d73f49da2b57",
+      "framework/benchmark_alloc.h": "90b7a06c40125ff934b2590b91d92d7a71acc47e3c59e4e17cfe5139128290e4",
+      "framework/framework_blas_bridge.c": "c4f98392c7fd4bb97c4e8f9a857d5399b62330bef9b25252dcb9e85dbd5a8fe4",
+      "framework/fused_sum_api.h": "0355bea996c2117586b339185e71bdf2ce4679a24c5271a94bd59a5f69768e30",
+      "framework/output_page_touch.h": "d98888c6cfa77d40cab450dddbfce669a267c2337d73a8d2014b1acec681ce57",
+      "framework/rectangular32_policy.h": "1132c0f302feef8798428f61835d62d685132c7358b8e1bbb28fc8d5df0db2d5",
+      "framework/rectangular32_range.h": "7e7bd175448561d40fb1de86b2a5c89bd68d4d40b3375613fa9c39f819626e6d",
+      "framework/rectangular64_policy.h": "d6e534e028007233a483dd6967346fd834d1beb01496446961e0140284115308",
+      "framework/rectangular64_range.h": "97bf3a867931c7daf05be6dab55b90b939539cc8bc1d98b0b151bc6217d91a16",
+      "framework/shared_grid32.h": "d6c343ac4f848df036f0c01d54087e730a76a94f79560a699012f6de4b797e06",
+      "framework/strassen_one_level.h": "53516df103e0df79a549c14783a2d51c0c2d5f37ac752541dff6212c60892d96",
+      "configs/build-requirements.txt": "6df362c6b84bd65af99010bbdb6b2f199af37e2a65e921f5789575e6ba048b42",
+      "configs/grace.json": "d503e1f5a1b14f983522a8b9d1d3e0a854c3f53938dab50521b1741f9d703d9f",
+      "configs/runtime-requirements.txt": "ff6eae8ab1bb4faf369954aa662d43f57ee6f40849549bf2225b4ebb4e79002b",
+      "configs/style-requirements.txt": "3a0a5b5699e15b5e0857538bfd652c74ed6f2ab27ba0f1b70b602d917f7afcbf"
+    },
+    "binary_sha256": {
+      "libframework_blas.so": "2574189740241935b365a3559a32e279d1458a0db186e400081eb0c36ce0e4e4",
+      "libcamblas_sve_nr4.so": "c54370c43f44e055fd985c9f2c588ccad0eaca28ab5f48e0188bf09a1c8a9144"
+    },
+    "transposed_a_check": "/lus/lfs1aip2/projects/u6yq/users/p3jitnath/camblas/.frameworks/nvpl-tuning-20261001/target60-transposed32-check.log"
+  }
+}

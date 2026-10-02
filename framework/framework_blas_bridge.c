@@ -43,6 +43,9 @@
 #ifndef CAMBLAS_FRAMEWORK_SPIN_POOL
 #define CAMBLAS_FRAMEWORK_SPIN_POOL 0
 #endif
+#ifndef CAMBLAS_FRAMEWORK_SHARED_GRID32
+#define CAMBLAS_FRAMEWORK_SHARED_GRID32 0
+#endif
 #ifndef CAMBLAS_FRAMEWORK_OPENMP
 #define CAMBLAS_FRAMEWORK_OPENMP 0
 #endif
@@ -129,6 +132,7 @@ enum {
     NCOUNTERS
 };
 static _Atomic uint64_t counters[NCOUNTERS];
+static _Atomic uint64_t shared_grid32_calls;
 static pthread_once_t once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t gemm_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int thread_count, trace_calls;
@@ -187,6 +191,7 @@ VENDOR_DIRECT(d, double)
 #undef VENDOR_DIRECT
 static camblas_topology_t topology;
 static camblas_ctx_t context;
+#if CAMBLAS_FRAMEWORK_SPIN_POOL
 static int app_torch;
 static int detect_torch(void)
 {
@@ -203,6 +208,7 @@ static int detect_torch(void)
     fclose(f);
     return found;
 }
+#endif
 static camblas_pthread_pool_t *pool;
 static camblas_pthread_pool_t *small_pool;
 static camblas_ctx_t small_context;
@@ -270,10 +276,12 @@ static int framework_team_exchange(framework_team_t *team)
 }
 static int framework_team_call(void (*fn)(void *), void *data, int m, int n, int k)
 {
-    int want_team = CAMBLAS_FRAMEWORK_SPIN_POOL
-                        ? (thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192 &&
-                           (thread_count < 64 || (app_torch && k > 1024)))
-                        : (thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192);
+#if CAMBLAS_FRAMEWORK_SPIN_POOL
+    int want_team = thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192 &&
+                    (thread_count < 64 || (app_torch && k > 1024));
+#else
+    int want_team = thread_count >= 16 && m <= 8192 && n <= 8192 && k <= 8192;
+#endif
     if (!want_team || omp_in_parallel()) {
         fn(data);
         return 0;
@@ -301,8 +309,9 @@ static int framework_team_call(void (*fn)(void *), void *data, int m, int n, int
 #if CAMBLAS_FRAMEWORK_SPIN_POOL
 __attribute__((unused))
 #endif
-static int framework_omp_run(camblas_task_fn fn, const camblas_task_t *tasks, int count, void *gctx,
-                             void *data)
+static int
+framework_omp_run(camblas_task_fn fn, const camblas_task_t *tasks, int count, void *gctx,
+                  void *data)
 {
     if (!fn || count < 0 || (count && !tasks))
         return -1;
@@ -372,7 +381,7 @@ __attribute__((unused))
 static camblas_executor_t framework_omp_executor = {framework_omp_run, &thread_count};
 #endif
 #if CAMBLAS_FRAMEWORK_SPIN_POOL
-/* Always-spinning worker pool replacing per-call OpenMP fork/join on the GEMM
+/* Persistent worker pool replacing per-call OpenMP fork/join on the GEMM
  * executor path. The calling thread participates as worker 0 and the task and
  * output-preparation slices use the same contiguous static distribution as the
  * OpenMP executor, so results and page-touch behaviour are unchanged. */
@@ -396,9 +405,9 @@ static inline void spin_pause(void)
 {
     __asm__ volatile("yield");
 }
-/* Workers spin only while a GEMM call is open (bridging the gaps between its
- * executor phases wake-free) and sleep on a futex once the master fences the
- * call, so idle cores stay available to the application's own thread pools. */
+/* Workers poll briefly between executor batches, then wait on a futex. The
+ * polling window bridges short phase gaps without keeping idle workers active
+ * indefinitely. Its duration scales with the pool size. */
 static void spin_futex_wait(int seen)
 {
     struct timespec timeout = {.tv_sec = 1};
@@ -459,6 +468,10 @@ static void *spin_worker(void *arg)
     for (;;) {
         spin_wait_for_work(seen);
         int gen = atomic_load_explicit(&spin_gen, memory_order_acquire);
+        /* A timeout or interrupted futex wait does not publish new work.
+         * The previous task and its stack-backed arguments may have expired. */
+        if (gen == seen)
+            continue;
         seen = gen;
         if (gen < 0)
             break;
@@ -653,6 +666,11 @@ void framework_blas_reset_stats(void)
     atomic_store_explicit(&bilinear_calls, 0, memory_order_relaxed);
     atomic_store_explicit(&compact_calls, 0, memory_order_relaxed);
     atomic_store_explicit(&dot_calls, 0, memory_order_relaxed);
+    atomic_store_explicit(&shared_grid32_calls, 0, memory_order_relaxed);
+}
+uint64_t framework_blas_shared_grid32_calls(void)
+{
+    return atomic_load_explicit(&shared_grid32_calls, memory_order_relaxed);
 }
 uint64_t framework_blas_dot_calls(void)
 {
@@ -816,6 +834,16 @@ static camblas_ctx_t *gemm_context(int m, int n, int k)
     }
     atomic_fetch_add_explicit(&small_pool_calls, 1, memory_order_relaxed);
     return &small_context;
+}
+static void select_call_executor(camblas_ctx_t *ctx, int k)
+{
+#if CAMBLAS_FRAMEWORK_SPIN_POOL
+    ctx->executor = thread_count >= 64 && !(app_torch && k > 1024) ? &framework_spin_executor
+                                                                   : &framework_omp_executor;
+#else
+    (void)ctx;
+    (void)k;
+#endif
 }
 static void record_plan(const camblas_plan_t *plan)
 {
@@ -1027,6 +1055,15 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
 #define release_rect32() ((void)0)
 #endif
 
+#if defined(CAMBLAS_FRAMEWORK_SHARED_GRID32) && CAMBLAS_FRAMEWORK_SHARED_GRID32 && \
+    CAMBLAS_FRAMEWORK_SPIN_POOL
+#include "shared_grid32.h"
+#else
+#define try_shared32_s(...) 0
+#define try_shared32_d(...) 0
+#define release_shared32() ((void)0)
+#endif
+
 #define DEFINE_GEMM(SUFFIX, TYPE, FP64, VENDOR, COUNTER, STRASSEN_COUNTER)                                                  \
     typedef struct {                                                                                                        \
         camblas_ctx_t *ctx;                                                                                                 \
@@ -1099,30 +1136,34 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
             if (try_symmetric_##SUFFIX(at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, 1,                             \
                                        1)) {                                                                                \
                 clear_output_touch();                                                                                       \
-                    if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
+                if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
                     fail("symmetric GEMM unlock");                                                                          \
                 return;                                                                                                     \
             }                                                                                                               \
             camblas_ctx_t *call_context = gemm_context(m, n, k);                                                            \
-            if (CAMBLAS_FRAMEWORK_SPIN_POOL)                                                                                \
-                call_context->executor = (thread_count >= 64 && !(app_torch && k > 1024))                                  \
-                                             ? &framework_spin_executor                                                    \
-                                             : &framework_omp_executor;                                                    \
+            select_call_executor(call_context, k);                                                                          \
+            if (try_shared32_##SUFFIX(call_context, at, bt, m, n, k, alpha, a, lda, b, ldb, beta,                           \
+                                      c, ldc)) {                                                                            \
+                clear_output_touch();                                                                                       \
+                if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
+                    fail("shared FP32 unlock");                                                                             \
+                return;                                                                                                     \
+            }                                                                                                               \
             if (try_dot_##SUFFIX(at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {                                   \
                 clear_output_touch();                                                                                       \
-                    if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
+                if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
                     fail("dot GEMM unlock");                                                                                \
                 return;                                                                                                     \
             }                                                                                                               \
             if (try_compact_##SUFFIX(at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {                               \
                 clear_output_touch();                                                                                       \
-                    if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
+                if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
                     fail("compact GEMM unlock");                                                                            \
                 return;                                                                                                     \
             }                                                                                                               \
             if (try_bilinear_##SUFFIX(at, bt, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc)) {                              \
                 clear_output_touch();                                                                                       \
-                    if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
+                if (pthread_mutex_unlock(&gemm_mutex))                                                                      \
                     fail("bilinear GEMM unlock");                                                                           \
                 return;                                                                                                     \
             }                                                                                                               \
@@ -1179,7 +1220,7 @@ DEFINE_BILINEAR_CALL(d, double, 1, camblas_bilinear_f64, STRASSEN_D)
             clear_output_touch();                                                                                           \
             kernel = plan.kernel_id;                                                                                        \
             record_plan(&plan);                                                                                             \
-                if (pthread_mutex_unlock(&gemm_mutex))                                                                          \
+            if (pthread_mutex_unlock(&gemm_mutex))                                                                          \
                 fail("GEMM unlock");                                                                                        \
         }                                                                                                                   \
         if (trace_calls)                                                                                                    \
@@ -1237,7 +1278,7 @@ DEFINE_GEMM(d, double, 1, vendor_dg, DG, STRASSEN_D)
                 try_symmetric_##SUFFIX(at, at == 'N' ? 'T' : 'N', n, n, k, alpha, a, lda, a, lda,  \
                                        beta, c, ldc, order == 102 ? uplo == 121 : uplo == 122, 0); \
             clear_output_touch();                                                                  \
-                if (pthread_mutex_unlock(&gemm_mutex))                                                 \
+            if (pthread_mutex_unlock(&gemm_mutex))                                                 \
                 fail("SYRK unlock");                                                               \
             if (used)                                                                              \
                 return;                                                                            \
@@ -1315,6 +1356,7 @@ __attribute__((destructor)) static void release_resources(void)
     if (owner && owner == getpid()) {
         release_rect64();
         release_rect32();
+        release_shared32();
 #if CAMBLAS_FRAMEWORK_SPIN_POOL
         spin_pool_stop();
 #endif

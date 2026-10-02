@@ -8,6 +8,7 @@ grace:
 	$(PYTHON) scripts/build.py --target grace --cc "$(CC)"
 test:
 	$(PYTHON) scripts/build.py --target reference --cc "$(CC)" --test
+	$(PYTHON) tests/check_bridge_build.py --cc "$(CC)"
 	$(PYTHON) -m unittest discover -s tests -p test_tools.py
 format:
 	$(PYTHON) scripts/style.py --fix

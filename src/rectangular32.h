@@ -42,4 +42,16 @@ int camblas_experimental_rectangular32_f32_op_checked(int tb, const camblas_exec
                                                       const float *a, int lda, const float *b,
                                                       int ldb, float *c, int ldc, void *scratch,
                                                       size_t bytes, int levels);
+/* Independent reusable storage for bounded depth panels. Every segment is
+ * disjoint from operands, C and the other segments. No packed values persist. */
+typedef struct {
+    void *data[3];
+    size_t bytes[3];
+} camblas_rectangular32_segments_t;
+int camblas_experimental_rectangular32_segment_bytes(int workers, int m, int n, int k,
+                                                     size_t sizes[3]);
+int camblas_experimental_rectangular32_f32_segments_checked(
+    int tb, const camblas_executor_t *executor, int workers, int m, int n, int k, const float *a,
+    int lda, const float *b, int ldb, float *c, int ldc,
+    const camblas_rectangular32_segments_t *segments, int levels);
 #endif

@@ -43,15 +43,23 @@ def main():
     ruff = [sys.executable, "-m", "ruff"]
     if args.fix:
         commands = [
-            [*ruff, "check", "--select", "I", "--fix", *python_dirs],
-            [*ruff, "format", *python_dirs],
+            [
+                *ruff,
+                "check",
+                "--respect-gitignore",
+                "--select",
+                "I",
+                "--fix",
+                *python_dirs,
+            ],
+            [*ruff, "format", "--respect-gitignore", *python_dirs],
             [str(clang_format), "-i", *c_files],
-            [*ruff, "check", *python_dirs],
+            [*ruff, "check", "--respect-gitignore", *python_dirs],
         ]
     else:
         commands = [
-            [*ruff, "check", *python_dirs],
-            [*ruff, "format", "--check", *python_dirs],
+            [*ruff, "check", "--respect-gitignore", *python_dirs],
+            [*ruff, "format", "--respect-gitignore", "--check", *python_dirs],
             [str(clang_format), "--dry-run", "--Werror", *c_files],
         ]
     for command in commands:

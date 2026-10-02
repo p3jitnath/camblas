@@ -1,5 +1,6 @@
 /* Experimental FP64 rectangular Strassen with fused packed transforms.
- * Packing, all seven products and recombination each use one executor batch.
+ * Deep products reuse bounded depth panels; packing and compute complete
+ * synchronously before panels are reused, and C is written only at recombination.
  * No input-dependent values survive the call. This is a different floating-
  * point algorithm from classical GEMM and requires separate error checks. */
 #include "camblas.h"
@@ -12,6 +13,12 @@
 #include <stdatomic.h>
 #include <math.h>
 #include <stdint.h>
+#ifndef CAMBLAS_RECT_KC
+#define CAMBLAS_RECT_KC 256
+#endif
+#if CAMBLAS_RECT_KC < 4 || CAMBLAS_RECT_KC > 1024 || CAMBLAS_RECT_KC % 4
+#error "Rectangular depth blocks must be multiples of four in [4, 1024]"
+#endif
 
 int camblas_batch_dgemm_amicro6_tile(int m, int n, int k, double alpha, const double *a, int lda,
                                      const double *b, int ldb, double *c, int ldc, int initialize);
@@ -38,8 +45,8 @@ int camblas_experimental_rectangular64_bytes(int m, int n, int k, size_t *bytes)
         return -1;
     uint64_t hm = (unsigned)m / 2, hn = (unsigned)n / 2, hk = (unsigned)k / 2;
     uint64_t apad = (hm + 5) / 6 * 6, bpad = (hn + 7) / 8 * 8;
-    uint64_t packed_k = hk;
-    uint64_t elements = 7 * ((apad + bpad) * packed_k + hm * hn);
+    /* Preserve the full-depth scratch contract, including streamed calls. */
+    uint64_t elements = 7 * ((apad + bpad) * hk + hm * hn);
     if (elements > PTRDIFF_MAX / sizeof(double) || elements > SIZE_MAX / sizeof(double))
         return -1;
     *bytes = (size_t)elements * sizeof(double);
@@ -47,7 +54,8 @@ int camblas_experimental_rectangular64_bytes(int m, int n, int k, size_t *bytes)
 }
 
 typedef struct {
-    int tb, hm, hn, hk, lda, ldb, ldc, workers, row_groups, column_groups, depth_blocks;
+    int ta, tb, hm, hn, hk, source_pc, fused_b, lda, ldb, ldc, workers, row_groups, column_groups,
+        depth_blocks, kc;
     size_t a_plane, b_plane, product_plane;
     const double *a[7], *a2[7], *b[7], *b2[7];
     double *packed_a, *packed_b, *products, *c;
@@ -115,15 +123,17 @@ static void rectangular64_pack_b_block(rectangular64_t *w, int product, int colu
     int count = w->hn - column < 8 ? w->hn - column : 8;
     double *out = w->packed_b + (size_t)product * w->b_plane + (size_t)pc * w->column_groups * 8 +
                   (size_t)column * bk;
-    size_t initial_offset = w->tb ? column + (size_t)pc * w->ldb : pc + (size_t)column * w->ldb;
+    size_t initial_offset = w->tb ? column + (size_t)(w->source_pc + pc) * w->ldb
+                                  : w->source_pc + pc + (size_t)column * w->ldb;
     const double *left = w->b[product] + initial_offset;
     const double *right = w->b2[product] ? w->b2[product] + initial_offset : NULL;
     float64x2_t acc = vdupq_n_f64(0);
     double tail = 0;
 
     if (w->tb) {
-        left = w->b[product] + column + (size_t)pc * w->ldb;
-        right = w->b2[product] ? w->b2[product] + column + (size_t)pc * w->ldb : NULL;
+        left = w->b[product] + column + (size_t)(w->source_pc + pc) * w->ldb;
+        right =
+            w->b2[product] ? w->b2[product] + column + (size_t)(w->source_pc + pc) * w->ldb : NULL;
         for (int q = 0; q < bk; ++q) {
             int j = 0;
             for (; j + 2 <= count; j += 2)
@@ -189,7 +199,8 @@ static void rectangular64_pack_all_b(rectangular64_t *w, int column, int pc, int
 {
     int count = w->hn - column < 8 ? w->hn - column : 8;
     const double *quadrants[4] = {w->b[0], w->b[2], w->b[3], w->b[4]};
-    size_t base_offset = w->tb ? column + (size_t)pc * w->ldb : pc + (size_t)column * w->ldb;
+    size_t base_offset = w->tb ? column + (size_t)(w->source_pc + pc) * w->ldb
+                               : w->source_pc + pc + (size_t)column * w->ldb;
     double *base = w->packed_b + (size_t)pc * w->column_groups * 8 + (size_t)column * bk;
     size_t plane = w->b_plane;
     float64x2_t acc = vdupq_n_f64(0);
@@ -244,6 +255,94 @@ static void rectangular64_pack_all_b(rectangular64_t *w, int column, int pc, int
         }
     rectangular64_store_max(acc, tail, bmax);
 }
+/* Read transposed A directly as two depths by two logical rows, forming
+ * all seven transforms in the same pass. No full-size transpose is stored. */
+static void rectangular64_pack_transposed_a(rectangular64_t *w, int first, int last, int pc, int bk,
+                                            double *amax)
+{
+    const double *quadrants[4] = {w->a[0], w->a[1], w->a[6], w->a[3]};
+    size_t plane = w->a_plane;
+    float64x2_t acc = vdupq_n_f64(0);
+    double tail = 0;
+    for (int group = first; group < last; ++group) {
+        int row = group * 6, count = w->hm - row < 6 ? w->hm - row : 6;
+        double *base = w->packed_a + (size_t)pc * w->row_groups * 6 + (size_t)row * bk;
+        int q = 0;
+        for (; q + 2 <= bk; q += 2) {
+            int i = 0;
+            for (; i + 2 <= count; i += 2) {
+                size_t source = w->source_pc + pc + q + (size_t)(row + i) * w->lda;
+                float64x2_t tiles[4][2];
+                for (int t = 0; t < 4; ++t) {
+                    float64x2_t a = vld1q_f64(quadrants[t] + source);
+                    float64x2_t b = vld1q_f64(quadrants[t] + source + w->lda);
+                    acc = rectangular64_abs_max2(acc, a);
+                    acc = rectangular64_abs_max2(acc, b);
+                    tiles[t][0] = vtrn1q_f64(a, b);
+                    tiles[t][1] = vtrn2q_f64(a, b);
+                }
+                for (int l = 0; l < 2; ++l) {
+                    float64x2_t a11 = tiles[0][l], a21 = tiles[1][l], a12 = tiles[2][l],
+                                a22 = tiles[3][l];
+                    double *out = base + (size_t)(q + l) * 6 + i;
+                    vst1q_f64(out, vaddq_f64(a11, a22));
+                    vst1q_f64(out + plane, vaddq_f64(a21, a22));
+                    vst1q_f64(out + 2 * plane, a11);
+                    vst1q_f64(out + 3 * plane, a22);
+                    vst1q_f64(out + 4 * plane, vaddq_f64(a11, a12));
+                    vst1q_f64(out + 5 * plane, vsubq_f64(a21, a11));
+                    vst1q_f64(out + 6 * plane, vsubq_f64(a12, a22));
+                }
+            }
+            for (; i < 6; ++i)
+                for (int l = 0; l < 2; ++l) {
+                    size_t source = w->source_pc + pc + q + l + (size_t)(row + i) * w->lda;
+                    double a11 = i < count ? quadrants[0][source] : 0;
+                    double a21 = i < count ? quadrants[1][source] : 0;
+                    double a12 = i < count ? quadrants[2][source] : 0;
+                    double a22 = i < count ? quadrants[3][source] : 0;
+                    if (i < count) {
+                        rectangular64_scan_max(&tail, a11);
+                        rectangular64_scan_max(&tail, a21);
+                        rectangular64_scan_max(&tail, a12);
+                        rectangular64_scan_max(&tail, a22);
+                    }
+                    double *out = base + (size_t)(q + l) * 6 + i;
+                    out[0] = a11 + a22;
+                    out[plane] = a21 + a22;
+                    out[2 * plane] = a11;
+                    out[3 * plane] = a22;
+                    out[4 * plane] = a11 + a12;
+                    out[5 * plane] = a21 - a11;
+                    out[6 * plane] = a12 - a22;
+                }
+        }
+        for (; q < bk; ++q)
+            for (int i = 0; i < 6; ++i) {
+                size_t source = w->source_pc + pc + q + (size_t)(row + i) * w->lda;
+                double a11 = i < count ? quadrants[0][source] : 0;
+                double a21 = i < count ? quadrants[1][source] : 0;
+                double a12 = i < count ? quadrants[2][source] : 0;
+                double a22 = i < count ? quadrants[3][source] : 0;
+                if (i < count) {
+                    rectangular64_scan_max(&tail, a11);
+                    rectangular64_scan_max(&tail, a21);
+                    rectangular64_scan_max(&tail, a12);
+                    rectangular64_scan_max(&tail, a22);
+                }
+                double *out = base + (size_t)q * 6 + i;
+                out[0] = a11 + a22;
+                out[plane] = a21 + a22;
+                out[2 * plane] = a11;
+                out[3 * plane] = a22;
+                out[4 * plane] = a11 + a12;
+                out[5 * plane] = a21 - a11;
+                out[6 * plane] = a12 - a22;
+            }
+    }
+    rectangular64_store_max(acc, tail, amax);
+}
+
 /* Reuse four loaded quadrants for all seven A transforms. A small row/depth
  * tile limits the live input set when original columns have a large stride. */
 static void rectangular64_pack_all_a(rectangular64_t *w, int first, int last, int pc, int bk,
@@ -258,7 +357,7 @@ static void rectangular64_pack_all_a(rectangular64_t *w, int first, int last, in
             int row = group * 6, count = w->hm - row < 6 ? w->hm - row : 6;
             double *base = w->packed_a + (size_t)pc * w->row_groups * 6 + (size_t)row * bk;
             for (int q = q0; q < end; ++q) {
-                size_t source = row + (size_t)(pc + q) * w->lda;
+                size_t source = row + (size_t)(w->source_pc + pc + q) * w->lda;
                 double *out = base + (size_t)q * 6;
                 int i = 0;
                 for (; i + 2 <= count; i += 2) {
@@ -320,18 +419,21 @@ static void rectangular64_pack(const camblas_task_t *task, void *opaque)
     int total = groups * w->depth_blocks, worker = task->i0;
     for (int index = total * worker / w->workers; index < total * (worker + 1) / w->workers;
          ++index) {
-        int group = index % groups, pc = (index / groups) * 256;
-        int bk = w->hk - pc < 256 ? w->hk - pc : 256;
+        int group = index % groups, pc = (index / groups) * w->kc;
+        int bk = w->hk - pc < w->kc ? w->hk - pc : w->kc;
         if (group < a_blocks * weight) {
             if (group % weight)
                 continue;
             int first = group / weight * per_block, last = first + per_block;
             if (last > w->row_groups)
                 last = w->row_groups;
-            rectangular64_pack_all_a(w, first, last, pc, bk, &a_max);
+            if (w->ta)
+                rectangular64_pack_transposed_a(w, first, last, pc, bk, &a_max);
+            else
+                rectangular64_pack_all_a(w, first, last, pc, bk, &a_max);
         } else {
             group -= a_blocks * weight;
-            if (!w->tb)
+            if (!w->tb && !w->fused_b)
                 rectangular64_pack_b_block(w, group / w->column_groups,
                                            group % w->column_groups * 8, pc, bk, &b_max);
             else if (group % 7 == 0)
@@ -350,8 +452,8 @@ static void rectangular64_product(const camblas_task_t *task, void *opaque)
     int product = task->i0 / w->hm, row = task->i0 % w->hm;
     int bm = task->i1 - task->i0, column = task->j0, bn = task->j1 - column;
     int end_pc = w->hk;
-    for (int pc = 0; pc < end_pc; pc += 256) {
-        int bk = w->hk - pc < 256 ? w->hk - pc : 256;
+    for (int pc = 0; pc < end_pc; pc += w->kc) {
+        int bk = w->hk - pc < w->kc ? w->hk - pc : w->kc;
         const double *a = w->packed_a + (size_t)product * w->a_plane +
                           (size_t)pc * w->row_groups * 6 + (size_t)row * bk;
         const double *b = w->packed_b + (size_t)product * w->b_plane +
@@ -359,11 +461,11 @@ static void rectangular64_product(const camblas_task_t *task, void *opaque)
         double *c = w->products + (size_t)product * w->product_plane + row + (size_t)column * w->hm;
         int status;
         if (!w->tb)
-            status =
-                camblas_dgemm_sve_amicro6_tile(bm, bn, bk, 1.0, a, bk, b, bk, c, w->hm, pc == 0);
+            status = camblas_dgemm_sve_amicro6_tile(bm, bn, bk, 1.0, a, bk, b, bk, c, w->hm,
+                                                    pc == 0 && w->source_pc == 0);
         else
-            status =
-                camblas_batch_dgemm_amicro6_tile(bm, bn, bk, 1.0, a, bk, b, bk, c, w->hm, pc == 0);
+            status = camblas_batch_dgemm_amicro6_tile(bm, bn, bk, 1.0, a, bk, b, bk, c, w->hm,
+                                                      pc == 0 && w->source_pc == 0);
         if (status) {
             atomic_store_explicit(&w->failed, 1, memory_order_relaxed);
             return;
@@ -404,15 +506,18 @@ static void rectangular64_combine(const camblas_task_t *task, void *opaque)
 /* Core packed route. levels > 0 fuses the conservative range preflight into
  * the pack pass and returns 1 when the classical path should own the call;
  * levels == 0 keeps the historical unconditional behaviour. */
-static int rectangular64_execute(int tb, const camblas_executor_t *executor, int workers, int m,
-                                 int n, int k, const double *a, int lda, const double *b, int ldb,
-                                 double *c, int ldc, void *scratch, size_t bytes, int levels)
+static int rectangular64_execute(int ta, int tb, const camblas_executor_t *executor, int workers,
+                                 int m, int n, int k, const double *a, int lda, const double *b,
+                                 int ldb, double *c, int ldc, void *scratch, size_t bytes,
+                                 int levels)
 {
     size_t needed;
-    if ((tb != 0 && tb != 1) || !executor || !executor->run || workers < 1 || workers > 64 || !a ||
-        !b || !c || !scratch || (uintptr_t)scratch % _Alignof(double) ||
-        camblas_experimental_rectangular64_bytes(m, n, k, &needed) || bytes < needed || lda < m ||
-        ldb < (tb ? n : k) || ldc < m || camblas_matrix_span_fits(m, k, lda, sizeof(double)) ||
+    if ((ta != 0 && ta != 1) || (tb != 0 && tb != 1) || !executor || !executor->run ||
+        workers < 1 || workers > 64 || !a || !b || !c || !scratch ||
+        (uintptr_t)scratch % _Alignof(double) ||
+        camblas_experimental_rectangular64_bytes(m, n, k, &needed) || bytes < needed ||
+        lda < (ta ? k : m) || ldb < (tb ? n : k) || ldc < m ||
+        camblas_matrix_span_fits(ta ? k : m, ta ? m : k, lda, sizeof(double)) ||
         camblas_matrix_span_fits(tb ? n : k, tb ? k : n, ldb, sizeof(double)) ||
         camblas_matrix_span_fits(m, n, ldc, sizeof(double)))
         return -1;
@@ -421,7 +526,11 @@ static int rectangular64_execute(int tb, const camblas_executor_t *executor, int
     if (!runtime.compiled_sve || !runtime.hw_sve || runtime.vl_bits != 128)
         return -1;
     int hm = m / 2, hn = n / 2, hk = k / 2;
-    rectangular64_t work = {.tb = tb,
+    /* A wider depth panel avoids rereading partial products in the bounded
+     * 64-worker square route. Streamed rectangles retain their smaller slab. */
+    int kc = workers == 64 && hm == hn && hm <= 512 && hk >= 256 ? 512 : CAMBLAS_RECT_KC;
+    rectangular64_t work = {.ta = ta,
+                            .tb = tb,
                             .hm = hm,
                             .hn = hn,
                             .hk = hk,
@@ -431,16 +540,21 @@ static int rectangular64_execute(int tb, const camblas_executor_t *executor, int
                             .workers = workers,
                             .row_groups = (hm + 5) / 6,
                             .column_groups = (hn + 7) / 8,
-                            .depth_blocks = (hk + 256 - 1) / 256,
+                            .depth_blocks = (hk + kc - 1) / kc,
+                            .kc = kc,
                             .c = c};
-    int packed_k = hk;
+    work.fused_b = workers <= 32 && (m != n || k < 512);
+    int stream = workers >= 16 && workers <= 32 && m > n && k > 1024;
+    int packed_k = stream && hk > kc ? kc : hk;
     work.a_plane = (size_t)work.row_groups * 6 * packed_k;
     work.b_plane = (size_t)work.column_groups * 8 * packed_k;
     work.product_plane = (size_t)hm * hn;
     work.packed_a = scratch;
     work.packed_b = work.packed_a + 7 * work.a_plane;
     work.products = work.packed_b + 7 * work.b_plane;
-    const double *a12 = a + (size_t)hk * lda, *a21 = a + hm, *a22 = a12 + hm;
+    const double *a12 = a + (ta ? (size_t)hk : (size_t)hk * lda);
+    const double *a21 = a + (ta ? (size_t)hm * lda : (size_t)hm);
+    const double *a22 = a12 + (ta ? (size_t)hm * lda : (size_t)hm);
     const double *b12 = b + (tb ? (size_t)hn : (size_t)hn * ldb);
     const double *b21 = b + (tb ? (size_t)hk * ldb : (size_t)hk);
     const double *b22 = b12 + (tb ? (size_t)hk * ldb : (size_t)hk);
@@ -480,23 +594,50 @@ static int rectangular64_execute(int tb, const camblas_executor_t *executor, int
                     j1 = hn;
                 product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
             }
-    /* Each synchronous stage completes before its outputs are consumed. The
+    if (!stream) {
+        /* Each synchronous stage completes before its outputs are consumed. The
      * pack pass also produces the per-worker operand maxima, so the range
      * preflight costs no separate scan of A and B. */
-    if (executor->run(rectangular64_pack, workers_tasks, workers, &work, executor->user_data))
-        return -1;
-    if (levels) {
-        double a_peak = 0, b_peak = 0;
-        for (int t = 0; t < workers; ++t) {
-            a_peak = fmax(a_peak, work.a_max[t]);
-            b_peak = fmax(b_peak, work.b_max[t]);
+        if (executor->run(rectangular64_pack, workers_tasks, workers, &work, executor->user_data))
+            return -1;
+        if (levels) {
+            double a_peak = 0, b_peak = 0;
+            for (int t = 0; t < workers; ++t) {
+                a_peak = fmax(a_peak, work.a_max[t]);
+                b_peak = fmax(b_peak, work.b_max[t]);
+            }
+            if (!rectangular64_range_verdict(a_peak, b_peak, k, levels))
+                return 1;
         }
-        if (!rectangular64_range_verdict(a_peak, b_peak, k, levels))
-            return 1;
+        if (executor->run(rectangular64_product, product_tasks, count, &work,
+                          executor->user_data) ||
+            atomic_load_explicit(&work.failed, memory_order_relaxed))
+            return -1;
+        return executor->run(rectangular64_combine, workers_tasks, workers, &work,
+                             executor->user_data);
     }
-    if (executor->run(rectangular64_product, product_tasks, count, &work, executor->user_data) ||
-        atomic_load_explicit(&work.failed, memory_order_relaxed))
-        return -1;
+    /* Private products accumulate across slabs. A late range rejection
+     * leaves caller C untouched so the bridge can use classical GEMM. */
+    double a_peak = 0, b_peak = 0;
+    for (int origin = 0; origin < hk; origin += kc) {
+        work.source_pc = origin;
+        work.hk = hk - origin < kc ? hk - origin : kc;
+        work.depth_blocks = 1;
+        if (executor->run(rectangular64_pack, workers_tasks, workers, &work, executor->user_data))
+            return -1;
+        if (levels) {
+            for (int t = 0; t < workers; t++) {
+                a_peak = fmax(a_peak, work.a_max[t]);
+                b_peak = fmax(b_peak, work.b_max[t]);
+            }
+            if (!rectangular64_range_verdict(a_peak, b_peak, k, levels))
+                return 1;
+        }
+        if (executor->run(rectangular64_product, product_tasks, count, &work,
+                          executor->user_data) ||
+            atomic_load_explicit(&work.failed, memory_order_relaxed))
+            return -1;
+    }
     return executor->run(rectangular64_combine, workers_tasks, workers, &work, executor->user_data);
 }
 
@@ -505,7 +646,7 @@ int camblas_experimental_rectangular64_f64_op(int tb, const camblas_executor_t *
                                               int lda, const double *b, int ldb, double *c, int ldc,
                                               void *scratch, size_t bytes)
 {
-    return rectangular64_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
+    return rectangular64_execute(0, tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
                                  bytes, 0);
 }
 
@@ -515,7 +656,7 @@ int camblas_experimental_rectangular64_f64_op_checked(int tb, const camblas_exec
                                                       int ldb, double *c, int ldc, void *scratch,
                                                       size_t bytes, int levels)
 {
-    return rectangular64_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
+    return rectangular64_execute(0, tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
                                  bytes, levels);
 }
 
@@ -526,4 +667,15 @@ int camblas_experimental_rectangular64_f64(const camblas_executor_t *executor, i
 {
     return camblas_experimental_rectangular64_f64_op(0, executor, workers, m, n, k, a, lda, b, ldb,
                                                      c, ldc, scratch, bytes);
+}
+
+int camblas_experimental_rectangular64_f64_ops_checked(int ta, int tb,
+                                                       const camblas_executor_t *executor,
+                                                       int workers, int m, int n, int k,
+                                                       const double *a, int lda, const double *b,
+                                                       int ldb, double *c, int ldc, void *scratch,
+                                                       size_t bytes, int levels)
+{
+    return rectangular64_execute(ta, tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc,
+                                 scratch, bytes, levels);
 }

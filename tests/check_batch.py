@@ -77,6 +77,29 @@ def main():
                 timeout=120,
             )
             subprocess.run([executable], check=True, env=env, timeout=180)
+        transposed = directory / "transposed32"
+        subprocess.run(
+            [
+                *cc,
+                "-O2",
+                "-std=gnu11",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-fopenmp",
+                ROOT / "tests/shared_grid32_test.c",
+                "-ldl",
+                "-lm",
+                "-o",
+                transposed,
+            ],
+            check=True,
+            env=env,
+            timeout=120,
+        )
+        subprocess.run(
+            [transposed, bridge, "--transpose-a"], check=True, env=env, timeout=180
+        )
         nested = directory / "batch_nested"
         subprocess.run(
             [

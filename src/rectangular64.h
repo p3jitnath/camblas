@@ -6,10 +6,10 @@
 
 /* Internal FP64 one-level Strassen. The caller owns disjoint scratch;
  * inputs are repacked every call. Alpha=1 and beta=0 are required. A is
- * untransposed; the _op entry accepts ordinary B (tb=0) or transposed B
- * (tb=1), with column-major physical storage and explicit leading dimensions.
+ * untransposed in the legacy entries; _op accepts ordinary B (tb=0)
+ * or transposed B (tb=1), with column-major physical storage and explicit leading dimensions.
  * The bridge selects bounded geometries and handles other BLAS cases.
- * The range preflight belongs to the bridge, before this routine is called.
+ * Checked entries fuse the conservative range preflight into packing.
  * Any executor failure is fatal to this attempt: C must not be retried. */
 /* Query the current SVE runtime before any operand or workspace access. */
 int camblas_experimental_rectangular64_available(void);
@@ -44,4 +44,13 @@ int camblas_experimental_rectangular64_f64_op_checked(int tb, const camblas_exec
                                                       const double *a, int lda, const double *b,
                                                       int ldb, double *c, int ldc, void *scratch,
                                                       size_t bytes, int levels);
+/* Also accepts transposed A (ta=1), without materialising a full transpose.
+ * The physical A shape is K by M when ta=1, and M by K otherwise. The
+ * scratch capacity, checked range verdict and return values match _op_checked. */
+int camblas_experimental_rectangular64_f64_ops_checked(int ta, int tb,
+                                                       const camblas_executor_t *executor,
+                                                       int workers, int m, int n, int k,
+                                                       const double *a, int lda, const double *b,
+                                                       int ldb, double *c, int ldc, void *scratch,
+                                                       size_t bytes, int levels);
 #endif

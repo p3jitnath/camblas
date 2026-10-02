@@ -1,5 +1,6 @@
 /* Experimental FP32 rectangular Strassen with fused packed transforms.
- * Packing, all seven products and recombination each use one executor batch.
+ * Deep products reuse bounded depth panels; packing and compute complete
+ * synchronously before panels are reused, and C is written only at recombination.
  * No input-dependent values survive the call. This is a different floating-
  * point algorithm from classical GEMM and requires separate error checks. */
 #include "camblas.h"
@@ -12,6 +13,18 @@
 #include <stdatomic.h>
 #include <math.h>
 #include <stdint.h>
+#ifndef CAMBLAS_RECT_ROWS16
+#define CAMBLAS_RECT_ROWS16 8
+#endif
+#if CAMBLAS_RECT_ROWS16 < 1 || CAMBLAS_RECT_ROWS16 > 16 || 16 % CAMBLAS_RECT_ROWS16
+#error "The sixteen-worker row grid must divide sixteen"
+#endif
+#ifndef CAMBLAS_RECT_KC
+#define CAMBLAS_RECT_KC 256
+#endif
+#if CAMBLAS_RECT_KC < 4 || CAMBLAS_RECT_KC > 1024 || CAMBLAS_RECT_KC % 4
+#error "Rectangular depth blocks must be multiples of four in [4, 1024]"
+#endif
 
 /* Packing and recombination share this seven-product order:
  * P1 = (A11 + A22) * (B11 + B22), P2 = (A21 + A22) * B11,
@@ -35,16 +48,32 @@ int camblas_experimental_rectangular32_bytes(int m, int n, int k, size_t *bytes)
         return -1;
     uint64_t hm = (unsigned)m / 2, hn = (unsigned)n / 2, hk = (unsigned)k / 2;
     uint64_t apad = (hm + 11) / 12 * 12, bpad = (hn + 7) / 8 * 8;
-    uint64_t packed_k = hk;
-    uint64_t elements = 7 * ((apad + bpad) * packed_k + hm * hn);
+    /* Preserve the full-depth scratch contract, including streamed calls. */
+    uint64_t elements = 7 * ((apad + bpad) * hk + hm * hn);
     if (elements > PTRDIFF_MAX / sizeof(float) || elements > SIZE_MAX / sizeof(float))
         return -1;
     *bytes = (size_t)elements * sizeof(float);
     return 0;
 }
 
+int camblas_experimental_rectangular32_segment_bytes(int workers, int m, int n, int k,
+                                                     size_t sizes[3])
+{
+    size_t legacy;
+    if (!sizes || workers < 1 || workers > 64 ||
+        camblas_experimental_rectangular32_bytes(m, n, k, &legacy))
+        return -1;
+    int hm = m / 2, hn = n / 2, hk = k / 2;
+    int stream = workers >= 16 && workers <= 32 && m >= (int64_t)n * 4 && k > 1024;
+    int packed_k = stream && hk > CAMBLAS_RECT_KC ? CAMBLAS_RECT_KC : hk;
+    sizes[0] = 7 * (size_t)((hm + 11) / 12 * 12) * packed_k * sizeof(float);
+    sizes[1] = 7 * (size_t)((hn + 7) / 8 * 8) * packed_k * sizeof(float);
+    sizes[2] = 7 * (size_t)hm * hn * sizeof(float);
+    return 0;
+}
+
 typedef struct {
-    int tb, hm, hn, hk, lda, ldb, ldc, workers, row_groups, column_groups, depth_blocks;
+    int tb, hm, hn, hk, source_pc, lda, ldb, ldc, workers, row_groups, column_groups, depth_blocks;
     size_t a_plane, b_plane, product_plane;
     const float *a[7], *a2[7], *b[7], *b2[7];
     float *packed_a, *packed_b, *products, *c;
@@ -111,7 +140,8 @@ static void rectangular32_pack_all_b(rectangular32_t *w, int column, int pc, int
 {
     int count = w->hn - column < 8 ? w->hn - column : 8;
     const float *quadrants[4] = {w->b[0], w->b[2], w->b[3], w->b[4]};
-    size_t base_offset = w->tb ? column + (size_t)pc * w->ldb : pc + (size_t)column * w->ldb;
+    size_t base_offset = w->tb ? column + (size_t)(w->source_pc + pc) * w->ldb
+                               : w->source_pc + pc + (size_t)column * w->ldb;
     float *base = w->packed_b + (size_t)pc * w->column_groups * 8 + (size_t)column * bk;
     size_t plane = w->b_plane;
     float32x4_t acc = vdupq_n_f32(0);
@@ -176,7 +206,7 @@ static void rectangular32_pack_all_a(rectangular32_t *w, int first, int last, in
             int row = group * 12, count = w->hm - row < 12 ? w->hm - row : 12;
             float *base = w->packed_a + (size_t)pc * w->row_groups * 12 + (size_t)row * bk;
             for (int q = q0; q < end; ++q) {
-                size_t source = row + (size_t)(pc + q) * w->lda;
+                size_t source = row + (size_t)(w->source_pc + pc + q) * w->lda;
                 float *out = base + (size_t)q * 12;
                 int i = 0;
                 for (; i + 4 <= count; i += 4) {
@@ -235,8 +265,8 @@ static void rectangular32_pack(const camblas_task_t *task, void *opaque)
     int total = groups * w->depth_blocks, worker = task->i0;
     for (int index = total * worker / w->workers; index < total * (worker + 1) / w->workers;
          ++index) {
-        int group = index % groups, pc = (index / groups) * 256;
-        int bk = w->hk - pc < 256 ? w->hk - pc : 256;
+        int group = index % groups, pc = (index / groups) * CAMBLAS_RECT_KC;
+        int bk = w->hk - pc < CAMBLAS_RECT_KC ? w->hk - pc : CAMBLAS_RECT_KC;
         if (group < a_blocks * weight) {
             if (group % weight)
                 continue;
@@ -262,14 +292,15 @@ static void rectangular32_product(const camblas_task_t *task, void *opaque)
     int product = task->i0 / w->hm, row = task->i0 % w->hm;
     int bm = task->i1 - task->i0, column = task->j0, bn = task->j1 - column;
     int end_pc = w->hk;
-    for (int pc = 0; pc < end_pc; pc += 256) {
-        int bk = w->hk - pc < 256 ? w->hk - pc : 256;
+    for (int pc = 0; pc < end_pc; pc += CAMBLAS_RECT_KC) {
+        int bk = w->hk - pc < CAMBLAS_RECT_KC ? w->hk - pc : CAMBLAS_RECT_KC;
         const float *a = w->packed_a + (size_t)product * w->a_plane +
                          (size_t)pc * w->row_groups * 12 + (size_t)row * bk;
         const float *b = w->packed_b + (size_t)product * w->b_plane +
                          (size_t)pc * w->column_groups * 8 + (size_t)column * bk;
         float *c = w->products + (size_t)product * w->product_plane + row + (size_t)column * w->hm;
-        if (camblas_sgemm_sve_amicro12_tile(bm, bn, bk, 1.0f, a, bk, b, bk, c, w->hm, pc == 0)) {
+        if (camblas_sgemm_sve_amicro12_tile(bm, bn, bk, 1.0f, a, bk, b, bk, c, w->hm,
+                                            pc == 0 && w->source_pc == 0)) {
             atomic_store_explicit(&w->failed, 1, memory_order_relaxed);
             return;
         }
@@ -311,13 +342,15 @@ static void rectangular32_combine(const camblas_task_t *task, void *opaque)
  * levels == 0 keeps the historical unconditional behaviour. */
 static int rectangular32_execute(int tb, const camblas_executor_t *executor, int workers, int m,
                                  int n, int k, const float *a, int lda, const float *b, int ldb,
-                                 float *c, int ldc, void *scratch, size_t bytes, int levels)
+                                 float *c, int ldc, void *scratch, size_t bytes, int levels,
+                                 const camblas_rectangular32_segments_t *segments)
 {
     size_t needed;
     if ((tb != 0 && tb != 1) || !executor || !executor->run || workers < 1 || workers > 64 || !a ||
-        !b || !c || !scratch || (uintptr_t)scratch % _Alignof(float) ||
-        camblas_experimental_rectangular32_bytes(m, n, k, &needed) || bytes < needed || lda < m ||
-        ldb < (tb ? n : k) || ldc < m || camblas_matrix_span_fits(m, k, lda, sizeof(float)) ||
+        !b || !c || (!scratch && !segments) || (uintptr_t)scratch % _Alignof(float) ||
+        camblas_experimental_rectangular32_bytes(m, n, k, &needed) ||
+        (!segments && bytes < needed) || lda < m || ldb < (tb ? n : k) || ldc < m ||
+        camblas_matrix_span_fits(m, k, lda, sizeof(float)) ||
         camblas_matrix_span_fits(tb ? n : k, tb ? k : n, ldb, sizeof(float)) ||
         camblas_matrix_span_fits(m, n, ldc, sizeof(float)))
         return -1;
@@ -336,15 +369,29 @@ static int rectangular32_execute(int tb, const camblas_executor_t *executor, int
                             .workers = workers,
                             .row_groups = (hm + 11) / 12,
                             .column_groups = (hn + 7) / 8,
-                            .depth_blocks = (hk + 256 - 1) / 256,
+                            .depth_blocks = (hk + CAMBLAS_RECT_KC - 1) / CAMBLAS_RECT_KC,
                             .c = c};
-    int packed_k = hk;
+    int stream = workers >= 16 && workers <= 32 && m >= (int64_t)n * 4 && k > 1024;
+    int packed_k = stream && hk > CAMBLAS_RECT_KC ? CAMBLAS_RECT_KC : hk;
     work.a_plane = (size_t)work.row_groups * 12 * packed_k;
     work.b_plane = (size_t)work.column_groups * 8 * packed_k;
     work.product_plane = (size_t)hm * hn;
-    work.packed_a = scratch;
-    work.packed_b = work.packed_a + 7 * work.a_plane;
-    work.products = work.packed_b + 7 * work.b_plane;
+    if (segments) {
+        size_t sizes[3];
+        if (camblas_experimental_rectangular32_segment_bytes(workers, m, n, k, sizes))
+            return -1;
+        for (int t = 0; t < 3; ++t)
+            if (!segments->data[t] || (uintptr_t)segments->data[t] % _Alignof(float) ||
+                segments->bytes[t] < sizes[t])
+                return -1;
+        work.packed_a = segments->data[0];
+        work.packed_b = segments->data[1];
+        work.products = segments->data[2];
+    } else {
+        work.packed_a = scratch;
+        work.packed_b = work.packed_a + 7 * work.a_plane;
+        work.products = work.packed_b + 7 * work.b_plane;
+    }
     const float *a12 = a + (size_t)hk * lda, *a21 = a + hm, *a22 = a12 + hm;
     const float *b12 = b + (tb ? (size_t)hn : (size_t)hn * ldb);
     const float *b21 = b + (tb ? (size_t)hk * ldb : (size_t)hk);
@@ -366,6 +413,11 @@ static int rectangular32_execute(int tb, const camblas_executor_t *executor, int
     int row_grid = workers >= 64 ? 8 : workers >= 16 ? 4 : 1;
     int column_grid = workers >= 64 ? 8 : workers >= 16 ? 4 : 1;
     int rows = work.row_groups < row_grid ? work.row_groups : row_grid;
+    if (stream && workers == 16) {
+        row_grid = CAMBLAS_RECT_ROWS16;
+        column_grid = 16 / row_grid;
+        rows = work.row_groups < row_grid ? work.row_groups : row_grid;
+    }
     int columns = work.column_groups < column_grid ? work.column_groups : column_grid;
     int count = 0;
     for (int p = 0; p < 7; ++p)
@@ -381,23 +433,50 @@ static int rectangular32_execute(int tb, const camblas_executor_t *executor, int
                     j1 = hn;
                 product_tasks[count++] = (camblas_task_t){p * hm + i0, p * hm + i1, j0, j1};
             }
-    /* Each synchronous stage completes before its outputs are consumed. The
+    if (!stream) {
+        /* Each synchronous stage completes before its outputs are consumed. The
      * pack pass also produces the per-worker operand maxima, so the range
      * preflight costs no separate scan of A and B. */
-    if (executor->run(rectangular32_pack, workers_tasks, workers, &work, executor->user_data))
-        return -1;
-    if (levels) {
-        float a_peak = 0, b_peak = 0;
-        for (int t = 0; t < workers; ++t) {
-            a_peak = fmaxf(a_peak, work.a_max[t]);
-            b_peak = fmaxf(b_peak, work.b_max[t]);
+        if (executor->run(rectangular32_pack, workers_tasks, workers, &work, executor->user_data))
+            return -1;
+        if (levels) {
+            float a_peak = 0, b_peak = 0;
+            for (int t = 0; t < workers; ++t) {
+                a_peak = fmaxf(a_peak, work.a_max[t]);
+                b_peak = fmaxf(b_peak, work.b_max[t]);
+            }
+            if (!rectangular32_range_verdict(a_peak, b_peak, k, levels))
+                return 1;
         }
-        if (!rectangular32_range_verdict(a_peak, b_peak, k, levels))
-            return 1;
+        if (executor->run(rectangular32_product, product_tasks, count, &work,
+                          executor->user_data) ||
+            atomic_load_explicit(&work.failed, memory_order_relaxed))
+            return -1;
+        return executor->run(rectangular32_combine, workers_tasks, workers, &work,
+                             executor->user_data);
     }
-    if (executor->run(rectangular32_product, product_tasks, count, &work, executor->user_data) ||
-        atomic_load_explicit(&work.failed, memory_order_relaxed))
-        return -1;
+    /* Private products accumulate across slabs. A late range rejection
+     * leaves caller C untouched so the bridge can use classical GEMM. */
+    float a_peak = 0, b_peak = 0;
+    for (int origin = 0; origin < hk; origin += CAMBLAS_RECT_KC) {
+        work.source_pc = origin;
+        work.hk = hk - origin < CAMBLAS_RECT_KC ? hk - origin : CAMBLAS_RECT_KC;
+        work.depth_blocks = 1;
+        if (executor->run(rectangular32_pack, workers_tasks, workers, &work, executor->user_data))
+            return -1;
+        if (levels) {
+            for (int t = 0; t < workers; t++) {
+                a_peak = fmaxf(a_peak, work.a_max[t]);
+                b_peak = fmaxf(b_peak, work.b_max[t]);
+            }
+            if (!rectangular32_range_verdict(a_peak, b_peak, k, levels))
+                return 1;
+        }
+        if (executor->run(rectangular32_product, product_tasks, count, &work,
+                          executor->user_data) ||
+            atomic_load_explicit(&work.failed, memory_order_relaxed))
+            return -1;
+    }
     return executor->run(rectangular32_combine, workers_tasks, workers, &work, executor->user_data);
 }
 
@@ -407,7 +486,7 @@ int camblas_experimental_rectangular32_f32_op(int tb, const camblas_executor_t *
                                               void *scratch, size_t bytes)
 {
     return rectangular32_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
-                                 bytes, 0);
+                                 bytes, 0, NULL);
 }
 
 int camblas_experimental_rectangular32_f32_op_checked(int tb, const camblas_executor_t *executor,
@@ -417,7 +496,7 @@ int camblas_experimental_rectangular32_f32_op_checked(int tb, const camblas_exec
                                                       size_t bytes, int levels)
 {
     return rectangular32_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, scratch,
-                                 bytes, levels);
+                                 bytes, levels, NULL);
 }
 
 /* Convenience wrapper for an untransposed B operand. */
@@ -427,4 +506,15 @@ int camblas_experimental_rectangular32_f32(const camblas_executor_t *executor, i
 {
     return camblas_experimental_rectangular32_f32_op(0, executor, workers, m, n, k, a, lda, b, ldb,
                                                      c, ldc, scratch, bytes);
+}
+
+int camblas_experimental_rectangular32_f32_segments_checked(
+    int tb, const camblas_executor_t *executor, int workers, int m, int n, int k, const float *a,
+    int lda, const float *b, int ldb, float *c, int ldc,
+    const camblas_rectangular32_segments_t *segments, int levels)
+{
+    if (!segments)
+        return -1;
+    return rectangular32_execute(tb, executor, workers, m, n, k, a, lda, b, ldb, c, ldc, NULL, 0,
+                                 levels, segments);
 }

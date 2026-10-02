@@ -25,11 +25,21 @@ def main():
     parser.add_argument(
         "--profile", choices=("deep", "shallow", "batch"), default="deep"
     )
+    parser.add_argument(
+        "--torch-context",
+        action="store_true",
+        help="Exercise the PyTorch OpenMP executor",
+    )
     args = parser.parse_args()
     bridge = args.library.resolve()
     dtype = np.dtype(args.dtype)
     scalar = ct.c_float if args.dtype == "float32" else ct.c_double
     lib = ct.CDLL(str(bridge))
+    if args.torch_context:
+        import torch
+
+        torch.set_num_threads(lib.framework_blas_threads())
+        torch.set_num_interop_threads(1)
     ptr = ct.POINTER(scalar)
     fn = getattr(lib, "cblas_sgemm" if args.dtype == "float32" else "cblas_dgemm")
     fn.argtypes = [ct.c_int] * 6 + [
@@ -54,6 +64,7 @@ def main():
         (8193, 129, 1025),
         (2056, 2049, 1025),
         (1024, 512, 1024),
+        (520, 256, 1025),
     ]
     if args.profile == "deep" and args.dtype == "float64":
         # Exercise both sides of the short-rectangle aspect-ratio bound,

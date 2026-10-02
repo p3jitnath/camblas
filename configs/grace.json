@@ -1,5 +1,5 @@
 {
-  "description": "Retained Grace/SVE128 candidate; flags recovered from the measured build commands.",
+  "description": "Retained Grace/SVE128 configuration with bounded cache panels and the private 64-thread packed grid.",
   "units": {
     "scalar": [
       "-O3",
@@ -502,6 +502,8 @@
     "-DCAMBLAS_FRAMEWORK_PRIVATE_SHORT=0",
     "-DCAMBLAS_PRIVATE_K_LIMIT=1024",
     "-DCAMBLAS_FRAMEWORK_OPENMP=1",
+    "-DCAMBLAS_FRAMEWORK_SPIN_POOL=1",
+    "-DCAMBLAS_FRAMEWORK_TEAM_REUSE=1",
     "-DCAMBLAS_BENCH_MEMORY_POLICY=1",
     "-fopenmp",
     "-DCAMBLAS_FRAMEWORK_NATIVE_SYRK=3",
@@ -517,6 +519,7 @@
     "-DCAMBLAS_FRAMEWORK_REUSE_WIDE_A=1",
     "-DCAMBLAS_FRAMEWORK_TOUCH_MAX_BYTES=134217728",
     "-DCAMBLAS_FRAMEWORK_RECT32=1",
-    "-DCAMBLAS_FRAMEWORK_RECT64=1"
+    "-DCAMBLAS_FRAMEWORK_RECT64=1",
+    "-DCAMBLAS_FRAMEWORK_SHARED_GRID32=1"
   ]
 }
