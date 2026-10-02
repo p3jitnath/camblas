@@ -14,7 +14,7 @@ typedef void (*gemm_t)(int, int, int, int, int, int, float, const float *, int, 
                        float, float *, int);
 typedef uint64_t (*counter_t)(void);
 typedef void (*reset_t)(void);
-typedef int (*stats_t)(uint64_t *, int);
+typedef int (*stats_t)(uint64_t *, size_t);
 
 static int transpose_a;
 static stats_t route_stats;

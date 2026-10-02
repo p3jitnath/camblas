@@ -213,6 +213,14 @@ int main(void)
                                          application_shapes[i][2], application_workers[j], 0, 0));
             ++cases;
         }
+    /* The 64-worker FP64 NEON route uses the existing Strassen panel layout.
+     * These squares exercise short rows, full rows and column tail stores. */
+    const int neon_squares[] = {512, 528, 1024};
+    for (size_t i = 0; i < sizeof(neon_squares) / sizeof(neon_squares[0]); ++i) {
+        int dimension = neon_squares[i];
+        peak = fmax(peak, check_case(dimension, dimension, dimension, 64, 0, 0));
+        ++cases;
+    }
     const int short_transposed_shapes[][3] = {{1024, 1024, 256}, {1032, 1032, 258}};
     for (size_t i = 0; i < sizeof(short_transposed_shapes) / sizeof(short_transposed_shapes[0]);
          ++i)

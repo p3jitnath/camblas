@@ -379,7 +379,8 @@
       "-Wextra",
       "-Werror",
       "-mcpu=neoverse-v2",
-      "-fPIC"
+      "-fPIC",
+      "-DCAMBLAS_RECT64_NEON6=1"
     ],
     "rectangular32": [
       "-O3",
