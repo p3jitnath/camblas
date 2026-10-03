@@ -46,6 +46,7 @@ def main():
                 "bench",
                 "scripts",
                 "tests",
+                "camblas_gpu",
             ],
             cwd=ROOT,
             text=True,
@@ -56,7 +57,7 @@ def main():
         str(path.relative_to(ROOT))
         for directory in ("framework", "include", "src", "tests")
         for path in (ROOT / directory).rglob("*")
-        if path.suffix in (".c", ".h")
+        if path.suffix in (".c", ".h", ".cpp", ".cu", ".cuh")
     )
     ruff = [sys.executable, "-m", "ruff"]
     if args.fix:

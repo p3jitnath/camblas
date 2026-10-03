@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import tempfile
 import types
 import unittest
@@ -96,6 +97,7 @@ class ImportSafetyTests(unittest.TestCase):
             "bench/compare.py",
             "bench/workload.py",
             "scripts/build.py",
+            "scripts/build_cuda.py",
             "scripts/frameworks.py",
             "scripts/style.py",
             "tests/test_framework_bridge.py",
@@ -121,6 +123,51 @@ class ImportSafetyTests(unittest.TestCase):
             parse_args.assert_not_called()
             load_library.assert_not_called()
             run_command.assert_not_called()
+
+
+class CudaBuildTests(unittest.TestCase):
+    """Preserve loaded libraries and previous build products across compiler failures."""
+
+    def test_atomic_library_publication(self):
+        """Retain open-file contents on success and leave the destination intact on failure."""
+        module_spec = importlib.util.spec_from_file_location(
+            "camblas_cuda_build_test", ROOT / "scripts/build_cuda.py"
+        )
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        for succeeds in (False, True):
+            with (
+                self.subTest(succeeds=succeeds),
+                tempfile.TemporaryDirectory(prefix="camblas-build-test-") as directory,
+            ):
+                library = Path(directory) / "library.so"
+                library.write_bytes(b"previous build")
+
+                def compiler(command, **_):
+                    """Simulate a compiler that writes output before reporting success or failure."""
+                    Path(command[-1]).write_bytes(b"candidate build")
+                    if not succeeds:
+                        raise subprocess.CalledProcessError(1, command)
+
+                with (
+                    library.open("rb") as loaded,
+                    patch.object(module.subprocess, "run", side_effect=compiler),
+                ):
+                    if succeeds:
+                        module.compile_library(
+                            ["compiler", "-o", str(library)], library
+                        )
+                    else:
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            module.compile_library(
+                                ["compiler", "-o", str(library)], library
+                            )
+                    self.assertEqual(loaded.read(), b"previous build")
+                self.assertEqual(
+                    library.read_bytes(),
+                    b"candidate build" if succeeds else b"previous build",
+                )
+                self.assertEqual(list(Path(directory).iterdir()), [library])
 
 
 class ComparisonTests(unittest.TestCase):
