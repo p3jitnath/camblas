@@ -60,6 +60,13 @@ int camblas_cuda_dgemm(camblas_cuda_context *context, char trans_a, char trans_b
                        int k, double alpha, const double *a, int lda, const double *b, int ldb,
                        double beta, double *c, int ldc);
 
+/* BF16 input/output storage with FP32 accumulation and alpha/beta. Device
+ * pointers address BF16 values; layouts and ownership follow GEMM above.
+ * BF16 uses cuBLAS/cuBLASLt, including for explicitly requested Strassen modes. */
+int camblas_cuda_bgemm(camblas_cuda_context *context, char trans_a, char trans_b, int m, int n,
+                       int k, float alpha, const void *a, int lda, const void *b, int ldb,
+                       float beta, void *c, int ldc);
+
 /* dtype: 0 FP32, 1 FP64. Row-major affine result = X W + bias, optionally ReLU.
  * Output and hidden arrays are caller-owned contiguous device storage. */
 int camblas_cuda_affine(camblas_cuda_context *context, int dtype, int rows, int inner, int columns,
@@ -84,6 +91,30 @@ int camblas_cuda_mlp_backward(camblas_cuda_context *context, int dtype, int rows
                               const void *w2, const void *hidden_output, const void *grad_output,
                               void *grad_hidden, void *dx, void *dw1, void *db1, void *dw2,
                               void *db2);
+
+/* Inference-only elementwise SiLU(gate)*up with FP32 arithmetic and an
+ * intermediate conversion to the storage type. dtype: 0 FP32, 2 BF16.
+ * Exact in-place output==gate/up is supported; partial overlap is not. */
+int camblas_cuda_silu_multiply(camblas_cuda_context *context, int dtype, uint64_t count,
+                               const void *gate, const void *up, void *output);
+/* Row-major RMS normalisation in FP32, rounding normalised values to the
+ * storage type before multiplying by weight. dtype: 0 FP32, 2 BF16.
+ * Weight has width elements. Inputs/output must not partially overlap. */
+int camblas_cuda_rms_norm(camblas_cuda_context *context, int dtype, int rows, int width,
+                          float epsilon, const void *input, const void *weight, void *output);
+/* Single-row residual sum and RMS norm. dtype: 0 FP32, 2 BF16. Both outputs
+ * must be distinct caller-owned buffers that do not alias inputs; width is
+ * 2048..65536, divisible by four. Sum is rounded to storage dtype first. */
+int camblas_cuda_add_rms_norm(camblas_cuda_context *context, int dtype, int width, float epsilon,
+                              const void *input, const void *residual, const void *weight,
+                              void *added, void *output);
+/* BF16-to-FP32 squares and final RMS scaling allow the tensor binding to retain
+ * PyTorch's FP32 mean reduction order. Means contains count/width FP32 entries. */
+int camblas_cuda_bfloat16_square(camblas_cuda_context *context, uint64_t count, const void *input,
+                                 float *output);
+int camblas_cuda_rms_scale(camblas_cuda_context *context, int dtype, uint64_t count, int width,
+                           float epsilon, const void *input, const void *weight, const float *means,
+                           void *output);
 
 /* Host launch counters: classical GEMM, Strassen, symmetric Gram, affine, LT,
  * guarded classical fallback, attention, MLP backward. length is 6 or 8.

@@ -126,6 +126,10 @@ def report(directory, rows, manifest):
         "graph replay, input staging and call overhead are included in timing.",
         "",
         "Speedup = PyTorch time / CAMBLAS time; values above 1 favour CAMBLAS.",
+        f"CPU output allocation: {manifest.get('output_memory', 'pageable')}. "
+        "Fresh allocation remains inside each timed call for every backend. "
+        "Prefault includes a full CPU zero-fill; pinned uses PyTorch's warmed host allocator.",
+        f"Candidate transfer entry: {manifest.get('transfer_entry', 'python')}; saved controls use Python. "
         f"Candidate algorithm: {manifest.get('camblas_algorithm', 'auto')}. "
         "Resident timings include tensor allocation, dispatch and stream completion. "
         "Transfer timings also copy every input/weight from pageable CPU memory "
@@ -289,6 +293,18 @@ def main():
     parser.add_argument("--threads", type=int, default=64)
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument(
+        "--output-memory",
+        choices=["pageable", "prefault", "pinned"],
+        default="pageable",
+        help="CPU output allocation policy applied identically to every backend",
+    )
+    parser.add_argument(
+        "--transfer-entry",
+        choices=["python", "native"],
+        default="python",
+        help="Use the native transfer entry for candidate inference; saved controls keep their existing Python entry",
+    )
+    parser.add_argument(
         "--workloads", nargs="+", choices=GPU_WORKLOADS, default=list(WORKLOADS)
     )
     parser.add_argument(
@@ -306,6 +322,7 @@ def main():
         choices=[
             "auto",
             "classical",
+            "symmetric",
             "lt",
             "strassen",
             "strassen2",
@@ -378,6 +395,8 @@ def main():
     directory = args.output.resolve()
     manifest = dict(
         camblas_algorithm=args.camblas_algorithm,
+        output_memory=args.output_memory,
+        transfer_entry=args.transfer_entry,
         timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         hostname=socket.gethostname(),
         command=os.sys.argv,
@@ -503,9 +522,19 @@ def main():
                         args.compile_mode,
                         "--algorithm",
                         algorithm,
+                        "--output-memory",
+                        args.output_memory,
                         "--output",
                         str(output),
                     ]
+                    command.extend(
+                        [
+                            "--transfer-entry",
+                            args.transfer_entry
+                            if backend in ("camblas", "classical")
+                            else "python",
+                        ]
+                    )
                     if round_id % 2:
                         command.append("--transfer-first")
                     if backend == "coherent":

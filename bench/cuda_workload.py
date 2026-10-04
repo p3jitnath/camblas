@@ -50,6 +50,18 @@ def main():
     parser.add_argument("--repetitions", type=int, default=21)
     parser.add_argument("--warmups", type=int, default=10)
     parser.add_argument("--transfer-first", action="store_true")
+    parser.add_argument(
+        "--output-memory",
+        choices=["pageable", "prefault", "pinned"],
+        default="pageable",
+        help="Allocate each CPU output inside transfer timing; prefault includes zero-fill",
+    )
+    parser.add_argument(
+        "--transfer-entry",
+        choices=["python", "native"],
+        default="python",
+        help="CAMBLAS CPU-to-GPU-to-CPU inference entry; every allocation and copy remains timed",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--engine", choices=["pytorch", "camblas"], default="pytorch")
     parser.add_argument(
@@ -325,6 +337,25 @@ def main():
 
         def call():
             """Run one complete operation, copying results when transfers are timed."""
+            if (
+                mode == "transfer"
+                and args.transfer_entry == "native"
+                and cb is not None
+                and not gradient_indices
+            ):
+                options = dict(output_memory=args.output_memory)
+                if args.workload.startswith("square") or args.workload == "transpose":
+                    a, b = host_inputs
+                    return [
+                        cb.matmul_transfer(
+                            a.T if args.workload == "transpose" else a, b, **options
+                        )
+                    ]
+                if args.workload == "gram":
+                    return [cb.gram_transfer(host_inputs[0], **options)]
+                if args.workload == "mlp":
+                    return [cb.mlp_transfer(*host_inputs, **options)]
+                return [cb.attention_transfer(*host_inputs, scale=1 / 16, **options)]
             inputs = (
                 host_inputs
                 if mode == "host"
@@ -334,7 +365,22 @@ def main():
             )
             results = operation(inputs, host=mode == "host")
             if mode == "transfer":
-                return [value.detach().cpu() for value in results]
+                outputs = []
+                for value in results:
+                    value = value.detach()
+                    if args.output_memory == "pageable":
+                        host_output = value.cpu()
+                    else:
+                        host_output = torch.empty_like(
+                            value,
+                            device="cpu",
+                            pin_memory=args.output_memory == "pinned",
+                        )
+                        if args.output_memory == "prefault":
+                            host_output.zero_()
+                        host_output.copy_(value)
+                    outputs.append(host_output)
+                return outputs
             return results
 
         for _ in range(args.warmups):
@@ -449,6 +495,10 @@ def main():
         backend="camblas_cuda" if cb is not None else "cuda",
         engine=args.engine,
         memory_mode="coherent_host" if args.host_access else "explicit_copy",
+        output_memory=args.output_memory,
+        transfer_entry=args.transfer_entry
+        if cb is not None and not gradient_indices
+        else "python",
         algorithm=args.algorithm if cb is not None else "pytorch",
         pytorch_baseline=args.pytorch_baseline if cb is None else None,
         compile_mode=args.compile_mode if cb is None and compiled else None,

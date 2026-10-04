@@ -3,12 +3,14 @@
 
 #include <cublasLt.h>
 #include <cublas_v2.h>
+#include <cuda_bf16.h>
 #include <cuda_runtime.h>
 #include <math_constants.h>
 #include <mma.h>
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -63,7 +65,7 @@ struct camblas_cuda_context {
     size_t scratch_bytes = 0;
     bool scratch_captured = false;
     bool short_attention_supported = false;
-    std::vector<void *> captured_scratch;
+    std::vector<void *> retired_allocations;
     unsigned *guard = nullptr;
     unsigned *host_guard = nullptr;
     std::atomic<uint64_t> counts[8] = {};
@@ -413,7 +415,7 @@ int reserve_scratch(camblas_cuda_context *context, size_t required)
         }
         if (context->scratch_captured) {
             try {
-                context->captured_scratch.push_back(context->scratch);
+                context->retired_allocations.push_back(context->scratch);
             } catch (...) {
                 cudaFree(replacement);
                 throw;
@@ -429,6 +431,7 @@ int reserve_scratch(camblas_cuda_context *context, size_t required)
 }
 
 #include "strassen_four.cuh"
+#include "decode_float.cuh"
 
 template <typename T>
 int strassen(camblas_cuda_context *context, int n, T alpha, const T *a, int lda, const T *b,
@@ -552,7 +555,9 @@ LtPlan *get_plan(camblas_cuda_context *context, cublasOperation_t ta, cublasOper
                  int n, int k, int lda, int ldb, int ldc, const T *bias, const T *a_pointer,
                  const T *b_pointer, const T *c_pointer, bool relu)
 {
-    int type = std::is_same_v<T, float> ? 0 : 1;
+    static_assert(std::is_same_v<T, float> || std::is_same_v<T, double> ||
+                  std::is_same_v<T, __nv_bfloat16>);
+    int type = std::is_same_v<T, float> ? 0 : (std::is_same_v<T, double> ? 1 : 2);
     unsigned aa = pointer_alignment(a_pointer), ab = pointer_alignment(b_pointer);
     unsigned ac = pointer_alignment(c_pointer), bias_alignment = pointer_alignment(bias);
     PlanKey key(type, int(ta), int(tb), m, n, k, lda, ldb, ldc, bias ? (relu ? 2 : 1) : 0, int(aa),
@@ -560,13 +565,38 @@ LtPlan *get_plan(camblas_cuda_context *context, cublasOperation_t ta, cublasOper
     auto existing = context->plans.find(key);
     if (existing != context->plans.end())
         return existing->second.get();
+    // Wide FP32 panels benefit from a larger search/workspace. Keep short
+    // panels and other precisions on the established allocation budget.
+    bool wide_panel =
+        type == 0 && m >= 1024 && k >= 4096 && n >= 256 && n <= 1024 && (m >= 16384 || k >= 16384);
+    if (wide_panel && context->lt_workspace_bytes < 128u * 1024u * 1024u) {
+        cudaStreamCaptureStatus capture;
+        if (cudaStreamIsCapturing(context->stream, &capture) == cudaSuccess &&
+            capture == cudaStreamCaptureStatusNone) {
+            context->retired_allocations.reserve(context->retired_allocations.size() + 1);
+            void *grown = nullptr;
+            size_t bytes = 128u * 1024u * 1024u;
+            cudaError_t error = cudaMalloc(&grown, bytes);
+            if (error == cudaSuccess) {
+                if (cublasSetWorkspace(context->blas, grown, bytes) == CUBLAS_STATUS_SUCCESS) {
+                    // Earlier graphs may still reference the original workspace.
+                    context->retired_allocations.push_back(context->lt_workspace);
+                    context->lt_workspace = grown;
+                    context->lt_workspace_bytes = bytes;
+                } else
+                    cudaFree(grown);
+            } else
+                cudaGetLastError();
+        }
+    }
     auto owned = std::make_unique<LtPlan>();
     LtPlan *plan = owned.get();
     plan->broadcast_bias = bias && std::is_same_v<T, double>;
     context->plans.emplace(key, std::move(owned));
-    cudaDataType_t datatype = type == 0 ? CUDA_R_32F : CUDA_R_64F;
-    cublasComputeType_t compute = type == 0 ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_64F;
-    if (cublasLtMatmulDescCreate(&plan->operation, compute, datatype) != CUBLAS_STATUS_SUCCESS)
+    cudaDataType_t datatype = type == 0 ? CUDA_R_32F : (type == 1 ? CUDA_R_64F : CUDA_R_16BF);
+    cudaDataType_t scale_type = type == 1 ? CUDA_R_64F : CUDA_R_32F;
+    cublasComputeType_t compute = type == 1 ? CUBLAS_COMPUTE_64F : CUBLAS_COMPUTE_32F;
+    if (cublasLtMatmulDescCreate(&plan->operation, compute, scale_type) != CUBLAS_STATUS_SUCCESS)
         return plan;
     if (cublasLtMatmulDescSetAttribute(plan->operation, CUBLASLT_MATMUL_DESC_TRANSA, &ta,
                                        sizeof(ta)) != CUBLAS_STATUS_SUCCESS)
@@ -614,11 +644,17 @@ LtPlan *get_plan(camblas_cuda_context *context, cublasOperation_t ta, cublasOper
                                          plan->broadcast_bias ? &bias_alignment : &ac, sizeof(ac));
     cublasLtMatmulPreferenceSetAttribute(preference, CUBLASLT_MATMUL_PREF_MIN_ALIGNMENT_D_BYTES,
                                          &ac, sizeof(ac));
-    cublasLtMatmulHeuristicResult_t candidates[12];
+    if (type == 2) {
+        uint32_t reductions = CUBLASLT_REDUCTION_SCHEME_COMPUTE_TYPE;
+        cublasLtMatmulPreferenceSetAttribute(preference, CUBLASLT_MATMUL_PREF_REDUCTION_SCHEME_MASK,
+                                             &reductions, sizeof(reductions));
+    }
+    cublasLtMatmulHeuristicResult_t candidates[64];
+    int requested = wide_panel ? 64 : 12;
     int count = 0;
     cublasStatus_t status = cublasLtMatmulAlgoGetHeuristic(
         context->lt, plan->operation, plan->a, plan->b, plan->c, plan->d ? plan->d : plan->c,
-        preference, 12, candidates, &count);
+        preference, requested, candidates, &count);
     cublasLtMatmulPreferenceDestroy(preference);
     if (status == CUBLAS_STATUS_SUCCESS && count > 0) {
         plan->algorithm = candidates[0].algo;
@@ -630,12 +666,12 @@ LtPlan *get_plan(camblas_cuda_context *context, cublasOperation_t ta, cublasOper
     return plan;
 }
 
-template <typename T>
+template <typename T, typename Scalar = T>
 cublasStatus_t lt_call(camblas_cuda_context *context, LtPlan *plan,
-                       const cublasLtMatmulAlgo_t *algorithm, T alpha, const T *a, const T *b,
-                       T beta, T *c, const T *bias = nullptr)
+                       const cublasLtMatmulAlgo_t *algorithm, Scalar alpha, const T *a, const T *b,
+                       Scalar beta, T *c, const T *bias = nullptr)
 {
-    T broadcast_beta = T(1);
+    Scalar broadcast_beta = Scalar(1);
     return cublasLtMatmul(context->lt, plan->operation, &alpha, a, plan->a, b, plan->b,
                           plan->broadcast_bias ? &broadcast_beta : &beta,
                           plan->broadcast_bias ? bias : c, plan->c, c, plan->d ? plan->d : plan->c,
@@ -705,8 +741,28 @@ cublasStatus_t lt_gemm(camblas_cuda_context *context, cublasOperation_t ta, cubl
                 cudaError_t error = cudaEventSynchronize(end);
                 float milliseconds = 0;
                 cudaEventElapsedTime(&milliseconds, begin, end);
-                plan->prefer_unfused = error == cudaSuccess && status == CUBLAS_STATUS_SUCCESS &&
-                                       milliseconds < fastest;
+                if (error == cudaSuccess && status == CUBLAS_STATUS_SUCCESS) {
+                    // GPU-only batches hide dispatch overhead. Compare completed
+                    // calls with the selected Lt algorithm before choosing a tie.
+                    auto latency = [&](auto operation) {
+                        double total = 0;
+                        for (int repeat = 0; repeat < 3; ++repeat) {
+                            auto start = std::chrono::steady_clock::now();
+                            cublasStatus_t result = operation();
+                            cudaError_t finished = cudaStreamSynchronize(context->stream);
+                            if (result != CUBLAS_STATUS_SUCCESS || finished != cudaSuccess)
+                                return std::numeric_limits<double>::infinity();
+                            total += std::chrono::duration<double>(
+                                         std::chrono::steady_clock::now() - start)
+                                         .count();
+                        }
+                        return total;
+                    };
+                    double fused = latency([&] {
+                        return lt_call(context, plan, &plan->algorithm, alpha, a, b, beta, c, bias);
+                    });
+                    plan->prefer_unfused = latency(unfused) < fused;
+                }
             }
         }
         if (begin)
@@ -745,6 +801,12 @@ int gemm(camblas_cuda_context *context, char trans_a, char trans_b, int m, int n
     }
     if (!a || !b || a == c || b == c)
         return fail(context, "missing or aliased GEMM operand", 1);
+    if constexpr (std::is_same_v<T, float>) {
+        if (context->algorithm == CAMBLAS_CUDA_AUTO && n == 1 && ta && nb && m >= 1024 &&
+            k >= 4096 && k % 4 == 0 && lda % 4 == 0 && reinterpret_cast<uintptr_t>(a) % 16 == 0 &&
+            reinterpret_cast<uintptr_t>(b) % 16 == 0)
+            return native_float_gemv(context, m, k, alpha, a, lda, b, beta, c);
+    }
     cublasOperation_t opa = na ? CUBLAS_OP_N : CUBLAS_OP_T;
     cublasOperation_t opb = nb ? CUBLAS_OP_N : CUBLAS_OP_T;
     cublasStatus_t status;
@@ -797,6 +859,8 @@ int gemm(camblas_cuda_context *context, char trans_a, char trans_b, int m, int n
     return status == CUBLAS_STATUS_SUCCESS ? 0 : fail(context, "classical GEMM", status);
 }
 
+#include "bfloat16.cuh"
+
 template <typename T>
 int affine(camblas_cuda_context *context, int rows, int inner, int columns, const T *x,
            const T *weight, const T *bias, bool relu, T *output)
@@ -827,8 +891,7 @@ int affine(camblas_cuda_context *context, int rows, int inner, int columns, cons
         return result;
     if (!fused_bias) {
         bias_activation<<<unsigned((size_t(rows) * columns + 255) / 256), 256, 0,
-                          context->stream>>>(output, fused_bias ? nullptr : bias,
-                                             size_t(rows) * columns, columns, relu);
+                          context->stream>>>(output, bias, size_t(rows) * columns, columns, relu);
         cudaError_t error = cudaGetLastError();
         if (error != cudaSuccess)
             return fail(context, "bias/activation", error);
@@ -836,6 +899,7 @@ int affine(camblas_cuda_context *context, int rows, int inner, int columns, cons
     return 0;
 }
 #include "fusion.cuh"
+#include "inference_fusion.cuh"
 } // namespace
 
 namespace
@@ -906,7 +970,9 @@ extern "C" int camblas_cuda_create(int device, void *stream, camblas_cuda_contex
     }
     if (status == 0) {
         operation = "cuBLAS math mode";
-        status = int(cublasSetMathMode(context->blas, CUBLAS_DEFAULT_MATH));
+        status = int(cublasSetMathMode(
+            context->blas,
+            cublasMath_t(CUBLAS_DEFAULT_MATH | CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION)));
     }
     if (status == 0) {
         operation = "cuBLASLt create";
@@ -955,7 +1021,7 @@ extern "C" int camblas_cuda_destroy(camblas_cuda_context *context)
         cublasLtDestroy(context->lt);
     if (context->scratch)
         cudaFree(context->scratch);
-    for (void *allocation : context->captured_scratch)
+    for (void *allocation : context->retired_allocations)
         cudaFree(allocation);
     if (context->lt_workspace)
         cudaFree(context->lt_workspace);
@@ -998,6 +1064,17 @@ extern "C" int camblas_cuda_dgemm(camblas_cuda_context *context, char ta, char t
     });
 }
 
+extern "C" int camblas_cuda_bgemm(camblas_cuda_context *context, char ta, char tb, int m, int n,
+                                  int k, float alpha, const void *a, int lda, const void *b,
+                                  int ldb, float beta, void *c, int ldc)
+{
+    return execute(context, [&] {
+        return bfloat16_gemm(context, ta, tb, m, n, k, alpha, static_cast<const __nv_bfloat16 *>(a),
+                             lda, static_cast<const __nv_bfloat16 *>(b), ldb, beta,
+                             static_cast<__nv_bfloat16 *>(c), ldc);
+    });
+}
+
 extern "C" int camblas_cuda_affine(camblas_cuda_context *context, int dtype, int rows, int inner,
                                    int columns, const void *x, const void *weight, const void *bias,
                                    int relu, void *output)
@@ -1029,6 +1106,101 @@ extern "C" int camblas_cuda_mlp(camblas_cuda_context *context, int dtype, int ro
         return result;
     return camblas_cuda_affine(context, dtype, rows, hidden, outputs, hidden_output, w2, b2, 0,
                                output);
+}
+
+extern "C" int camblas_cuda_silu_multiply(camblas_cuda_context *context, int dtype, uint64_t count,
+                                          const void *gate, const void *up, void *output)
+{
+    return execute(context, [&] {
+        if (dtype != 0 && dtype != 2)
+            return fail(context, "unsupported SiLU dtype", 1);
+        if (!count)
+            return 0;
+        if (!gate || !up || !output || count > SIZE_MAX / (dtype == 0 ? 4 : 2))
+            return fail(context, "invalid SiLU operands or length", 1);
+        if (dtype == 0)
+            return launch_silu_multiply<float>(context, count, gate, up, output);
+        return launch_silu_multiply<__nv_bfloat16>(context, count, gate, up, output);
+    });
+}
+
+extern "C" int camblas_cuda_add_rms_norm(camblas_cuda_context *context, int dtype, int width,
+                                         float epsilon, const void *input, const void *residual,
+                                         const void *weight, void *added, void *output)
+{
+    return execute(context, [&] {
+        if ((dtype != 0 && dtype != 2) || width < 2048 || width > 65536 || width % 4 ||
+            !std::isfinite(epsilon) || epsilon < 0 || !input || !residual || !weight || !added ||
+            !output || added == output || added == input || added == residual || added == weight ||
+            output == input || output == residual || output == weight)
+            return fail(context, "invalid residual RMS arguments", 1);
+        if (dtype == 0)
+            rms_decode_kernel<float, true><<<1, 512, 0, context->stream>>>(
+                width, epsilon, static_cast<const float *>(input),
+                static_cast<const float *>(weight), static_cast<float *>(output),
+                static_cast<const float *>(residual), static_cast<float *>(added));
+        else
+            rms_decode_kernel<__nv_bfloat16, true><<<1, 512, 0, context->stream>>>(
+                width, epsilon, static_cast<const __nv_bfloat16 *>(input),
+                static_cast<const __nv_bfloat16 *>(weight), static_cast<__nv_bfloat16 *>(output),
+                static_cast<const __nv_bfloat16 *>(residual), static_cast<__nv_bfloat16 *>(added));
+        cudaError_t error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "residual RMS normalisation", error);
+    });
+}
+
+extern "C" int camblas_cuda_rms_norm(camblas_cuda_context *context, int dtype, int rows, int width,
+                                     float epsilon, const void *input, const void *weight,
+                                     void *output)
+{
+    return execute(context, [&] {
+        if ((dtype != 0 && dtype != 2) || rows < 0 || width < 0 || !std::isfinite(epsilon) ||
+            epsilon < 0)
+            return fail(context, "invalid RMS normalisation dimensions, dtype or epsilon", 1);
+        if (!rows || !width)
+            return 0;
+        if (!input || !weight || !output || output == weight)
+            return fail(context, "invalid RMS normalisation operands", 1);
+        if (dtype == 0)
+            return launch_rms_norm<float>(context, rows, width, epsilon, input, weight, output);
+        return launch_rms_norm<__nv_bfloat16>(context, rows, width, epsilon, input, weight, output);
+    });
+}
+
+extern "C" int camblas_cuda_bfloat16_square(camblas_cuda_context *context, uint64_t count,
+                                            const void *input, float *output)
+{
+    return execute(context, [&] {
+        if (!count)
+            return 0;
+        if (!input || !output || count > SIZE_MAX / sizeof(float))
+            return fail(context, "invalid BF16 square operands", 1);
+        unsigned blocks = unsigned(std::min<uint64_t>((count + 255) / 256, 65535));
+        bfloat16_square_kernel<<<blocks, 256, 0, context->stream>>>(
+            count, static_cast<const __nv_bfloat16 *>(input), output);
+        cudaError_t error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "BF16 squares", error);
+    });
+}
+
+extern "C" int camblas_cuda_rms_scale(camblas_cuda_context *context, int dtype, uint64_t count,
+                                      int width, float epsilon, const void *input,
+                                      const void *weight, const float *means, void *output)
+{
+    return execute(context, [&] {
+        if ((dtype != 0 && dtype != 2) || width < 0 || !std::isfinite(epsilon) || epsilon < 0)
+            return fail(context, "invalid RMS scale dimensions, dtype or epsilon", 1);
+        if (!count)
+            return 0;
+        if (!width || count % width || count > SIZE_MAX / sizeof(float) || !input || !weight ||
+            !means || !output || output == weight)
+            return fail(context, "invalid RMS scale operands", 1);
+        if (dtype == 0)
+            return launch_rms_scale<float>(context, count, width, epsilon, input, weight, means,
+                                           output);
+        return launch_rms_scale<__nv_bfloat16>(context, count, width, epsilon, input, weight, means,
+                                               output);
+    });
 }
 
 extern "C" int camblas_cuda_stats(const camblas_cuda_context *context, uint64_t *counts, int length)

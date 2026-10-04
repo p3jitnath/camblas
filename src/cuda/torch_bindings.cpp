@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cfloat>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -113,12 +114,14 @@ camblas_cuda_context *get_context(int device, int algorithm, bool host_memory = 
     return context;
 }
 
-void validate(const Tensor &tensor, const Tensor &reference)
+void validate(const Tensor &tensor, const Tensor &reference, bool allow_bfloat16 = false)
 {
     check_process();
     require(tensor.is_cuda() &&
-                (tensor.scalar_type() == at::kFloat || tensor.scalar_type() == at::kDouble),
-            "CAMBLAS CUDA requires CUDA FP32 or FP64 tensors");
+                (tensor.scalar_type() == at::kFloat || tensor.scalar_type() == at::kDouble ||
+                 (allow_bfloat16 && tensor.scalar_type() == at::kBFloat16)),
+            allow_bfloat16 ? "CAMBLAS matmul requires CUDA FP32, FP64 or BF16 tensors"
+                           : "CAMBLAS CUDA requires CUDA FP32 or FP64 tensors");
     require(tensor.device() == reference.device() &&
                 tensor.scalar_type() == reference.scalar_type(),
             "All operands must have the same device and dtype");
@@ -146,8 +149,8 @@ Operand operand(const Tensor &tensor)
 Tensor matmul(const Tensor &a, const Tensor &b, const std::optional<Tensor> &output, double alpha,
               double beta, int algorithm)
 {
-    validate(a, a);
-    validate(b, a);
+    validate(a, a, true);
+    validate(b, a, true);
     require(a.dim() == 2 && b.dim() == 2 && a.size(1) == b.size(0),
             "matmul requires compatible rank-two operands");
     c10::cuda::CUDAGuard device(a.device());
@@ -155,7 +158,7 @@ Tensor matmul(const Tensor &a, const Tensor &b, const std::optional<Tensor> &out
     Tensor c;
     if (output) {
         c = *output;
-        validate(c, a);
+        validate(c, a, true);
         require(!c10::GradMode::is_enabled() || !c.requires_grad(),
                 "Autograd matmul does not support an out tensor requiring gradients");
         require(c.dim() == 2 && c.size(0) == m && c.size(1) == n && c.is_contiguous(),
@@ -173,11 +176,16 @@ Tensor matmul(const Tensor &a, const Tensor &b, const std::optional<Tensor> &out
                                     left.tensor.const_data_ptr<float>(), left.ld,
                                     right.tensor.const_data_ptr<float>(), right.ld, float(beta),
                                     c.mutable_data_ptr<float>(), std::max(1, n));
-    else
+    else if (a.scalar_type() == at::kDouble)
         status = camblas_cuda_dgemm(context, left.transpose, right.transpose, n, m, k, alpha,
                                     left.tensor.const_data_ptr<double>(), left.ld,
                                     right.tensor.const_data_ptr<double>(), right.ld, beta,
                                     c.mutable_data_ptr<double>(), std::max(1, n));
+    else
+        status =
+            camblas_cuda_bgemm(context, left.transpose, right.transpose, n, m, k, float(alpha),
+                               left.tensor.const_data_ptr(), left.ld, right.tensor.const_data_ptr(),
+                               right.ld, float(beta), c.mutable_data_ptr(), std::max(1, n));
     check(status, context);
     if (output && !c.is_inference())
         torch::autograd::impl::bump_version(c);
@@ -225,6 +233,161 @@ Tensor matmul_public(const Tensor &a, const Tensor &b, const std::optional<Tenso
         return MatmulAutograd::apply(a, b, algorithm);
     }
     return matmul(a, b, output, alpha, beta, algorithm);
+}
+
+Tensor linear_public(const Tensor &x, const Tensor &weight, const std::optional<Tensor> &bias,
+                     int algorithm)
+{
+    validate(x, x, true);
+    validate(weight, x, true);
+    require(x.dim() >= 1 && weight.dim() == 2 && x.size(-1) == weight.size(1),
+            "linear requires matching input and [outputs, inputs] weight dimensions");
+    int64_t rows = 1;
+    for (int64_t index = 0; index + 1 < x.dim(); ++index) {
+        int64_t size = x.size(index);
+        require(rows <= INT_MAX / std::max<int64_t>(1, size), "LP64 flattened row overflow");
+        rows *= size;
+    }
+    if (bias) {
+        validate(*bias, x, true);
+        require(bias->dim() == 1 && bias->size(0) == weight.size(0),
+                "linear bias must have the output width");
+    }
+    Tensor result =
+        matmul_public(x.reshape({rows, x.size(-1)}), weight.t(), std::nullopt, 1., 0., algorithm);
+    if (bias) {
+        result = result.add(*bias);
+    }
+    auto shape = x.sizes().vec();
+    shape.back() = weight.size(0);
+    return result.reshape(shape);
+}
+
+void validate_fusion_inference(const Tensor &value, const Tensor &reference)
+{
+    validate(value, reference, true);
+    require(value.scalar_type() != at::kDouble, "Native fusion requires FP32 or BF16 storage");
+    require(!c10::GradMode::is_enabled() || !value.requires_grad(),
+            "Native fusion supports inference only");
+}
+
+Tensor silu_multiply_public(const Tensor &gate, const Tensor &up)
+{
+    validate_fusion_inference(gate, gate);
+    validate_fusion_inference(up, gate);
+    require(gate.sizes() == up.sizes(), "SiLU operands must have matching shapes");
+    c10::cuda::CUDAGuard device(gate.device());
+    Tensor gc = gate.contiguous(), uc = up.contiguous();
+    Tensor result = at::empty(gate.sizes(), gate.options());
+    auto *context = get_context(gate.get_device(), default_algorithm);
+    check(camblas_cuda_silu_multiply(context, gate.scalar_type() == at::kFloat ? 0 : 2,
+                                     gate.numel(), gc.const_data_ptr(), uc.const_data_ptr(),
+                                     result.mutable_data_ptr()),
+          context);
+    return result;
+}
+
+Tensor rms_norm_public(const Tensor &x, const Tensor &weight, double epsilon)
+{
+    validate_fusion_inference(x, x);
+    validate_fusion_inference(weight, x);
+    require(x.dim() >= 1 && weight.dim() == 1 && x.size(-1) == weight.size(0),
+            "RMS norm weight must match the input's last dimension");
+    require(std::isfinite(epsilon) && epsilon >= 0 && epsilon <= FLT_MAX,
+            "RMS norm epsilon must be finite and nonnegative");
+    int64_t rows = 1;
+    for (int64_t index = 0; index + 1 < x.dim(); ++index) {
+        int64_t size = x.size(index);
+        require(rows <= INT_MAX / std::max<int64_t>(1, size), "LP64 flattened row overflow");
+        rows *= size;
+    }
+    c10::cuda::CUDAGuard device(x.device());
+    Tensor xc = x.contiguous(), wc = weight.contiguous();
+    Tensor result = at::empty(x.sizes(), x.options());
+    auto *context = get_context(x.get_device(), default_algorithm);
+    if (x.scalar_type() == at::kBFloat16 && x.numel() &&
+        !(rows == 1 && weight.size(0) >= 2048 && weight.size(0) <= 65536 &&
+          weight.size(0) % 4 == 0)) {
+        // Preserve the reference's reduction order: changing it can move BF16
+        // rounding boundaries and accumulate logit drift across 80 layers.
+        Tensor squares = at::empty(x.sizes(), x.options().dtype(at::kFloat));
+        check(camblas_cuda_bfloat16_square(context, x.numel(), xc.const_data_ptr(),
+                                           squares.mutable_data_ptr<float>()),
+              context);
+        Tensor means = squares.mean(at::IntArrayRef{-1}, true);
+        check(camblas_cuda_rms_scale(context, 2, x.numel(), int(weight.size(0)), float(epsilon),
+                                     xc.const_data_ptr(), wc.const_data_ptr(),
+                                     means.const_data_ptr<float>(), result.mutable_data_ptr()),
+              context);
+        return result;
+    }
+    check(camblas_cuda_rms_norm(context, x.scalar_type() == at::kFloat ? 0 : 2, int(rows),
+                                int(weight.size(0)), float(epsilon), xc.const_data_ptr(),
+                                wc.const_data_ptr(), result.mutable_data_ptr()),
+          context);
+    return result;
+}
+
+std::tuple<Tensor, Tensor> add_rms_norm_public(const Tensor &x, const Tensor &residual,
+                                               const Tensor &weight, double epsilon)
+{
+    validate_fusion_inference(x, x);
+    validate_fusion_inference(residual, x);
+    validate_fusion_inference(weight, x);
+    require(x.dim() >= 1 && x.sizes() == residual.sizes() && weight.dim() == 1 &&
+                x.size(-1) == weight.size(0),
+            "Residual RMS dimensions must match");
+    require(std::isfinite(epsilon) && epsilon >= 0 && epsilon <= FLT_MAX, "Invalid RMS epsilon");
+    int64_t width = weight.size(0);
+    if (x.numel() != width || width < 2048 || width > 65536 || width % 4) {
+        Tensor added = x.add(residual);
+        return std::make_tuple(added, rms_norm_public(added, weight, epsilon));
+    }
+    c10::cuda::CUDAGuard device(x.device());
+    Tensor xc = x.contiguous(), rc = residual.contiguous(), wc = weight.contiguous();
+    Tensor added = at::empty(x.sizes(), x.options()), output = at::empty(x.sizes(), x.options());
+    auto *context = get_context(x.get_device(), default_algorithm);
+    check(camblas_cuda_add_rms_norm(context, x.scalar_type() == at::kFloat ? 0 : 2, int(width),
+                                    float(epsilon), xc.const_data_ptr(), rc.const_data_ptr(),
+                                    wc.const_data_ptr(), added.mutable_data_ptr(),
+                                    output.mutable_data_ptr()),
+          context);
+    return std::make_tuple(added, output);
+}
+
+Tensor gated_mlp_public(const Tensor &x, const Tensor &gate_weight, const Tensor &up_weight,
+                        const Tensor &down_weight, int algorithm)
+{
+    validate_fusion_inference(x, x);
+    validate_fusion_inference(gate_weight, x);
+    validate_fusion_inference(up_weight, x);
+    validate_fusion_inference(down_weight, x);
+    require(x.dim() >= 1 && gate_weight.dim() == 2 && up_weight.dim() == 2 &&
+                down_weight.dim() == 2 && gate_weight.sizes() == up_weight.sizes() &&
+                x.size(-1) == gate_weight.size(1) && down_weight.size(1) == gate_weight.size(0),
+            "Invalid gated MLP dimensions");
+    Tensor gate = linear_public(x, gate_weight, std::nullopt, algorithm);
+    Tensor up = linear_public(x, up_weight, std::nullopt, algorithm);
+    c10::cuda::CUDAGuard device(x.device());
+    auto *context = get_context(x.get_device(), algorithm < 0 ? default_algorithm : algorithm);
+    check(camblas_cuda_silu_multiply(context, x.scalar_type() == at::kFloat ? 0 : 2, gate.numel(),
+                                     gate.const_data_ptr(), up.const_data_ptr(),
+                                     gate.mutable_data_ptr()),
+          context);
+    return linear_public(gate, down_weight, std::nullopt, algorithm);
+}
+
+std::tuple<Tensor, Tensor, Tensor> qkv_linear_public(const Tensor &x, const Tensor &q_weight,
+                                                     const Tensor &k_weight, const Tensor &v_weight,
+                                                     int algorithm)
+{
+    validate_fusion_inference(x, x);
+    for (const Tensor &weight : {q_weight, k_weight, v_weight})
+        validate_fusion_inference(weight, x);
+    Tensor q = linear_public(x, q_weight, std::nullopt, algorithm);
+    Tensor k = linear_public(x, k_weight, std::nullopt, algorithm);
+    Tensor v = linear_public(x, v_weight, std::nullopt, algorithm);
+    return std::make_tuple(q, k, v);
 }
 
 Tensor affine(const Tensor &x, const Tensor &weight, const Tensor &bias, bool relu,
@@ -568,6 +731,89 @@ struct HostCompletion {
     }
 };
 
+Tensor transfer_result(const Tensor &value, const std::string &memory)
+{
+    require(memory == "pageable" || memory == "prefault" || memory == "pinned",
+            "Unknown CPU output allocation policy");
+    if (memory == "pageable")
+        return value.to(at::kCPU);
+    Tensor output = at::empty(value.sizes(),
+                              value.options().device(at::kCPU).pinned_memory(memory == "pinned"));
+    if (memory == "prefault")
+        output.zero_();
+    output.copy_(value);
+    return output;
+}
+
+void validate_transfer(const Tensor &value, const Tensor &reference)
+{
+    validate_host(value, reference);
+    require(!c10::GradMode::is_enabled() || !value.requires_grad(),
+            "Explicit transfer operations support inference only");
+}
+
+void validate_transfer_stream()
+{
+    cudaStreamCaptureStatus capture;
+    cudaError_t error = cudaStreamIsCapturing(c10::cuda::getCurrentCUDAStream(), &capture);
+    require(error == cudaSuccess && capture == cudaStreamCaptureStatusNone,
+            "Synchronous CPU transfers cannot run during CUDA graph capture");
+}
+
+Tensor matmul_transfer(const Tensor &a, const Tensor &b, int device, const std::string &memory,
+                       int algorithm)
+{
+    validate_transfer(a, a);
+    validate_transfer(b, a);
+    require(a.dim() == 2 && b.dim() == 2 && a.size(1) == b.size(0),
+            "matmul requires compatible rank-two operands");
+    c10::cuda::CUDAGuard guard(device);
+    validate_transfer_stream();
+    Tensor ac = a.to(c10::Device(c10::kCUDA, device));
+    Tensor bc = b.to(c10::Device(c10::kCUDA, device));
+    return transfer_result(matmul_public(ac, bc, std::nullopt, 1., 0., algorithm), memory);
+}
+
+Tensor gram_transfer(const Tensor &a, int device, const std::string &memory, int algorithm)
+{
+    validate_transfer(a, a);
+    require(a.dim() == 2, "Gram requires a rank-two operand");
+    c10::cuda::CUDAGuard guard(device);
+    validate_transfer_stream();
+    Tensor ac = a.to(c10::Device(c10::kCUDA, device));
+    return transfer_result(matmul_public(ac.t(), ac, std::nullopt, 1., 0., algorithm), memory);
+}
+
+Tensor mlp_transfer(const Tensor &x, const Tensor &w1, const Tensor &b1, const Tensor &w2,
+                    const Tensor &b2, int device, const std::string &memory, int algorithm)
+{
+    for (const Tensor &value : {x, w1, b1, w2, b2})
+        validate_transfer(value, x);
+    c10::cuda::CUDAGuard guard(device);
+    validate_transfer_stream();
+    c10::Device target(c10::kCUDA, device);
+    std::array<Tensor, 5> uploaded;
+    int index = 0;
+    for (const Tensor &value : {x, w1, b1, w2, b2})
+        uploaded[index++] = value.to(target);
+    return transfer_result(
+        mlp_public(uploaded[0], uploaded[1], uploaded[2], uploaded[3], uploaded[4], algorithm),
+        memory);
+}
+
+Tensor attention_transfer(const Tensor &q, const Tensor &k, const Tensor &v,
+                          std::optional<double> scale, int device, const std::string &memory,
+                          int algorithm)
+{
+    for (const Tensor &value : {q, k, v})
+        validate_transfer(value, q);
+    c10::cuda::CUDAGuard guard(device);
+    validate_transfer_stream();
+    c10::Device target(c10::kCUDA, device);
+    Tensor qc = q.to(target), kc = k.to(target), vc = v.to(target);
+    return transfer_result(attention_public(qc, kc, vc, scale, algorithm), memory);
+}
+
 Tensor matmul_host(const Tensor &a, const Tensor &b, const std::optional<Tensor> &output,
                    double alpha, double beta, int device)
 {
@@ -691,7 +937,37 @@ PYBIND11_MODULE(_camblas_cuda_torch, module)
                "Multiply two CUDA matrices with transpose views and autograd. Strassen changes "
                "rounding; use algorithm('classical') for classical cuBLAS multiplication.");
     module.def("set_default_algorithm", [](int algorithm) { default_algorithm = algorithm; });
+    module.def("linear_public", &linear_public, py::arg("input"), py::arg("weight"),
+               py::arg("bias") = py::none(), py::kw_only(), py::arg("algorithm") = -1,
+               "Apply a CUDA linear transform with [outputs, inputs] weights and autograd.");
     module.def("affine", &affine);
+    module.def("qkv_linear", &qkv_linear_public, py::arg("input"), py::arg("q_weight"),
+               py::arg("k_weight"), py::arg("v_weight"), py::kw_only(), py::arg("algorithm") = -1,
+               "Apply three bias-free linear projections in one inference dispatch.");
+    module.def("matmul_transfer", &matmul_transfer, py::arg("a"), py::arg("b"), py::kw_only(),
+               py::arg("device") = 0, py::arg("output_memory") = "pinned",
+               py::arg("algorithm") = -1, "Upload both CPU operands and return fresh CPU output.");
+    module.def("gram_transfer", &gram_transfer, py::arg("a"), py::kw_only(), py::arg("device") = 0,
+               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
+               "Upload a CPU matrix once and return its Gram matrix.");
+    module.def("mlp_transfer", &mlp_transfer, py::arg("x"), py::arg("w1"), py::arg("b1"),
+               py::arg("w2"), py::arg("b2"), py::kw_only(), py::arg("device") = 0,
+               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
+               "Upload every MLP operand and return fresh CPU output synchronously.");
+    module.def("attention_transfer", &attention_transfer, py::arg("q"), py::arg("k"), py::arg("v"),
+               py::kw_only(), py::arg("scale") = py::none(), py::arg("device") = 0,
+               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
+               "Upload every attention operand and return fresh CPU output synchronously.");
+    module.def("silu_multiply", &silu_multiply_public, py::arg("gate"), py::arg("up"),
+               "Compute SiLU(gate)*up with storage rounding, for inference.");
+    module.def("add_rms_norm", &add_rms_norm_public, py::arg("x"), py::arg("residual"),
+               py::arg("weight"), py::arg("epsilon") = 1e-6,
+               "Return fresh residual sum and RMS-normalised output.");
+    module.def("rms_norm", &rms_norm_public, py::arg("input"), py::arg("weight"),
+               py::arg("epsilon") = 1e-6, "Apply RMS normalisation with FP32 arithmetic.");
+    module.def("gated_mlp", &gated_mlp_public, py::arg("input"), py::arg("gate_weight"),
+               py::arg("up_weight"), py::arg("down_weight"), py::kw_only(),
+               py::arg("algorithm") = -1, "Apply a bias-free SiLU gated MLP for inference.");
     module.def("affine_public", &affine_public, py::arg("x"), py::arg("weight"), py::arg("bias"),
                py::kw_only(), py::arg("relu") = false, py::arg("algorithm") = -1,
                "Compute x @ weight + bias, optionally followed by ReLU, with autograd.");

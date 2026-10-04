@@ -113,7 +113,11 @@ def library():
             integer,
         ),
     }
-    for name, scalar in (("sgemm", ct.c_float), ("dgemm", ct.c_double)):
+    for name, scalar in (
+        ("sgemm", ct.c_float),
+        ("dgemm", ct.c_double),
+        ("bgemm", ct.c_float),
+    ):
         declarations[name] = (
             [
                 ptr,
@@ -150,6 +154,8 @@ def library():
         integer,
     )
     for name, (arguments, result) in declarations.items():
+        if name == "bgemm" and not hasattr(lib, "camblas_cuda_bgemm"):
+            continue
         function = getattr(lib, "camblas_cuda_" + name)
         function.argtypes = arguments
         function.restype = result
@@ -303,12 +309,19 @@ def stats(device=None, reset=False, all_threads=False):
     return dict(zip(_COUNTERS, counts))
 
 
-def _validate(*tensors):
+def _validate(*tensors, allow_bfloat16=False):
     if not tensors:
         return
     first = tensors[0]
-    if first.device.type != "cuda" or first.dtype not in (torch.float32, torch.float64):
-        raise ValueError("CAMBLAS CUDA requires CUDA FP32 or FP64 tensors")
+    dtypes = (torch.float32, torch.float64)
+    if allow_bfloat16:
+        dtypes += (torch.bfloat16,)
+    if first.device.type != "cuda" or first.dtype not in dtypes:
+        raise ValueError(
+            "CAMBLAS matmul requires CUDA FP32, FP64 or BF16 tensors"
+            if allow_bfloat16
+            else "CAMBLAS CUDA requires CUDA FP32 or FP64 tensors"
+        )
     if any(t.device != first.device or t.dtype != first.dtype for t in tensors):
         raise ValueError("All operands must have the same device and dtype")
     if any(any(s > 2**31 - 1 for s in t.shape + t.stride()) for t in tensors):
@@ -334,7 +347,7 @@ def matmul_raw(a, b, out=None, alpha=1.0, beta=0.0):
     if module is not None:
         return module.matmul(a, b, out, alpha, beta, _algorithm_id())
     supplied_output = out is not None
-    _validate(a, b)
+    _validate(a, b, allow_bfloat16=True)
     if a.ndim != 2 or b.ndim != 2 or a.shape[1] != b.shape[0]:
         raise ValueError("matmul requires compatible rank-two operands")
     m, k = a.shape
@@ -344,7 +357,7 @@ def matmul_raw(a, b, out=None, alpha=1.0, beta=0.0):
             raise ValueError("beta requires an existing output tensor")
         out = torch.empty((m, n), device=a.device, dtype=a.dtype)
     else:
-        _validate(a, out)
+        _validate(a, out, allow_bfloat16=True)
         if torch.is_grad_enabled() and out.requires_grad:
             raise ValueError(
                 "Autograd matmul does not support an out tensor requiring gradients"
@@ -361,11 +374,14 @@ def matmul_raw(a, b, out=None, alpha=1.0, beta=0.0):
     a, ta, lda = _operand(a)
     b, tb, ldb = _operand(b)
     native = context(a.device.index)
-    call = (
-        library().camblas_cuda_sgemm
-        if a.dtype == torch.float32
-        else library().camblas_cuda_dgemm
-    )
+    name = {
+        torch.float32: "camblas_cuda_sgemm",
+        torch.float64: "camblas_cuda_dgemm",
+        torch.bfloat16: "camblas_cuda_bgemm",
+    }[a.dtype]
+    call = getattr(library(), name, None)
+    if call is None:
+        raise RuntimeError("The loaded CAMBLAS backend does not support BF16 GEMM")
     _check(
         call(
             native.handle,

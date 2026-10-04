@@ -2,9 +2,12 @@
 
 Build with ``python scripts/build_cuda.py --cuda-root /path/to/cuda``. Operations
 use the active PyTorch CUDA stream and preserve FP32 or FP64 storage and compute
-types. Inputs on other streams require the same stream ordering and lifetime
+types; matrix multiplication and linear also support BF16 with FP32 accumulation.
+Inputs on other streams require the same stream ordering and lifetime
 management as ordinary PyTorch CUDA operations.
 """
+
+from functools import partial
 
 import torch
 from torch.autograd.function import once_differentiable
@@ -21,18 +24,30 @@ from ._native import (
     stats,
     tensor_module,
 )
+from ._transfer import copy_to_cpu
 
 __all__ = [
+    "add_rms_norm",
     "affine",
     "algorithm",
     "attention",
     "attention_host",
+    "attention_transfer",
+    "copy_to_cpu",
+    "gated_mlp",
+    "gram_transfer",
+    "linear",
     "matmul",
     "matmul_host",
+    "matmul_transfer",
     "mlp",
     "mlp_host",
+    "mlp_transfer",
+    "qkv_linear",
+    "rms_norm",
     "set_algorithm",
     "stats",
+    "silu_multiply",
 ]
 
 
@@ -188,6 +203,14 @@ def attention_host(q, k, v, *, scale=None, device=0):
     return _host_binding().attention_host(q, k, v, scale=scale, device=device)
 
 
+def _require_native(name, *args, **kwargs):
+    """Report unavailable optional operations when using an older CUDA build."""
+    module = tensor_module()
+    if module is None or not hasattr(module, name):
+        raise RuntimeError(f"{name} requires a current CUDA build with --torch")
+    return getattr(module, name)(*args, **kwargs)
+
+
 _tensor_binding = tensor_module()
 if _tensor_binding is not None:
     matmul = _tensor_binding.matmul_public
@@ -197,3 +220,21 @@ if _tensor_binding is not None:
     matmul_host = _tensor_binding.matmul_host
     mlp_host = _tensor_binding.mlp_host
     attention_host = _tensor_binding.attention_host
+
+# Share native implementations rather than duplicate Python wrappers. Older
+# controls and ctypes-only builds report a clear error for unavailable features.
+for _public, _native_name in {
+    "add_rms_norm": "add_rms_norm",
+    "linear": "linear_public",
+    "rms_norm": "rms_norm",
+    "silu_multiply": "silu_multiply",
+    "gated_mlp": "gated_mlp",
+    "qkv_linear": "qkv_linear",
+    "matmul_transfer": "matmul_transfer",
+    "gram_transfer": "gram_transfer",
+    "mlp_transfer": "mlp_transfer",
+    "attention_transfer": "attention_transfer",
+}.items():
+    globals()[_public] = getattr(_tensor_binding, _native_name, None) or partial(
+        _require_native, _native_name
+    )

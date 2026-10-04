@@ -236,7 +236,7 @@ Build from the repository root with a CUDA toolkit and a compatible CUDA PyTorch
 python3.11 bench/compare_gpu.py --threads 64 --output bench/results/camblas_gpu
 ```
 
-From the repository root, use `import camblas_gpu as cb` and `cb.matmul(a, b)`, `cb.affine(x, weight, bias, relu=True)`, `cb.mlp(x, w1, b1, w2, b2)` or `cb.attention(q, k, v)`. Operands must be CUDA FP32/FP64 tensors on the same device. Matrix multiplication accepts transpose views and padded row/column input storage; other irregular layouts are materialised. Supplied `out` tensors must have contiguous row storage and their mutations update PyTorch's version counter. Affine, MLP and attention use contiguous storage. Operations follow the active PyTorch stream; ordering and operand lifetimes across streams follow PyTorch's ordinary CUDA rules. Matrix multiplication and affine support autograd; MLP supports first derivatives, and attention uses differentiable matrix products and PyTorch softmax when gradients are requested.
+From the repository root, use `import camblas_gpu as cb` and `cb.matmul(a, b)`, `cb.affine(x, weight, bias, relu=True)`, `cb.mlp(x, w1, b1, w2, b2)` or `cb.attention(q, k, v)`. Affine, MLP and attention operands must be CUDA FP32/FP64 tensors on the same device. Matrix multiplication also supports BF16 storage with FP32 accumulation. Matrix multiplication accepts transpose views and padded row/column input storage; other irregular layouts are materialised. Supplied `out` tensors must have contiguous row storage and their mutations update PyTorch's version counter. Affine, MLP and attention use contiguous storage. Inference-only FP32/BF16 operations also include `cb.linear(x, weight, bias=None)`, `cb.rms_norm(x, weight)`, `cb.add_rms_norm(x, residual, weight)`, `cb.gated_mlp(x, gate_weight, up_weight, down_weight)` and `cb.qkv_linear(x, q_weight, k_weight, v_weight)`. Linear projection weights have PyTorch’s `[outputs, inputs]` layout. Residual RMS returns both the fresh residual sum and its normalised output. Operations follow the active PyTorch stream; ordering and operand lifetimes across streams follow PyTorch's ordinary CUDA rules. Matrix multiplication and affine support autograd; MLP supports first derivatives, and attention uses differentiable matrix products and PyTorch softmax when gradients are requested.
 
 Automatic dispatch uses guarded Strassen for large even square products, with fused packing and recombination for up to four levels, and classical/cuBLASLt kernels elsewhere. Four levels apply to FP32 squares of size at least 12288 and FP64 squares of size at least 24576, with sizes divisible by 256. Three levels apply to the remaining FP64 squares of size at least 16384 and FP32 squares of size at least 32768, with sizes divisible by 128. It never enables TF32 or reduces the compute dtype. Strassen changes summation order and can worsen relative error when dot products cancel; range checks address overflow, rather than guaranteeing relative accuracy. Request `with cb.algorithm("classical")` to use classical multiplication, including backward. The explicit `lt`, `strassen`, `strassen2`, `strassen3`, `strassen4` and `symmetric` modes aid diagnosis. Recursive modes use fewer levels when dimensions do not divide evenly. Symmetric Gram multiplication is experimental and is excluded from automatic dispatch after measured regressions. Guarded Strassen performs a stream synchronisation for its input-range check. If third-level scratch allocation fails, it tries two levels before falling back to classical GEMM; fourth-level allocation failure falls back to classical GEMM.
 
@@ -433,3 +433,91 @@ binding 4ae26e933336a245065175cc878bca2937ec2852d4ba432d2ffb2a72a2d6e44b
 <!-- final-verification end -->
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributions and [LICENSE](LICENSE) for the MIT licence, copyright Pritthijit Nath. External dependencies retain their own licences; generated artefacts and internal documents are excluded from this repository.
+
+### Llama 3.1 70B and FP64 transfer update
+
+The complete [meta-llama/Llama-3.1-70B](https://huggingface.co/meta-llama/Llama-3.1-70B) checkpoint is pinned to `349b2ddb53ce8f2849a6c168a81980ab25258dac`: 70,553,706,496 BF16 parameters in 30 SHA256-verified shards. The previous Llama 3 checkpoint was removed after verification. No weight quantisation or CPU/disk parameter offload is used.
+
+Four GH200 GPUs use sequential layer sharding, not tensor parallelism. Each row aggregates three fresh processes with rotated paired backend order, batch 1 and 16 generated tokens. Both paths use the same Transformers 4.57.1 SDPA, RoPE and KV cache. CAMBLAS replaces linear projections and the selected generic inference fusions. PyTorch BF16 uses its normal reduced-precision reduction policy; CAMBLAS accumulates BF16 GEMMs in FP32. FP32 has TF32 disabled. Setup, model loading, autotuning, CPU parameter snapshots and accuracy checks are excluded; every GPU synchronises before and after timed calls.
+
+Token-transfer rows upload the CPU prompt and return final vocabulary logits and generated tokens; weights and the KV cache stay resident. Prefill tokens/s counts prompt tokens, decode tokens/s counts 15 new model steps after a prepared prefill, and full-request tokens/s counts all 16 generated tokens including prefill. Latency cells show median [minimum–maximum process median]. Speed-up is PyTorch/CAMBLAS; values below 1 are regressions.
+
+| Precision | Prompt | Phase | PyTorch ms [range] | CAMBLAS ms [range] | PyTorch tokens/s | CAMBLAS tokens/s | Speed-up |
+|---|---:|---|---:|---:|---:|---:|---:|
+| bfloat16 | 128 | prefill | 79.75 [77.59–87.35] | 60.60 [60.23–61.03] | 1605.09 | 2112.18 | 1.316× |
+| bfloat16 | 128 | decode | 1149.15 [1142.65–1267.44] | 781.83 [766.90–816.47] | 13.05 | 19.19 | 1.470× |
+| bfloat16 | 128 | request | 1227.96 [1225.88–1341.20] | 832.72 [818.14–876.14] | 13.03 | 19.21 | 1.475× |
+| bfloat16 | 512 | prefill | 137.03 [136.20–138.68] | 133.38 [133.19–134.07] | 3736.40 | 3838.55 | 1.027× |
+| bfloat16 | 512 | decode | 1224.83 [1156.03–1234.65] | 816.22 [774.57–825.63] | 12.25 | 18.38 | 1.501× |
+| bfloat16 | 512 | request | 1308.09 [1231.79–1337.72] | 898.94 [895.32–901.46] | 12.23 | 17.80 | 1.455× |
+| float32 | 128 | prefill | 430.35 [430.12–431.21] | 434.30 [432.97–435.93] | 297.43 | 294.73 | 0.991× |
+| float32 | 128 | decode | 1405.07 [1403.95–1405.25] | 1343.20 [1342.39–1343.63] | 10.68 | 11.17 | 1.046× |
+| float32 | 128 | request | 1834.06 [1831.44–1834.21] | 1775.72 [1773.69–1777.46] | 8.72 | 9.01 | 1.033× |
+| float32 | 512 | prefill | 1680.38 [1680.29–1682.44] | 1543.12 [1543.01–1543.25] | 304.69 | 331.80 | 1.089× |
+| float32 | 512 | decode | 1446.73 [1444.42–1449.15] | 1387.18 [1385.69–1389.59] | 10.37 | 10.81 | 1.043× |
+| float32 | 512 | request | 3128.88 [3125.79–3132.53] | 2930.71 [2930.20–2932.43] | 5.11 | 5.46 | 1.068× |
+
+Uploading all weights on every request is a separate contract. These three-process timings use the preceding core recorded below, before a workspace-lifetime correction for CUDA graphs. No graph capture is used in these measurements; the final full-weight smoke test uses the published core. Each timed prefill/request copies 131.4 GiB of BF16 parameters or 262.8 GiB of FP32 parameters from a CPU snapshot into the existing CUDA weights, plus token input/output transfers. Decode-only starts with resident weights and cache. CPU snapshot preparation is recorded outside the timer.
+
+| Precision | Phase | PyTorch ms [range] | CAMBLAS ms [range] | PyTorch tokens/s | CAMBLAS tokens/s | Speed-up |
+|---|---|---:|---:|---:|---:|---:|
+| bfloat16 | prefill | 1875.09 [1412.82–2622.47] | 1541.94 [1423.38–1971.92] | 68.26 | 83.01 | 1.216× |
+| bfloat16 | request | 2824.04 [2757.70–3091.66] | 2354.25 [2247.47–2718.00] | 5.67 | 6.80 | 1.200× |
+| float32 | prefill | 4154.06 [4074.63–4173.36] | 4288.77 [4071.40–4474.52] | 30.81 | 29.85 | 0.969× |
+| float32 | request | 5565.57 [5518.57–5590.47] | 5494.47 [5417.79–5556.04] | 2.87 | 2.91 | 1.013× |
+
+The preceding CUDA build is an unchanged control for the new residual fusion and dispatch changes. These paired Llama 3.1 runs use the same checkpoint, prompt lengths shown below, resident weights and token transfers; each candidate has three fresh processes. Latency cells retain the process range. The normalised gain divides the new PyTorch/CAMBLAS speed-up by the old paired speed-up, accounting for movement of the PyTorch baseline between sessions.
+
+| Precision | Prompt | Phase | Previous CAMBLAS ms [range] | New CAMBLAS ms [range] | Previous/new | Normalised gain |
+|---|---:|---|---:|---:|---:|---:|
+| bfloat16 | 128 | prefill | 66.66 [66.37–68.19] | 60.60 [60.23–61.03] | 1.100× | 1.001× |
+| bfloat16 | 128 | decode | 898.07 [897.59–911.44] | 781.83 [766.90–816.47] | 1.149× | 1.025× |
+| bfloat16 | 128 | request | 971.19 [967.19–981.96] | 832.72 [818.14–876.14] | 1.166× | 1.045× |
+| float32 | 512 | prefill | 1645.13 [1635.85–1646.24] | 1543.12 [1543.01–1543.25] | 1.066× | 1.064× |
+| float32 | 512 | decode | 1388.00 [1386.64–1392.40] | 1387.18 [1385.69–1389.59] | 1.001× | 1.001× |
+| float32 | 512 | request | 3034.52 [3027.81–3035.03] | 2930.71 [2930.20–2932.43] | 1.035× | 1.036× |
+
+Full final-vocabulary logits are checked against the paired PyTorch result; generated token sequences must match exactly, and changed token inputs are rechecked. Maximum final-logit absolute errors: bfloat16 `0`, float32 `0.00025177002`. Checks use `atol=rtol=2e-4` for FP32 and `2e-2` for BF16; accuracy tolerances were not relaxed to accept faster candidates.
+
+The FP64 transfer table uses fresh logical pinned CPU output allocations inside every timed call, with the same policy for PyTorch and CAMBLAS. All inputs/weights and outputs/parameter gradients are copied on every call; previous-result retirement is timed. PyTorch’s warmed pinned allocator may recycle freed physical storage. Small-case inference transfer operations use one native dispatch; backward retains its gradient path.
+
+| FP64 workload | Resident speed-up | PyTorch transfer ms [range] | CAMBLAS transfer ms [range] | Transfer speed-up |
+|---|---:|---:|---:|---:|
+| square1024 | 1.034× | 0.235 [0.232–0.239] | 0.231 [0.222–0.235] | 1.017× |
+| square4096 | 0.964× | 4.212 [4.122–4.229] | 4.215 [4.095–4.247] | 0.999× |
+| square8192 | 1.230× | 29.65 [29.38–29.68] | 25.29 [24.91–25.45] | 1.172× |
+| transpose | 0.950× | 0.275 [0.275–0.280] | 0.285 [0.279–0.289] | 0.967× |
+| gram | 1.006× | 0.195 [0.194–0.195] | 0.194 [0.193–0.196] | 1.006× |
+| mlp | 1.025× | 0.739 [0.724–0.742] | 0.720 [0.716–0.722] | 1.027× |
+| attention | 1.914× | 0.259 [0.248–0.261] | 0.185 [0.182–0.193] | 1.398× |
+| backward | 1.077× | 1.862 [1.831–1.886] | 1.802 [1.796–1.815] | 1.033× |
+| square32768 | — | 1883.02 [1869.34–1900.70] | 1322.34 [1318.50–1325.16] | 1.424× |
+
+The 32768² case uploads 16 GiB and downloads 8 GiB on every call. Every output element is checked against an independent analytic reference before and after input changes; 64 random entries are also checked with CPU FP64. The earlier pageable-output regression remains above because it uses a different allocation policy. Near-1× rows with overlapping process ranges do not establish a reliable win.
+
+Reproduce with a separately installed CUDA PyTorch 2.8.0+cu129 environment and the pinned model dependencies:
+
+```bash
+python -m pip install -r configs/llama-requirements.txt
+python bench/verify_llama_weights.py \
+  --model-directory .frameworks/models/Llama-3.1-70B \
+  --output build/cuda/llama31_verified.json
+taskset -c 0-63 python bench/compare_llama.py \
+  --model-directory .frameworks/models/Llama-3.1-70B \
+  --weights-manifest build/cuda/llama31_verified.json \
+  --linear-entry native --fuse-rms --fuse-mlp --fuse-qkv --fuse-residual \
+  --dtypes bfloat16 float32 --prompt-lengths 128 512 \
+  --generated-tokens 16 --rounds 3 --threads 64 \
+  --warmups 1 --repetitions 3 --output bench/results/llama31
+# Add --copy-weights-every-request for the full-weight transfer contract.
+taskset -c 0-63 python bench/compare_gpu.py \
+  --dtypes float64 --rounds 3 --threads 64 --repetitions 31 \
+  --output-memory pinned --transfer-entry native \
+  --output bench/results/fp64-pinned
+```
+
+Published native core SHA256: `51e51e1d9481734cd6fa4275a4c9c975cc8f27ef3ef42d771f009a8bfc4fa371`; full-weight timing core: `3700f1ec945920908177e3fdac45a966862d0606fdc39c49fc04246b6adcc317`; tensor binding: `627eae532a4e19c30a249df947ec0a2473056888390b8d82681e14f87e6a7ef6`. Compiler: CUDA 12.9.86, GCC 14.3, `sm_90`. Source and dependency identities, process medians, checks and rejected experiments are retained in ignored local reports; weights and binaries are excluded from Git.
+
+Production retains one FP32 decode GEMV, exact storage-rounding inference fusion, residual/RMSNorm fusion and completed-call latency selection between cuBLASLt and classical cuBLAS. Wide FP32 token panels use up to 64 Lt candidates and a 128 MiB workspace when the measured shape range warrants it; short panels retain the 12-candidate search. Rectangular Strassen and the inaccurate BF16 decode prototype were rejected and are excluded from production.
+
+Final checks ran 2026-10-04T05:59:06.037181+00:00–2026-10-04T06:02:18.517814+00:00 UTC on allocation 7032547: native tests 89 passed (0 skips), ctypes CUDA tests 43 passed (3 skips), CPU `make test`, style, byte-compilation and whitespace checks passed. Fresh Llama 3.1 and large FP64 transfer smoke benchmarks passed in the final window. Preflight kernel memory and synchronisation checks passed with zero reported errors.
