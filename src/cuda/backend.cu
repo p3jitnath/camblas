@@ -65,6 +65,7 @@ struct camblas_cuda_context {
     size_t scratch_bytes = 0;
     bool scratch_captured = false;
     bool short_attention_supported = false;
+    bool quantized_supported = false;
     std::vector<void *> retired_allocations;
     unsigned *guard = nullptr;
     unsigned *host_guard = nullptr;
@@ -432,6 +433,8 @@ int reserve_scratch(camblas_cuda_context *context, size_t required)
 
 #include "strassen_four.cuh"
 #include "decode_float.cuh"
+#include "quantized.cuh"
+#include "routing.cuh"
 
 template <typename T>
 int strassen(camblas_cuda_context *context, int n, T alpha, const T *a, int lda, const T *b,
@@ -1002,6 +1005,7 @@ extern "C" int camblas_cuda_create(int device, void *stream, camblas_cuda_contex
         return result;
     }
     context->short_attention_supported = initialise_short_attention(device);
+    context->quantized_supported = initialise_quantized();
     *out = context;
     return 0;
 }
@@ -1121,6 +1125,204 @@ extern "C" int camblas_cuda_silu_multiply(camblas_cuda_context *context, int dty
         if (dtype == 0)
             return launch_silu_multiply<float>(context, count, gate, up, output);
         return launch_silu_multiply<__nv_bfloat16>(context, count, gate, up, output);
+    });
+}
+
+extern "C" int camblas_cuda_swiglu(camblas_cuda_context *context, int dtype, uint64_t count,
+                                   int width, float limit, const void *gate, const void *up,
+                                   const float *routing, void *output)
+{
+    return execute(context, [&] {
+        if ((dtype != 0 && dtype != 2) || width <= 0 || count % unsigned(width) ||
+            !std::isfinite(limit) || limit < 0 || count > SIZE_MAX / (dtype == 0 ? 4 : 2))
+            return fail(context, "invalid SwiGLU dimensions or clipping limit", 1);
+        if (!count)
+            return 0;
+        unsigned alignment = dtype == 0 ? 4 : 2;
+        if (!gate || !up || !output || uintptr_t(gate) % alignment || uintptr_t(up) % alignment ||
+            uintptr_t(output) % alignment ||
+            (routing && (uintptr_t(routing) % 4 || output == routing)))
+            return fail(context, "invalid SwiGLU buffers", 1);
+        unsigned blocks = unsigned(std::min<uint64_t>((count + 255) / 256, 65535));
+        if (dtype == 0)
+            swiglu_kernel<float><<<blocks, 256, 0, context->stream>>>(
+                count, width, limit, static_cast<const float *>(gate),
+                static_cast<const float *>(up), routing, static_cast<float *>(output));
+        else
+            swiglu_kernel<__nv_bfloat16><<<blocks, 256, 0, context->stream>>>(
+                count, width, limit, static_cast<const __nv_bfloat16 *>(gate),
+                static_cast<const __nv_bfloat16 *>(up), routing,
+                static_cast<__nv_bfloat16 *>(output));
+        cudaError_t error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "SwiGLU", error);
+    });
+}
+
+extern "C" int camblas_cuda_quantized_matmul(camblas_cuda_context *context, int packed, int rows,
+                                             int outputs, int inner, int activation_block,
+                                             const void *input, const void *input_scale,
+                                             const void *weight, const void *weight_scale,
+                                             void *output)
+{
+    return execute(context, [&] {
+        if ((packed != 0 && packed != 1) || rows < 0 || rows > 65535 || outputs < 8 ||
+            outputs % 8 || inner < 32 || inner % 32 ||
+            (activation_block != 32 && activation_block != 128) || inner % activation_block ||
+            (!packed && activation_block != 32))
+            return fail(context, "invalid quantized matrix dimensions", 1);
+        if (!rows)
+            return 0;
+        if (!context->quantized_supported)
+            return fail(context, "quantized matrix multiplication requires an SM90+ binary", 1);
+        if (!input || !input_scale || !weight || !weight_scale || !output ||
+            (uintptr_t(input) & 3) || (uintptr_t(weight) & (packed ? 1 : 3)) ||
+            (uintptr_t(output) & 1) || output == input || output == input_scale ||
+            output == weight || output == weight_scale)
+            return fail(context, "invalid quantized matrix buffers", 1);
+        return packed ? launch_quantized<true>(context, rows, outputs, inner, activation_block,
+                                               input, input_scale, weight, weight_scale, output)
+                      : launch_quantized<false>(context, rows, outputs, inner, activation_block,
+                                                input, input_scale, weight, weight_scale, output);
+    });
+}
+
+extern "C" int camblas_cuda_grouped_quantized_matmul(camblas_cuda_context *context, int packed,
+                                                     int groups, int weight_groups, int rows,
+                                                     int outputs, int inner, int activation_block,
+                                                     const void *input, const void *input_scale,
+                                                     const void *metadata, const void *active,
+                                                     const void *counts, void *output)
+{
+    return execute(context, [&] {
+        if ((packed != 0 && packed != 1) || groups < 0 || groups > 65535 || weight_groups < 1 ||
+            weight_groups > 65535 || rows < 0 || rows > 65535 || outputs < 8 || outputs % 8 ||
+            inner < 32 || inner % 32 ||
+            (activation_block != 32 && !(packed && activation_block == 128)) ||
+            inner % activation_block ||
+            uint64_t(groups) * rows > SIZE_MAX / (uint64_t(outputs) * 2))
+            return fail(context, "invalid grouped matrix dimensions", 1);
+        if (!groups || !rows)
+            return 0;
+        if (!context->quantized_supported)
+            return fail(context, "grouped multiplication requires an SM90+ binary", 1);
+        if (!input || !input_scale || !metadata || !active || !counts || !output ||
+            (uintptr_t(input) & 3) || (uintptr_t(metadata) & 7) || (uintptr_t(active) & 3) ||
+            (uintptr_t(counts) & 3) || (uintptr_t(output) & 1) || output == input ||
+            output == input_scale || output == metadata || output == active || output == counts)
+            return fail(context, "invalid grouped matrix buffers", 1);
+        cudaError_t error =
+            cudaMemsetAsync(output, 0, size_t(groups) * rows * outputs * 2, context->stream);
+        if (error != cudaSuccess)
+            return fail(context, "grouped output initialisation", error);
+        dim3 grid((unsigned(outputs) + 15) / 16, (unsigned(rows) + 15) / 16, groups);
+        if (packed)
+            quantized_tile<true, true><<<grid, 64, 0, context->stream>>>(
+                rows, outputs, inner, activation_block, static_cast<const uint8_t *>(input),
+                static_cast<const uint8_t *>(input_scale), nullptr, nullptr,
+                static_cast<__nv_bfloat16 *>(output), static_cast<const uint64_t *>(metadata),
+                static_cast<const int32_t *>(active), static_cast<const int32_t *>(counts),
+                weight_groups);
+        else
+            quantized_tile<false, true><<<grid, 64, 0, context->stream>>>(
+                rows, outputs, inner, activation_block, static_cast<const uint8_t *>(input),
+                static_cast<const uint8_t *>(input_scale), nullptr, nullptr,
+                static_cast<__nv_bfloat16 *>(output), static_cast<const uint64_t *>(metadata),
+                static_cast<const int32_t *>(active), static_cast<const int32_t *>(counts),
+                weight_groups);
+        error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "grouped multiplication", error);
+    });
+}
+
+extern "C" int camblas_cuda_route_groups(camblas_cuda_context *context, int tokens, int choices,
+                                         int first_expert, int groups, int rows,
+                                         const void *experts, const void *active, void *counts,
+                                         void *slots, void *reverse)
+{
+    return execute(context, [&] {
+        if (tokens < 0 || choices < 1 || choices > 64 || first_expert < 0 || groups < 1 ||
+            groups > 65535 || rows < 1 || rows > 65535 || int64_t(tokens) * choices > INT_MAX ||
+            int64_t(groups) * rows > INT_MAX || !counts || !slots ||
+            (tokens && (!experts || !reverse)) || !active || (uintptr_t(experts) & 7) ||
+            (uintptr_t(active) & 3) || (uintptr_t(counts) & 3) || (uintptr_t(slots) & 3) ||
+            (uintptr_t(reverse) & 3) || counts == active || slots == active || reverse == active ||
+            counts == experts || slots == experts || (reverse && reverse == experts) ||
+            counts == slots || counts == reverse || slots == reverse)
+            return fail(context, "invalid routing dimensions or buffers", 1);
+        cudaError_t error = cudaMemsetAsync(counts, 0, size_t(groups) * 4, context->stream);
+        if (error == cudaSuccess)
+            error = cudaMemsetAsync(slots, 255, size_t(groups) * rows * 4, context->stream);
+        if (error == cudaSuccess && tokens)
+            error = cudaMemsetAsync(reverse, 255, size_t(tokens) * choices * 4, context->stream);
+        if (error != cudaSuccess)
+            return fail(context, "routing initialisation", error);
+        if (tokens)
+            assign_groups_kernel<<<std::min((unsigned(tokens) * choices + 255) / 256, 65535u), 256,
+                                   0, context->stream>>>(
+                tokens * choices, first_expert, groups, rows, static_cast<const int64_t *>(experts),
+                static_cast<const int32_t *>(active), static_cast<int32_t *>(counts),
+                static_cast<int32_t *>(slots), static_cast<int32_t *>(reverse));
+        error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "expert routing", error);
+    });
+}
+
+extern "C" int camblas_cuda_reduce_groups(camblas_cuda_context *context, int tokens, int choices,
+                                          int width, int grouped_rows, const void *experts,
+                                          const void *reverse, const void *input, void *output)
+{
+    return execute(context, [&] {
+        if (tokens < 0 || choices < 1 || choices > 64 || width < 1 || grouped_rows < 0 ||
+            int64_t(tokens) * choices > INT_MAX || (grouped_rows && !input) ||
+            (tokens && (!experts || !reverse || !output)) || (uintptr_t(experts) & 7) ||
+            (uintptr_t(reverse) & 3) || (uintptr_t(input) & 1) || (uintptr_t(output) & 3) ||
+            (tokens && (output == experts || output == reverse || output == input)))
+            return fail(context, "invalid grouped reduction arguments", 1);
+        if (!tokens)
+            return 0;
+        unsigned blocks =
+            unsigned(std::min<uint64_t>((uint64_t(tokens) * width + 255) / 256, 65535));
+        reduce_groups_kernel<<<blocks, 256, 0, context->stream>>>(
+            tokens, choices, width, grouped_rows, static_cast<const int64_t *>(experts),
+            static_cast<const int32_t *>(reverse), static_cast<const __nv_bfloat16 *>(input),
+            static_cast<float *>(output));
+        cudaError_t error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "grouped reduction", error);
+    });
+}
+
+extern "C" int camblas_cuda_rms_norm_decode(camblas_cuda_context *context, int dtype,
+                                            int weight_dtype, int width, float epsilon,
+                                            int round_before_weight, int descending,
+                                            const void *input, const void *weight, void *output)
+{
+    return execute(context, [&] {
+        if ((dtype != 0 && dtype != 2) || (weight_dtype != 0 && weight_dtype != 2) ||
+            (dtype == 0 && weight_dtype != 0) || width < 2048 || width > 65536 || width % 4 ||
+            (round_before_weight != 0 && round_before_weight != 1) ||
+            (descending != 0 && descending != 1) || !std::isfinite(epsilon) || epsilon < 0 ||
+            !input || !weight || !output || output == input || output == weight ||
+            (uintptr_t(input) % (dtype == 0 ? 4 : 2)) ||
+            (uintptr_t(weight) % (weight_dtype == 0 ? 4 : 2)) ||
+            (uintptr_t(output) % (dtype == 0 ? 4 : 2)))
+            return fail(context, "invalid decode RMS arguments", 1);
+        if (dtype == 0)
+            rms_decode_kernel<float><<<1, 512, 0, context->stream>>>(
+                width, epsilon, static_cast<const float *>(input),
+                static_cast<const float *>(weight), static_cast<float *>(output), nullptr, nullptr,
+                round_before_weight, descending);
+        else if (weight_dtype == 0)
+            rms_decode_kernel<__nv_bfloat16, false, float><<<1, 512, 0, context->stream>>>(
+                width, epsilon, static_cast<const __nv_bfloat16 *>(input),
+                static_cast<const float *>(weight), static_cast<__nv_bfloat16 *>(output), nullptr,
+                nullptr, round_before_weight, descending);
+        else
+            rms_decode_kernel<__nv_bfloat16><<<1, 512, 0, context->stream>>>(
+                width, epsilon, static_cast<const __nv_bfloat16 *>(input),
+                static_cast<const __nv_bfloat16 *>(weight), static_cast<__nv_bfloat16 *>(output),
+                nullptr, nullptr, round_before_weight, descending);
+        cudaError_t error = cudaGetLastError();
+        return error == cudaSuccess ? 0 : fail(context, "decode RMS normalisation", error);
     });
 }
 

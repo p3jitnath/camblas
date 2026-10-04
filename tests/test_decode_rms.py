@@ -68,6 +68,61 @@ class DecodeRMSTests(unittest.TestCase):
                 torch.testing.assert_close(output, expected, rtol=0, atol=0)
                 graph.reset()
 
+    def test_final_round_with_bfloat16_and_float32_weights(self):
+        """Compare final-only rounding with PyTorch and an independent CPU FP64 mean."""
+        binding = _native.tensor_module()
+        torch.manual_seed(20261004)
+        with torch.inference_mode():
+            for width in (128, 2048, 5120, 8192, 20480, 65536):
+                for rows in (1, 3):
+                    for weight_type in (torch.bfloat16, torch.float32):
+                        x = (
+                            torch.randn(
+                                (rows, width), device="cuda", dtype=torch.bfloat16
+                            )
+                            / 8
+                        )
+                        weight = (
+                            torch.randn(width, device="cuda", dtype=weight_type) / 8
+                        )
+                        for changed in ("original", "input", "weight"):
+                            if changed == "input":
+                                x.mul_(-0.5).add_(0.125)
+                            elif changed == "weight":
+                                weight.mul_(-0.5)
+                            for epsilon in (0, 1e-20, 1e-6):
+                                values = x.float()
+                                expected = (
+                                    weight.float()
+                                    * (
+                                        values
+                                        * (
+                                            values.square().mean(-1, keepdim=True)
+                                            + epsilon
+                                        ).rsqrt()
+                                    )
+                                ).to(x.dtype)
+                                actual = binding.rms_norm(
+                                    x, weight, epsilon, round_before_weight=False
+                                )
+                                torch.testing.assert_close(
+                                    actual, expected, rtol=0, atol=0
+                                )
+                                host = x.cpu().double()
+                                independent = (
+                                    weight.cpu().double()
+                                    * host
+                                    * (
+                                        host.square().mean(-1, keepdim=True) + epsilon
+                                    ).rsqrt()
+                                )
+                                torch.testing.assert_close(
+                                    actual.cpu().double(),
+                                    independent,
+                                    rtol=0.008,
+                                    atol=0.002,
+                                )
+
 
 if __name__ == "__main__":
     unittest.main()

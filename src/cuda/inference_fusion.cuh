@@ -28,6 +28,29 @@ __global__ void silu_multiply_kernel(size_t count, const T *gate, const T *up, T
 }
 
 template <typename T>
+__global__ void swiglu_kernel(size_t count, int width, float limit, const T *gate, const T *up,
+                              const float *routing, T *output)
+{
+    for (size_t index = size_t(blockIdx.x) * blockDim.x + threadIdx.x; index < count;
+         index += size_t(gridDim.x) * blockDim.x) {
+        float g = storage_float(gate[index]), u = storage_float(up[index]);
+        if (limit > 0) {
+            // Comparisons preserve NaNs, matching clamp rather than fmin/fmax.
+            if (g > limit)
+                g = limit;
+            if (u > limit)
+                u = limit;
+            if (u < -limit)
+                u = -limit;
+        }
+        float value = __fmul_rn(g / (1.f + expf(-g)), u);
+        if (routing)
+            value = __fmul_rn(routing[index / width], value);
+        output[index] = storage_round<T>(value);
+    }
+}
+
+template <typename T>
 __global__ void rms_norm_kernel(int rows, int width, float epsilon, const T *input, const T *weight,
                                 T *output)
 {
@@ -110,9 +133,10 @@ int launch_rms_scale(camblas_cuda_context *context, size_t count, int width, flo
 // A single-row mean in PyTorch 2.8 uses four independent accumulators per
 // thread, 512 threads, a halving shared-memory tree, then ascending shuffle
 // offsets. Retain that arithmetic order while fusing square and scale.
-template <typename T, bool Add = false>
-__global__ void rms_decode_kernel(int width, float epsilon, const T *input, const T *weight,
-                                  T *output, const T *residual = nullptr, T *added = nullptr)
+template <typename T, bool Add = false, typename W = T>
+__global__ void rms_decode_kernel(int width, float epsilon, const T *input, const W *weight,
+                                  T *output, const T *residual = nullptr, T *added = nullptr,
+                                  bool round_before_weight = true, bool descending = false)
 {
     __shared__ float partial[512];
     __shared__ float scale;
@@ -141,8 +165,13 @@ __global__ void rms_decode_kernel(int width, float epsilon, const T *input, cons
     }
     __syncthreads();
     if (threadIdx.x < 32) {
-        for (int offset = 1; offset < 32; offset *= 2)
-            sum = __fadd_rn(sum, __shfl_down_sync(0xffffffff, sum, offset));
+        if (descending) {
+            for (int offset = 16; offset; offset /= 2)
+                sum = __fadd_rn(sum, __shfl_down_sync(0xffffffff, sum, offset));
+        } else {
+            for (int offset = 1; offset < 32; offset *= 2)
+                sum = __fadd_rn(sum, __shfl_down_sync(0xffffffff, sum, offset));
+        }
         if (threadIdx.x == 0)
             scale = rsqrtf(__fadd_rn(__fmul_rn(sum, 1.f / float(width)), epsilon));
     }
@@ -154,9 +183,10 @@ __global__ void rms_decode_kernel(int width, float epsilon, const T *input, cons
                 storage_round<T>(__fadd_rn(storage_float(value), storage_float(residual[column])));
             added[column] = value;
         }
-        T normalised = storage_round<T>(__fmul_rn(storage_float(value), scale));
-        output[column] =
-            storage_round<T>(__fmul_rn(storage_float(normalised), storage_float(weight[column])));
+        float normalised = __fmul_rn(storage_float(value), scale);
+        if (round_before_weight)
+            normalised = storage_float(storage_round<T>(normalised));
+        output[column] = storage_round<T>(__fmul_rn(normalised, storage_float(weight[column])));
     }
 }
 

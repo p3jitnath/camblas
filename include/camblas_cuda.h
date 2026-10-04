@@ -97,11 +97,69 @@ int camblas_cuda_mlp_backward(camblas_cuda_context *context, int dtype, int rows
  * Exact in-place output==gate/up is supported; partial overlap is not. */
 int camblas_cuda_silu_multiply(camblas_cuda_context *context, int dtype, uint64_t count,
                                const void *gate, const void *up, void *output);
+/* SiLU(gate)*up, optionally multiplied by one FP32 routing value per row.
+ * dtype: 0 FP32, 2 BF16; FP32 intermediates round only at the final output.
+ * limit=0 disables clipping; positive finite limit caps gate above and up on
+ * both sides. width>0 divides count. routing may be null. Exact in-place
+ * output==gate/up is supported; partial overlap and output==routing are not.
+ * Buffers remain caller-owned and execution uses the context stream. */
+int camblas_cuda_swiglu(camblas_cuda_context *context, int dtype, uint64_t count, int width,
+                        float limit, const void *gate, const void *up, const float *routing,
+                        void *output);
+/* Row-major FP8 E4M3 input [rows,inner] times weight [outputs,inner]^T,
+ * accumulating in FP32 and writing BF16 [rows,outputs]. packed=1 stores E2M1
+ * nibbles in low/high order [outputs,inner/2]; packed=0 stores FP8 bytes.
+ * E8M0 input scales are [rows,inner/activation_block]; weight scales are
+ * [outputs,inner/32] for FP4 or [ceil(outputs/32),inner/32] for FP8.
+ * activation_block is 32 (both types) or 128 (FP4 only). SM90+ binary required;
+ * outputs is a positive multiple of eight, inner a positive multiple of 32,
+ * rows is 0..65535. Buffers must not overlap and must belong to this device.
+ * Input is four-byte aligned; weight alignment is two/four bytes for FP4/FP8.
+ * Outputs and operand lifetimes remain caller-owned; execution is asynchronous. */
+int camblas_cuda_quantized_matmul(camblas_cuda_context *context, int packed, int rows, int outputs,
+                                  int inner, int activation_block, const void *input,
+                                  const void *input_scale, const void *weight,
+                                  const void *weight_scale, void *output);
+/* Batched quantized products: input [groups,rows,inner], output [groups,rows,outputs].
+ * metadata is device uint64 [weight_groups,2] containing weight/scale addresses
+ * in the preceding operation's layouts. active/counts are device int32 [groups].
+ * Invalid active indices produce zeros; counts are clipped to [0,rows]. All
+ * padding is zeroed. groups/weight_groups <=65535. Operands, metadata and the
+ * referenced weight storages remain caller-owned, non-overlapping and alive
+ * until the context stream finishes. No activation or product data is cached. */
+int camblas_cuda_grouped_quantized_matmul(camblas_cuda_context *context, int packed, int groups,
+                                          int weight_groups, int rows, int outputs, int inner,
+                                          int activation_block, const void *input,
+                                          const void *input_scale, const void *metadata,
+                                          const void *active, const void *counts, void *output);
+/* Route int64 expert IDs [tokens,choices] to local int32 active IDs [groups].
+ * first_expert converts local IDs to global IDs; IDs outside [0,INT_MAX) are ignored.
+ * Initialises counts [groups], slots [groups,rows] and reverse [tokens,choices].
+ * Unassigned slots/reverse are -1; excess rows are discarded. Duplicate active
+ * IDs select their first group. All buffers are device-resident, disjoint and
+ * caller-owned. groups/rows <=65535; tokens*choices and groups*rows <=INT_MAX. */
+int camblas_cuda_route_groups(camblas_cuda_context *context, int tokens, int choices,
+                              int first_expert, int groups, int rows, const void *experts,
+                              const void *active, void *counts, void *slots, void *reverse);
+/* Sum BF16 grouped rows in ascending expert-ID/choice order into FP32 [tokens,width].
+ * reverse maps int64 expert IDs [tokens,choices] to input [grouped_rows,width].
+ * Negative/out-of-range expert IDs or reverse rows are ignored. choices is 1..64.
+ * Buffers remain caller-owned, disjoint and alive until the stream completes. */
+int camblas_cuda_reduce_groups(camblas_cuda_context *context, int tokens, int choices, int width,
+                               int grouped_rows, const void *experts, const void *reverse,
+                               const void *input, void *output);
 /* Row-major RMS normalisation in FP32, rounding normalised values to the
  * storage type before multiplying by weight. dtype: 0 FP32, 2 BF16.
  * Weight has width elements. Inputs/output must not partially overlap. */
 int camblas_cuda_rms_norm(camblas_cuda_context *context, int dtype, int rows, int width,
                           float epsilon, const void *input, const void *weight, void *output);
+/* Single-row RMS with explicit storage-rounding and warp-reduction policies.
+ * dtype/weight_dtype: 0 FP32, 2 BF16; FP32 input requires FP32 weight.
+ * round_before_weight and descending are boolean. width: 2048..65536, divisible
+ * by four. All buffers use their type's alignment and must not overlap. */
+int camblas_cuda_rms_norm_decode(camblas_cuda_context *context, int dtype, int weight_dtype,
+                                 int width, float epsilon, int round_before_weight, int descending,
+                                 const void *input, const void *weight, void *output);
 /* Single-row residual sum and RMS norm. dtype: 0 FP32, 2 BF16. Both outputs
  * must be distinct caller-owned buffers that do not alias inputs; width is
  * 2048..65536, divisible by four. Sum is rounded to storage dtype first. */

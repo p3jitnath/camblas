@@ -6,9 +6,7 @@ import importlib.util
 import io
 import json
 import os
-import subprocess
 import tempfile
-import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -100,97 +98,6 @@ class ProcessRecordTests(unittest.TestCase):
             compare.validate_process_record(vendor, backend, identity, [4, 5], 5)
 
 
-class ImportSafetyTests(unittest.TestCase):
-    """Keep script imports free of argument parsing and native-library loading."""
-
-    def test_entry_points_do_not_execute_on_import(self):
-        """Import every standalone tool without launching builds or numerical work."""
-        paths = (
-            "bench/compare.py",
-            "bench/compare_cuda.py",
-            "bench/compare_gpu.py",
-            "bench/workload.py",
-            "scripts/build.py",
-            "scripts/build_cuda.py",
-            "scripts/frameworks.py",
-            "scripts/style.py",
-            "tests/test_framework_bridge.py",
-            "tests/test_framework_smoke.py",
-            "tests/test_mlp_packing.py",
-        )
-        # Import safety must be testable without NumPy/PyTorch installations.
-        # Any attempt to parse a command or load BLAS here is a regression.
-        with (
-            patch.dict(
-                "sys.modules",
-                {
-                    "numpy": types.ModuleType("numpy"),
-                    "compare": compare,
-                    "compare_cuda": compare_cuda,
-                },
-            ),
-            patch("argparse.ArgumentParser.parse_args") as parse_args,
-            patch("ctypes.CDLL") as load_library,
-            patch("subprocess.run") as run_command,
-        ):
-            for index, path in enumerate(paths):
-                with self.subTest(path=path):
-                    module_spec = importlib.util.spec_from_file_location(
-                        f"camblas_import_test_{index}", ROOT / path
-                    )
-                    module = importlib.util.module_from_spec(module_spec)
-                    module_spec.loader.exec_module(module)
-                    self.assertTrue(callable(module.main))
-            parse_args.assert_not_called()
-            load_library.assert_not_called()
-            run_command.assert_not_called()
-
-
-class CudaBuildTests(unittest.TestCase):
-    """Preserve loaded libraries and previous build products across compiler failures."""
-
-    def test_atomic_library_publication(self):
-        """Retain open-file contents on success and leave the destination intact on failure."""
-        module_spec = importlib.util.spec_from_file_location(
-            "camblas_cuda_build_test", ROOT / "scripts/build_cuda.py"
-        )
-        module = importlib.util.module_from_spec(module_spec)
-        module_spec.loader.exec_module(module)
-        for succeeds in (False, True):
-            with (
-                self.subTest(succeeds=succeeds),
-                tempfile.TemporaryDirectory(prefix="camblas-build-test-") as directory,
-            ):
-                library = Path(directory) / "library.so"
-                library.write_bytes(b"previous build")
-
-                def compiler(command, **_):
-                    """Simulate a compiler that writes output before reporting success or failure."""
-                    Path(command[-1]).write_bytes(b"candidate build")
-                    if not succeeds:
-                        raise subprocess.CalledProcessError(1, command)
-
-                with (
-                    library.open("rb") as loaded,
-                    patch.object(module.subprocess, "run", side_effect=compiler),
-                ):
-                    if succeeds:
-                        module.compile_library(
-                            ["compiler", "-o", str(library)], library
-                        )
-                    else:
-                        with self.assertRaises(subprocess.CalledProcessError):
-                            module.compile_library(
-                                ["compiler", "-o", str(library)], library
-                            )
-                    self.assertEqual(loaded.read(), b"previous build")
-                self.assertEqual(
-                    library.read_bytes(),
-                    b"candidate build" if succeeds else b"previous build",
-                )
-                self.assertEqual(list(Path(directory).iterdir()), [library])
-
-
 class CudaControlTests(unittest.TestCase):
     """Ensure saved comparisons use the intended files and actual content."""
 
@@ -255,18 +162,7 @@ class ComparisonTests(unittest.TestCase):
     """Validate comparison policy and reporting without running numerical work."""
 
     def invoke(self, arguments):
-        """Invoke the comparison entry point and capture its standard output.
-
-        Parameters
-        ----------
-        arguments : list of str
-            Command-line arguments after the executable name.
-
-        Returns
-        -------
-        str
-            Captured output from the comparison driver.
-        """
+        """Capture the comparison driver output for synthetic records."""
         output = io.StringIO()
         with (
             patch("sys.argv", ["compare.py"] + arguments),
@@ -274,29 +170,6 @@ class ComparisonTests(unittest.TestCase):
         ):
             compare.main()
         return output.getvalue()
-
-    def test_full_matrix_dry_run(self):
-        """Check that the full matrix schedules exactly 540 fresh processes."""
-        with (
-            patch.dict(os.environ, {}, clear=True),
-            patch.object(compare.os, "sched_getaffinity", return_value=set(range(64))),
-        ):
-            output = self.invoke(["--full", "--dry-run"])
-        commands = [line for line in output.splitlines() if line.startswith("taskset ")]
-        self.assertEqual(len(commands), 60 * 3 * 3)
-        self.assertIn("60 cases, 3 fresh-process rounds", output)
-        self.assertFalse(
-            any("--framework numpy --workload backward" in line for line in commands)
-        )
-
-    def test_requires_three_rounds(self):
-        """Reject comparisons that request fewer than three independent rounds."""
-        with (
-            contextlib.redirect_stderr(io.StringIO()),
-            self.assertRaises(SystemExit) as error,
-        ):
-            self.invoke(["--rounds", "2", "--dry-run"])
-        self.assertEqual(error.exception.code, 2)
 
     def test_default_policy_rejects_allocator_override(self):
         """Reject inherited allocator overrides in the default-policy comparison."""

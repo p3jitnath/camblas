@@ -1,0 +1,9 @@
+# Install CUDA PyTorch 2.10.0+cu129 separately; use a separate environment from Llama.
+# The pinned reference requires TVM FFI 0.1.9 with TileLang 0.1.8.
+apache-tvm-ffi==0.1.9
+huggingface-hub==0.36.2
+numpy==2.3.2
+safetensors==0.8.0
+tilelang==0.1.8
+tokenizers==0.22.2
+transformers==4.57.1

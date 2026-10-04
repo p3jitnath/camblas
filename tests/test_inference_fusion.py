@@ -168,6 +168,106 @@ class InferenceFusionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.module.gated_mlp(x, weights[0], weights[1][:5], weights[2])
 
+    def test_swiglu_final_round_clipping_routing_and_changed_operands(self):
+        """Check every output against PyTorch and independent CPU double arithmetic."""
+        torch.manual_seed(20261004)
+        for dtype in (torch.bfloat16, torch.float32):
+            gate = torch.randn((3, 17, 2304), device="cuda", dtype=dtype) * 8
+            up = torch.randn_like(gate) * 8
+            routing = torch.randn((3, 17, 1), device="cuda", dtype=torch.float32)
+            for changed in ("original", "gate", "up", "routing"):
+                if changed == "gate":
+                    gate.mul_(-0.5).add_(0.25)
+                elif changed == "up":
+                    up.mul_(3)
+                elif changed == "routing":
+                    routing.add_(0.25)
+                for limit in (0, 10):
+                    for weights in (None, routing):
+                        g, u = gate.float(), up.float()
+                        host_g, host_u = gate.cpu().double(), up.cpu().double()
+                        if limit:
+                            g, u = g.clamp(max=limit), u.clamp(-limit, limit)
+                            host_g = host_g.clamp(max=limit)
+                            host_u = host_u.clamp(-limit, limit)
+                        expected = functional.silu(g) * u
+                        independent = host_g / (1 + (-host_g).exp()) * host_u
+                        if weights is not None:
+                            expected = weights * expected
+                            independent = weights.cpu().double() * independent
+                        actual = self.module.swiglu(
+                            gate, up, routing=weights, limit=limit
+                        )
+                        torch.testing.assert_close(
+                            actual, expected.to(dtype), rtol=0, atol=0
+                        )
+                        torch.testing.assert_close(
+                            actual.cpu().double(),
+                            independent,
+                            rtol=0.008 if dtype == torch.bfloat16 else 4e-6,
+                            atol=0.0001 if dtype == torch.bfloat16 else 2e-6,
+                        )
+            with self.assertRaises(ValueError):
+                self.module.swiglu(gate, up, routing=routing.to(dtype=torch.float64))
+            with self.assertRaises(ValueError):
+                self.module.swiglu(gate, up, routing=routing[..., 0, 0])
+            for limit in (-1, float("nan"), float("inf")):
+                with self.assertRaises(ValueError):
+                    self.module.swiglu(gate, up, limit=limit)
+
+    def test_swiglu_exceptional_values_empty_views_and_graphs(self):
+        """Preserve NaNs, views, empty shapes and changed graph inputs on every device."""
+        for device in range(torch.cuda.device_count()):
+            gate = torch.tensor(
+                [[float("nan"), float("inf"), -float("inf"), 0, -1000, 1000]],
+                device=device,
+                dtype=torch.bfloat16,
+            )
+            up = torch.tensor(
+                [[1, 1, 1, float("inf"), 1, 1]], device=device, dtype=gate.dtype
+            )
+            routing = torch.ones(1, device=device, dtype=torch.float32)
+            for limit in (0, 10):
+                g, u = gate.float(), up.float()
+                if limit:
+                    g, u = g.clamp(max=limit), u.clamp(-limit, limit)
+                actual = self.module.swiglu(gate, up, routing=routing, limit=limit)
+                torch.testing.assert_close(
+                    actual,
+                    (functional.silu(g) * u).to(gate.dtype),
+                    rtol=0,
+                    atol=0,
+                    equal_nan=True,
+                )
+                self.assertEqual(
+                    self.module.swiglu(gate[:0], up[:0], routing=routing[:0]).shape,
+                    (0, 6),
+                )
+            gate = torch.randn((3, 34), device=device, dtype=torch.bfloat16)[:, ::2]
+            up = torch.randn_like(gate)
+            routing = torch.randn(3, device=device, dtype=torch.float32)
+            stream = torch.cuda.Stream(device=device)
+            stream.wait_stream(torch.cuda.current_stream(device))
+            with torch.cuda.stream(stream):
+                self.module.swiglu(gate, up, routing=routing, limit=10)
+                graph = torch.cuda.CUDAGraph()
+                with torch.cuda.graph(graph, stream=stream):
+                    output = self.module.swiglu(gate, up, routing=routing, limit=10)
+                gate.add_(1)
+                up.mul_(-0.5)
+                routing.add_(0.25)
+                graph.replay()
+            stream.synchronize()
+            expected = (
+                routing[:, None]
+                * (
+                    functional.silu(gate.float().clamp(max=10))
+                    * up.float().clamp(-10, 10)
+                )
+            ).to(gate.dtype)
+            torch.testing.assert_close(output, expected, rtol=0, atol=0)
+            graph.reset()
+
     def test_graphs_streams_changed_inputs_all_devices(self):
         """Replay changed normalisation weights and MLP operands on each GPU."""
         for device in range(torch.cuda.device_count()):

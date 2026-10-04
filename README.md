@@ -520,4 +520,90 @@ Published native core SHA256: `51e51e1d9481734cd6fa4275a4c9c975cc8f27ef3ef42d771
 
 Production retains one FP32 decode GEMV, exact storage-rounding inference fusion, residual/RMSNorm fusion and completed-call latency selection between cuBLASLt and classical cuBLAS. Wide FP32 token panels use up to 64 Lt candidates and a 128 MiB workspace when the measured shape range warrants it; short panels retain the 12-candidate search. Rectangular Strassen and the inaccurate BF16 decode prototype were rejected and are excluded from production.
 
-Final checks ran 2026-10-04T05:59:06.037181+00:00–2026-10-04T06:02:18.517814+00:00 UTC on allocation 7032547: native tests 89 passed (0 skips), ctypes CUDA tests 43 passed (3 skips), CPU `make test`, style, byte-compilation and whitespace checks passed. Fresh Llama 3.1 and large FP64 transfer smoke benchmarks passed in the final window. Preflight kernel memory and synchronisation checks passed with zero reported errors.
+Final checks ran 2026-10-04T05:59:06.037181+00:00–2026-10-04T06:02:18.517814+00:00 UTC on allocation 7032547: native tests 89 passed (0 skips), ctypes CUDA tests 43 run (3 skips), CPU `make test`, style, byte-compilation and whitespace checks passed. Fresh Llama 3.1 and large FP64 transfer smoke benchmarks passed in the final window. Preflight kernel memory and synchronisation checks passed with zero reported errors.
+
+### DeepSeek V4.1 Flash
+
+The complete [deepseek-ai/DeepSeek-V4.1-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) checkpoint is pinned to `2cba9e42aa026125f3ed06c6d98c1db82f7ca027`. The [weight manifest](configs/deepseek-v41-flash-weights.json) records all 48 original shards, all four tensor-parallel shards, tokenizer files and inference sources. Every converted file was SHA256-verified before benchmarking. Each rank loads all 25,194 tensors, including the vision and MTP weights; the measured route is batch-one text prefill and ordinary greedy autoregressive decoding through all 40 backbone layers.
+
+The checkpoint already stores routed experts in packed FP4 E2M1, dense weights in FP8 E4M3 and scales in E8M0. No additional weight quantisation is applied. GH200 executes FP8 tensor-core products after losslessly expanding the FP4 nibbles into FP8 registers. Activations use BF16 and products accumulate in FP32; TF32 is disabled. The official converter's compressed projection conversion and the reference model's BF16-to-FP32 promotions are retained identically for both paths.
+
+The baseline is the pinned official **PyTorch + TileLang CUDA reference with a common activation-quantiser correctness fix**. Both FP8 and FP4 activation quantisers reuse shared memory for input and output. A missing CTA barrier allowed output writes to race outstanding input reads. The harness adds `T.sync_threads()` immediately before each `T.copy(y_local, y_shared)` in an ignored copy of the reference, for both backends. The downloaded sources remain unchanged. Racecheck reports six hazards in the original reproducer and zero after the fix; independent CPU quantisation checks cover both formats and repeated failing inputs. Comparisons against the unfixed, non-deterministic reference were rejected.
+
+CAMBLAS replaces eligible packed expert products with generic block-scaled tensor-core kernels, reuses activation quantisation between gate and up projections, and fuses final-round SwiGLU and single-row RMSNorm. Token batches of at least eight rows use grouped expert products and a deterministic contribution sum, reducing separate gathers and launches during prefill. Single-token decoding retains the existing vector route. The kernels retain the reference's scale-block accumulation and storage-rounding order. FP8 dense GEMMs and FP32 projections retain the reference path where replacement was slower or changed quantisation boundaries. This is a hybrid full-model comparison, not a replacement of every reference operation.
+
+The exclusive allocation uses four GH200 GPUs with sixteen host threads per rank, bound to the GPU's host NUMA node. Both paths use PyTorch 2.10.0+cu129, TileLang 0.1.8 and `PYTORCH_ALLOC_CONF=expandable_segments:True`. GPU weights remain resident. The complete 188.83 GiB of Engram tables stays on CPU, using read-only safetensors mappings. **Every index download, CPU row gather, row upload, dequantisation and collective is timed in both modes.** The transfer mode additionally uploads the prompt and downloads final vocabulary logits and generated tokens; whole-checkpoint uploads are excluded. Model loading, source verification, compilation, warm-up and accuracy checks are outside the timer.
+
+Each prompt length uses three fresh process groups per backend, rotated with an unchanged CAMBLAS main build. That older build lacks the new quantised operations and uses the reference fallback; its timings are retained as a control. Every process uses one warm-up call and two timed calls per phase/mode. Latency is the slowest rank's completed wall time. Prefill tokens/s counts prompt tokens, decode tokens/s counts the fifteen model steps after a prepared prefill, and request tokens/s counts all sixteen generated tokens including prefill. Cells report median [minimum–maximum process median].
+
+<!-- deepseek-results -->
+| Prompt | Phase, including transfers | PyTorch ms [range] | CAMBLAS ms [range] | PyTorch tokens/s | CAMBLAS tokens/s | Speed-up |
+|---:|---|---:|---:|---:|---:|---:|
+| 128 | prefill | 2744.91 [2744.41–2761.19] | 191.57 [179.29–196.93] | 46.63 | 668.16 | 14.328× |
+| 128 | decode | 4321.85 [4279.09–4766.18] | 2651.45 [2588.91–3153.39] | 3.47 | 5.66 | 1.630× |
+| 128 | request | 7183.78 [6925.54–7513.37] | 2971.97 [2815.57–3441.21] | 2.23 | 5.38 | 2.417× |
+| 512 | prefill | 3988.48 [3957.94–4013.89] | 332.26 [332.08–401.14] | 128.37 | 1540.96 | 12.004× |
+| 512 | decode | 4487.72 [4303.16–4498.05] | 2621.77 [2563.75–2622.07] | 3.34 | 5.72 | 1.712× |
+| 512 | request | 8276.62 [8182.33–8390.82] | 3098.84 [2930.25–3908.82] | 1.93 | 5.16 | 2.671× |
+<!-- deepseek-results end -->
+
+Compared with the preceding ungrouped study, prefill and request medians improve at both lengths. Standalone decode medians are 3.4% slower at 128 tokens and 1.0% slower at 512 tokens, with overlapping process ranges; the vector decode route is retained. The two studies used different warm-up/repetition counts, so this comparison does not isolate a causal decode change. The final grouped study ran 2026-10-04T15:33:19.492780+00:00–2026-10-04T16:44:13.016968+00:00 UTC on allocation 7059372, node nid011170. Its core is `41fb7f7b9ad9bf936afb2fabfbeed71f658e5641c89273674e3d1334ff369d24` and Torch 2.10 binding is `376046253dd300a9dba4117049f77b562e50360fda51065bc498ab3b2d8d6f5f`.
+
+All 129,280 final vocabulary logits must match bitwise, and greedy token sequences must match exactly, across backends, repeated calls, changed inputs and all ranks. These checks do not inspect every intermediate activation or every position's logits. No accuracy tolerance is relaxed to accept an optimisation.
+
+Install the [pinned dependencies](configs/deepseek-requirements.txt) into a separate CUDA PyTorch 2.10 environment. Preserve an unchanged main build as `build/cuda/control-deepseek` before building the candidate. With the pinned TP4 checkpoint available, run on a quiet four-GPU allocation:
+
+```bash
+python -m pip install -r configs/deepseek-requirements.txt
+python scripts/build_cuda.py --torch --architecture sm_90 \
+  --cuda-root "$CUDA_HOME" --cxx g++-14 --output build/cuda/deepseek
+OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 \
+PYTORCH_ALLOC_CONF=expandable_segments:True \
+python bench/compare_deepseek.py --python "$(command -v python)" \
+  --checkpoint .frameworks/models/DeepSeek-V4.1-Flash-mp4 \
+  --reference-directory .frameworks/models/DeepSeek-V4.1-Flash/inference \
+  --weights-manifest configs/deepseek-v41-flash-weights.json \
+  --library build/cuda/deepseek/libcamblas_cuda.so \
+  --control-library build/cuda/control-deepseek/libcamblas_cuda.so \
+  --prompt-lengths 128 512 --generated-tokens 16 --rounds 3 \
+  --warmups 1 --repetitions 2 --output bench/results/deepseek
+```
+
+The generic inference APIs now also include `cb.quantized_matmul(input, input_scale, weight, weight_scale, activation_block=32)`, `cb.swiglu(gate, up, routing=None, limit=0)` and `cb.rms_norm(x, weight, round_before_weight=False)`. Quantised multiplication requires contiguous CUDA FP8 inputs, FP8 or packed FP4 weights, E8M0 scales and an SM90+ binary; it returns fresh BF16 output. SwiGLU computes FP32 intermediates, optionally clips the gate above and up on both sides, applies one FP32 routing value per row, then rounds once to the input storage type. The RMS option multiplies the weight before the final storage rounding; the default retains Llama's existing rounding policy. All use the active stream and support inference only.
+
+`cb.QuantizedGroups(weights, scales)` retains matching quantised weight storages and their device address descriptors, without caching dequantised values or products. Its `matmul(input, input_scale, active, counts)` accepts `[groups, rows, inner]` FP8 input and CUDA int32 selectors/counts. Invalid selectors and padded rows return zero; counts clip to the available rows. In-place weight changes remain visible. Recreate the group when replacing or relocating weight storage, and retain it while captured graphs can replay. `cb.route_groups(experts, active, first_expert=0, rows=...)` produces slot/reverse maps and counts; `cb.reduce_groups(input, experts, reverse)` sums BF16 contributions into FP32 in ascending expert/choice order, including duplicate choices. These primitives use the active stream and caller-supplied shapes rather than model-specific constants.
+
+<!-- fp64-direct-followup -->
+### FP64 direct-transfer follow-up
+
+Three fresh rotated processes compare PyTorch, unchanged main and a direct-copy candidate with identical inputs and fresh logical pinned CPU output allocations inside every timed call. Each process uses ten warm-ups and 21 timed calls, 64 threads on CPU cores 0–63, and the native transfer entry for both CAMBLAS builds. Dense CPU storage, including transposes, uploads directly on the active stream; irregular views retain the normal copy path. The result downloads directly and the stream finishes before CPU output returns, including empty results and exception paths. No operand values are cached.
+
+| FP64 workload | Resident speed-up | PyTorch transfer ms [range] | CAMBLAS transfer ms [range] | Transfer speed-up | Main / candidate transfer |
+|---|---:|---:|---:|---:|---:|
+| transpose | 0.949× | 0.276 [0.275–0.278] | 0.273 [0.271–0.284] | 1.012× | 1.050× |
+| square4096 | 1.109× | 4.108 [3.982–4.118] | 4.143 [3.995–4.187] | 0.991× | 1.004× |
+| gram | 0.940× | 0.194 [0.193–0.194] | 0.192 [0.178–0.194] | 1.011× | 1.011× |
+| mlp | 1.038× | 0.731 [0.726–0.732] | 0.679 [0.670–0.694] | 1.076× | 1.050× |
+| attention | 1.746× | 0.245 [0.244–0.248] | 0.173 [0.169–0.174] | 1.416× | 1.106× |
+| square1024 | 0.996× | 0.236 [0.236–0.237] | 0.217 [0.212–0.222] | 1.089× | 1.046× |
+| square8192 | 1.246× | 29.590 [29.544–29.714] | 25.039 [24.554–25.056] | 1.182× | 0.992× |
+| backward | 1.041× | 1.905 [1.834–1.913] | 1.806 [1.792–1.817] | 1.055× | 0.994× |
+
+Seven of eight transfer medians exceed 1×; 4096² GEMM remains slightly slower. Overlapping ranges for transposed GEMM and Gram do not establish reliable wins. Clear gains against unchanged main occur for 1024² GEMM, MLP and attention. A separate 4096² Strassen trial improved resident compute but regressed transfer latency and was rejected.
+
+These timings use the preceding direct-copy core `bb7f3a3a7561c4a9668424ee2d86fc1ab43835c98394ab4b4d0138ab897006be`. The final core adds grouped quantised inference and removes the unreachable non-contiguous transfer-output branch; these eight rows were not remeasured with that final binary. The earlier 32768² three-process table above uses its original Python transfer entry and is retained with that contract.
+<!-- fp64-direct-followup end -->
+
+Seven redundant import, CLI, mock-build, tensor-copy and shape-only tests were removed. The retained suite targets independent numerical results, precision/cancellation, dispatch boundaries, changed operands, custom gradients, routing, graph/buffer lifetime, completed transfers and benchmark provenance. Routine PyTorch and standard-library behaviour is not tested separately.
+
+### Final verification for this update
+
+Final checks completed 2026-10-04T16:58:47.991152+00:00 UTC on exclusive allocation 7059372, node nid011170: 96 native tests and 26 Torch 2.10 inference tests passed without skips; 43 ctypes CUDA tests ran with three skips. CPU `make test`, style, byte-compilation and whitespace checks passed. Preflight kernel memory and synchronisation checks reported zero errors. The passing suite results from 16:44–16:45 UTC were retained by matching source and library identities when the model checks resumed.
+
+Complete Llama 3.1 70B BF16 and FP32 paired PyTorch/CAMBLAS verification used 128 prompt tokens, four generated tokens, one warm-up and one timed call per phase/mode. Transfer requests uploaded every parameter: 131.42 GiB for BF16 and 262.83 GiB for FP32. Full final-vocabulary logits, exact greedy tokens and changed token inputs passed; maximum logit errors were `0` and `3.71932983e-05` respectively, with the existing tolerances. These are verification cases; the preceding three-process Llama performance tables retain their earlier build identities. Slurm's default single-task step inherited only 112.30 GiB; explicitly requesting the allocated `--mem=460000` provided the 449.22 GiB needed for full CPU weight snapshots. Precision and transfer contracts were unchanged.
+
+A fresh four-rank DeepSeek pair also passed full-vocabulary bitwise equality, exact greedy tokens and changed inputs. The three-round performance results above use the same frozen source and binaries.
+
+The final 32768² FP64 native-transfer smoke uploads 16 GiB and downloads 8 GiB per call, including fresh logical pinned output allocation. PyTorch measured 2146.55 ms and CAMBLAS 1162.33 ms (1.847×). One fresh process used one warm-up and two timed calls; this does not replace a three-process performance study. All 1,073,741,824 output elements passed independent analytic checks before and after input changes, alongside 64 random CPU FP64 dot-product checks per backend.
+
+The final Torch 2.8 core is `a82c7296f52316c9176170658362075a99429780b7744b8be4822bc6e1a11ec3`; its binding is `7d086e485284f37da28275db212ee1a8d1dedfb8b8e6fabb65d642a8897ee561`. The separate Torch 2.10 DeepSeek binary identities are recorded above. Raw verification and benchmark records remain in ignored `build/cuda/deepseek_next_phase/`.

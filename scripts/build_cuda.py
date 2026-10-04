@@ -98,6 +98,8 @@ def main():
         ROOT / "src/cuda/attention_short.cuh",
         ROOT / "src/cuda/inference_fusion.cuh",
         ROOT / "src/cuda/decode_float.cuh",
+        ROOT / "src/cuda/quantized.cuh",
+        ROOT / "src/cuda/routing.cuh",
         ROOT / "src/cuda/strassen_four.cuh",
         ROOT / "src/cuda/bfloat16.cuh",
         ROOT / "include/camblas_cuda.h",

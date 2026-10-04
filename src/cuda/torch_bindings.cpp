@@ -9,6 +9,8 @@
 #include <c10/cuda/CUDAStream.h>
 #include <torch/csrc/autograd/custom_function.h>
 #include <torch/csrc/utils/pybind.h>
+#include <torch/version.h>
+#include <pybind11/stl.h>
 
 #include <algorithm>
 #include <array>
@@ -287,10 +289,240 @@ Tensor silu_multiply_public(const Tensor &gate, const Tensor &up)
     return result;
 }
 
-Tensor rms_norm_public(const Tensor &x, const Tensor &weight, double epsilon)
+Tensor swiglu_public(const Tensor &gate, const Tensor &up, const std::optional<Tensor> &routing,
+                     double limit)
+{
+    validate_fusion_inference(gate, gate);
+    validate_fusion_inference(up, gate);
+    require(gate.dim() >= 1 && gate.sizes() == up.sizes() && gate.size(-1) > 0 &&
+                gate.size(-1) <= INT_MAX && std::isfinite(limit) && limit >= 0 && limit <= FLT_MAX,
+            "Invalid SwiGLU shapes or clipping limit");
+    c10::cuda::CUDAGuard device(gate.device());
+    Tensor gc = gate.contiguous(), uc = up.contiguous(), rc;
+    if (routing) {
+        validate_fusion_inference(*routing, *routing);
+        require(routing->device() == gate.device() && routing->scalar_type() == at::kFloat,
+                "SwiGLU routing values must be FP32 on the input device");
+        auto shape = gate.sizes().vec();
+        shape.pop_back();
+        bool matching = routing->sizes().vec() == shape;
+        shape.push_back(1);
+        require(matching || routing->sizes().vec() == shape,
+                "SwiGLU routing requires one value per input row");
+        rc = routing->contiguous();
+    }
+    Tensor result = at::empty(gate.sizes(), gate.options());
+    auto *context = get_context(gate.get_device(), default_algorithm);
+    check(camblas_cuda_swiglu(context, gate.scalar_type() == at::kFloat ? 0 : 2, gate.numel(),
+                              int(gate.size(-1)), float(limit), gc.const_data_ptr(),
+                              uc.const_data_ptr(), routing ? rc.const_data_ptr<float>() : nullptr,
+                              result.mutable_data_ptr()),
+          context);
+    return result;
+}
+
+Tensor quantized_matmul_public(const Tensor &x, const Tensor &x_scale, const Tensor &weight,
+                               const Tensor &weight_scale, int activation_block)
+{
+    check_process();
+    require(x.is_cuda() && x.scalar_type() == at::ScalarType::Float8_e4m3fn,
+            "Quantized input must be CUDA FP8 E4M3");
+    bool packed = weight.scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
+    require(packed || weight.scalar_type() == at::ScalarType::Float8_e4m3fn,
+            "Quantized weight must be FP8 E4M3 or packed FP4 E2M1");
+    require(x_scale.scalar_type() == at::ScalarType::Float8_e8m0fnu &&
+                weight_scale.scalar_type() == at::ScalarType::Float8_e8m0fnu,
+            "Quantized scales must be E8M0");
+    for (const Tensor *tensor : {&x, &x_scale, &weight, &weight_scale}) {
+        require(tensor->device() == x.device() && tensor->is_contiguous(),
+                "Quantized operands must be contiguous and on the same CUDA device");
+        require(!c10::GradMode::is_enabled() || !tensor->requires_grad(),
+                "Quantized multiplication supports inference only");
+        for (int64_t size : tensor->sizes())
+            require(size <= INT_MAX, "LP64 dimension overflow");
+    }
+    require(x.dim() >= 1 && weight.dim() == 2 && x_scale.dim() == x.dim() &&
+                weight_scale.dim() == 2,
+            "Quantized matrix and scale ranks do not match");
+    int64_t inner = x.size(-1), outputs = weight.size(0), rows = 1;
+    require(inner >= 32 && inner % 32 == 0 && outputs >= 8 && outputs % 8 == 0 &&
+                weight.size(1) == inner / (packed ? 2 : 1) &&
+                (activation_block == 32 || (packed && activation_block == 128)) &&
+                inner % activation_block == 0,
+            "Invalid quantized matrix dimensions or activation block");
+    for (int64_t index = 0; index + 1 < x.dim(); ++index) {
+        require(x_scale.size(index) == x.size(index), "Input scale shape mismatch");
+        require(rows <= 65535 / std::max<int64_t>(1, x.size(index)),
+                "Quantized multiplication supports at most 65535 rows");
+        rows *= x.size(index);
+    }
+    require(x_scale.size(-1) == inner / activation_block &&
+                weight_scale.size(0) == (packed ? outputs : (outputs + 31) / 32) &&
+                weight_scale.size(1) == inner / 32,
+            "Quantized scale shapes do not match their blocks");
+    c10::cuda::CUDAGuard device(x.device());
+    auto shape = x.sizes().vec();
+    shape.back() = outputs;
+    Tensor result = at::empty(shape, x.options().dtype(at::kBFloat16));
+    auto *context = get_context(x.get_device(), default_algorithm);
+    check(camblas_cuda_quantized_matmul(context, packed, int(rows), int(outputs), int(inner),
+                                        activation_block, x.const_data_ptr(),
+                                        x_scale.const_data_ptr(), weight.const_data_ptr(),
+                                        weight_scale.const_data_ptr(), result.mutable_data_ptr()),
+          context);
+    return result;
+}
+
+struct QuantizedGroups {
+    std::vector<Tensor> weights, scales;
+    std::vector<const void *> pointers;
+    Tensor metadata;
+    int outputs, inner;
+    bool packed, trainable = false;
+
+    QuantizedGroups(const std::vector<Tensor> &w, const std::vector<Tensor> &s)
+    {
+        check_process();
+        require(!w.empty() && w.size() <= 65535 && w.size() == s.size(),
+                "Supply matching non-empty weight and scale groups");
+        require(w[0].is_cuda() && w[0].dim() == 2, "Grouped weights must be CUDA matrices");
+        packed = w[0].scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
+        require(packed || w[0].scalar_type() == at::ScalarType::Float8_e4m3fn,
+                "Grouped weights require FP8 or packed FP4 storage");
+        require(w[0].size(0) >= 8 && w[0].size(0) <= INT_MAX && w[0].size(0) % 8 == 0 &&
+                    w[0].size(1) >= (packed ? 16 : 32) &&
+                    w[0].size(1) <= INT_MAX / (packed ? 2 : 1),
+                "Invalid grouped weight dimensions");
+        outputs = int(w[0].size(0));
+        inner = int(w[0].size(1)) * (packed ? 2 : 1);
+        require(inner % 32 == 0, "Grouped inner dimension must be a multiple of 32");
+        Tensor host = at::empty({int64_t(w.size()), 2},
+                                at::TensorOptions().device(at::kCPU).dtype(at::kLong));
+        int64_t *addresses = host.mutable_data_ptr<int64_t>();
+        for (size_t i = 0; i < w.size(); ++i) {
+            require(w[i].device() == w[0].device() && w[i].scalar_type() == w[0].scalar_type() &&
+                        w[i].sizes() == w[0].sizes() && w[i].is_contiguous() &&
+                        !(uintptr_t(w[i].const_data_ptr()) & (packed ? 1 : 3)) &&
+                        s[i].device() == w[0].device() &&
+                        s[i].scalar_type() == at::ScalarType::Float8_e8m0fnu && s[i].dim() == 2 &&
+                        s[i].size(0) == (packed ? outputs : (outputs + 31LL) / 32) &&
+                        s[i].size(1) == inner / 32 && s[i].is_contiguous(),
+                    "Grouped weight shapes, dtypes, devices or scales differ");
+            trainable |= w[i].requires_grad() || s[i].requires_grad();
+            weights.push_back(w[i].detach());
+            scales.push_back(s[i].detach());
+            pointers.push_back(w[i].const_data_ptr());
+            pointers.push_back(s[i].const_data_ptr());
+            addresses[i * 2] = int64_t(uintptr_t(pointers[i * 2]));
+            addresses[i * 2 + 1] = int64_t(uintptr_t(pointers[i * 2 + 1]));
+        }
+        c10::cuda::CUDAGuard guard(w[0].device());
+        metadata = host.to(w[0].device());
+    }
+
+    Tensor matmul(const Tensor &x, const Tensor &sx, const Tensor &active, const Tensor &counts,
+                  int activation_block)
+    {
+        check_process();
+        require(!c10::GradMode::is_enabled() || (!trainable && !x.requires_grad()),
+                "Grouped multiplication supports inference only");
+        require(x.device() == metadata.device() &&
+                    x.scalar_type() == at::ScalarType::Float8_e4m3fn && x.dim() == 3 &&
+                    x.size(0) <= 65535 && x.size(1) <= 65535 && x.size(2) == inner &&
+                    (activation_block == 32 || (packed && activation_block == 128)) &&
+                    inner % activation_block == 0,
+                "Invalid grouped input dimensions or activation block");
+        require(sx.device() == x.device() && sx.scalar_type() == at::ScalarType::Float8_e8m0fnu &&
+                    sx.dim() == 3 && sx.size(0) == x.size(0) && sx.size(1) == x.size(1) &&
+                    sx.size(2) == inner / activation_block,
+                "Grouped input scale shape or dtype mismatch");
+        for (const Tensor *index : {&active, &counts})
+            require(index->device() == x.device() && index->scalar_type() == at::kInt &&
+                        index->dim() == 1 && index->numel() == x.size(0),
+                    "Grouped indices/counts require one CUDA int32 value per group");
+        for (const Tensor *value : {&x, &sx, &active, &counts})
+            require(value->is_contiguous(), "Grouped operands must be contiguous");
+        for (size_t i = 0; i < weights.size(); ++i)
+            require(weights[i].const_data_ptr() == pointers[i * 2] &&
+                        scales[i].const_data_ptr() == pointers[i * 2 + 1],
+                    "Captured weight storage changed; recreate the group");
+        c10::cuda::CUDAGuard guard(x.device());
+        Tensor result =
+            at::empty({x.size(0), x.size(1), outputs}, x.options().dtype(at::kBFloat16));
+        auto *context = get_context(x.get_device(), default_algorithm);
+        check(camblas_cuda_grouped_quantized_matmul(
+                  context, packed, int(x.size(0)), int(weights.size()), int(x.size(1)), outputs,
+                  inner, activation_block, x.const_data_ptr(), sx.const_data_ptr(),
+                  metadata.const_data_ptr(), active.const_data_ptr(), counts.const_data_ptr(),
+                  result.mutable_data_ptr()),
+              context);
+        return result;
+    }
+};
+
+std::tuple<Tensor, Tensor, Tensor> route_groups_public(const Tensor &experts, const Tensor &active,
+                                                       int first_expert, int rows)
+{
+    check_process();
+    require(experts.is_cuda() && experts.scalar_type() == at::kLong && experts.dim() == 2 &&
+                experts.is_contiguous() && experts.size(0) <= INT_MAX && experts.size(1) >= 1 &&
+                experts.size(1) <= 64 && experts.numel() <= INT_MAX &&
+                active.device() == experts.device() && active.scalar_type() == at::kInt &&
+                active.dim() == 1 && active.is_contiguous() && active.numel() >= 1 &&
+                active.numel() <= 65535 && rows >= 1 && rows <= 65535 &&
+                active.numel() * rows <= INT_MAX && first_expert >= 0,
+            "Invalid expert routing dimensions, indices or devices");
+    c10::cuda::CUDAGuard guard(experts.device());
+    auto options = active.options();
+    Tensor counts = at::empty({active.numel()}, options);
+    Tensor slots = at::empty({active.numel(), rows}, options);
+    Tensor reverse = at::empty(experts.sizes(), options);
+    auto *context = get_context(experts.get_device(), default_algorithm);
+    check(camblas_cuda_route_groups(
+              context, int(experts.size(0)), int(experts.size(1)), first_expert,
+              int(active.numel()), rows, experts.const_data_ptr(), active.const_data_ptr(),
+              counts.mutable_data_ptr(), slots.mutable_data_ptr(), reverse.mutable_data_ptr()),
+          context);
+    return std::make_tuple(slots, reverse, counts);
+}
+
+Tensor reduce_groups_public(const Tensor &input, const Tensor &experts, const Tensor &reverse)
+{
+    check_process();
+    require(input.is_cuda() && input.scalar_type() == at::kBFloat16 && input.dim() == 3 &&
+                input.is_contiguous() && input.size(0) * input.size(1) <= INT_MAX &&
+                input.size(2) >= 1 && input.size(2) <= INT_MAX &&
+                experts.device() == input.device() && experts.scalar_type() == at::kLong &&
+                experts.dim() == 2 && experts.is_contiguous() && experts.size(0) <= INT_MAX &&
+                experts.size(1) >= 1 && experts.size(1) <= 64 && experts.numel() <= INT_MAX &&
+                reverse.device() == input.device() && reverse.scalar_type() == at::kInt &&
+                reverse.sizes() == experts.sizes() && reverse.is_contiguous() &&
+                (!c10::GradMode::is_enabled() || !input.requires_grad()),
+            "Invalid grouped reduction shapes, types, devices or gradients");
+    c10::cuda::CUDAGuard guard(input.device());
+    Tensor result = at::empty({experts.size(0), input.size(2)}, input.options().dtype(at::kFloat));
+    auto *context = get_context(input.get_device(), default_algorithm);
+    check(camblas_cuda_reduce_groups(context, int(experts.size(0)), int(experts.size(1)),
+                                     int(input.size(2)), int(input.size(0) * input.size(1)),
+                                     experts.const_data_ptr(), reverse.const_data_ptr(),
+                                     input.const_data_ptr(), result.mutable_data_ptr()),
+          context);
+    return result;
+}
+
+Tensor rms_norm_public(const Tensor &x, const Tensor &weight, double epsilon,
+                       bool round_before_weight = true)
 {
     validate_fusion_inference(x, x);
-    validate_fusion_inference(weight, x);
+    if (round_before_weight)
+        validate_fusion_inference(weight, x);
+    else {
+        validate_fusion_inference(weight, weight);
+        require(weight.device() == x.device() &&
+                    (weight.scalar_type() == x.scalar_type() ||
+                     (x.scalar_type() == at::kBFloat16 && weight.scalar_type() == at::kFloat)),
+                "Final-round RMS weight must match input dtype or use FP32 with BF16 input");
+    }
     require(x.dim() >= 1 && weight.dim() == 1 && x.size(-1) == weight.size(0),
             "RMS norm weight must match the input's last dimension");
     require(std::isfinite(epsilon) && epsilon >= 0 && epsilon <= FLT_MAX,
@@ -303,11 +535,28 @@ Tensor rms_norm_public(const Tensor &x, const Tensor &weight, double epsilon)
     }
     c10::cuda::CUDAGuard device(x.device());
     Tensor xc = x.contiguous(), wc = weight.contiguous();
-    Tensor result = at::empty(x.sizes(), x.options());
     auto *context = get_context(x.get_device(), default_algorithm);
-    if (x.scalar_type() == at::kBFloat16 && x.numel() &&
-        !(rows == 1 && weight.size(0) >= 2048 && weight.size(0) <= 65536 &&
-          weight.size(0) % 4 == 0)) {
+    constexpr bool known_reduction =
+        TORCH_VERSION_MAJOR == 2 && (TORCH_VERSION_MINOR == 8 || TORCH_VERSION_MINOR == 10);
+    constexpr bool descending = TORCH_VERSION_MAJOR == 2 && TORCH_VERSION_MINOR == 10;
+    if (known_reduction && rows == 1 && weight.size(0) >= 2048 && weight.size(0) <= 65536 &&
+        weight.size(0) % 4 == 0) {
+        Tensor result = at::empty(x.sizes(), x.options());
+        check(camblas_cuda_rms_norm_decode(context, x.scalar_type() == at::kFloat ? 0 : 2,
+                                           weight.scalar_type() == at::kFloat ? 0 : 2,
+                                           int(weight.size(0)), float(epsilon), round_before_weight,
+                                           descending, xc.const_data_ptr(), wc.const_data_ptr(),
+                                           result.mutable_data_ptr()),
+              context);
+        return result;
+    }
+    if (!round_before_weight) {
+        Tensor values = xc.to(at::kFloat);
+        Tensor scale = values.pow(2).mean(at::IntArrayRef{-1}, true).add(epsilon).rsqrt();
+        return values.mul(scale).mul(wc.to(at::kFloat)).to(x.scalar_type());
+    }
+    Tensor result = at::empty(x.sizes(), x.options());
+    if (x.scalar_type() == at::kBFloat16 && x.numel()) {
         // Preserve the reference's reduction order: changing it can move BF16
         // rounding boundaries and accumulate logit drift across 80 layers.
         Tensor squares = at::empty(x.sizes(), x.options().dtype(at::kFloat));
@@ -339,7 +588,8 @@ std::tuple<Tensor, Tensor> add_rms_norm_public(const Tensor &x, const Tensor &re
             "Residual RMS dimensions must match");
     require(std::isfinite(epsilon) && epsilon >= 0 && epsilon <= FLT_MAX, "Invalid RMS epsilon");
     int64_t width = weight.size(0);
-    if (x.numel() != width || width < 2048 || width > 65536 || width % 4) {
+    if (x.numel() != width || width < 2048 || width > 65536 || width % 4 ||
+        TORCH_VERSION_MAJOR != 2 || TORCH_VERSION_MINOR != 8) {
         Tensor added = x.add(residual);
         return std::make_tuple(added, rms_norm_public(added, weight, epsilon));
     }
@@ -731,17 +981,39 @@ struct HostCompletion {
     }
 };
 
-Tensor transfer_result(const Tensor &value, const std::string &memory)
+Tensor upload_transfer(const Tensor &value, c10::Device device)
+{
+    if (!value.is_non_overlapping_and_dense())
+        return value.to(device);
+    Tensor output = at::empty_strided(value.sizes(), value.strides(),
+                                      value.options().device(device).pinned_memory(false));
+    if (value.numel()) {
+        cudaError_t error = cudaMemcpyAsync(output.mutable_data_ptr(), value.const_data_ptr(),
+                                            value.nbytes(), cudaMemcpyHostToDevice,
+                                            c10::cuda::getCurrentCUDAStream(device.index()));
+        if (error != cudaSuccess)
+            throw std::runtime_error(cudaGetErrorString(error));
+    }
+    return output;
+}
+
+Tensor transfer_result(const Tensor &value, const std::string &memory, HostCompletion &completion)
 {
     require(memory == "pageable" || memory == "prefault" || memory == "pinned",
             "Unknown CPU output allocation policy");
-    if (memory == "pageable")
-        return value.to(at::kCPU);
     Tensor output = at::empty(value.sizes(),
                               value.options().device(at::kCPU).pinned_memory(memory == "pinned"));
     if (memory == "prefault")
         output.zero_();
-    output.copy_(value);
+    if (value.numel()) {
+        // Every transfer operation produces a fresh contiguous CUDA result.
+        cudaError_t error =
+            cudaMemcpyAsync(output.mutable_data_ptr(), value.const_data_ptr(), value.nbytes(),
+                            cudaMemcpyDeviceToHost, completion.stream);
+        if (error != cudaSuccess)
+            throw std::runtime_error(cudaGetErrorString(error));
+    }
+    completion.finish();
     return output;
 }
 
@@ -769,9 +1041,11 @@ Tensor matmul_transfer(const Tensor &a, const Tensor &b, int device, const std::
             "matmul requires compatible rank-two operands");
     c10::cuda::CUDAGuard guard(device);
     validate_transfer_stream();
-    Tensor ac = a.to(c10::Device(c10::kCUDA, device));
-    Tensor bc = b.to(c10::Device(c10::kCUDA, device));
-    return transfer_result(matmul_public(ac, bc, std::nullopt, 1., 0., algorithm), memory);
+    HostCompletion completion(device);
+    Tensor ac = upload_transfer(a, c10::Device(c10::kCUDA, device));
+    Tensor bc = upload_transfer(b, c10::Device(c10::kCUDA, device));
+    return transfer_result(matmul_public(ac, bc, std::nullopt, 1., 0., algorithm), memory,
+                           completion);
 }
 
 Tensor gram_transfer(const Tensor &a, int device, const std::string &memory, int algorithm)
@@ -780,8 +1054,10 @@ Tensor gram_transfer(const Tensor &a, int device, const std::string &memory, int
     require(a.dim() == 2, "Gram requires a rank-two operand");
     c10::cuda::CUDAGuard guard(device);
     validate_transfer_stream();
-    Tensor ac = a.to(c10::Device(c10::kCUDA, device));
-    return transfer_result(matmul_public(ac.t(), ac, std::nullopt, 1., 0., algorithm), memory);
+    HostCompletion completion(device);
+    Tensor ac = upload_transfer(a, c10::Device(c10::kCUDA, device));
+    return transfer_result(matmul_public(ac.t(), ac, std::nullopt, 1., 0., algorithm), memory,
+                           completion);
 }
 
 Tensor mlp_transfer(const Tensor &x, const Tensor &w1, const Tensor &b1, const Tensor &w2,
@@ -791,14 +1067,15 @@ Tensor mlp_transfer(const Tensor &x, const Tensor &w1, const Tensor &b1, const T
         validate_transfer(value, x);
     c10::cuda::CUDAGuard guard(device);
     validate_transfer_stream();
+    HostCompletion completion(device);
     c10::Device target(c10::kCUDA, device);
     std::array<Tensor, 5> uploaded;
     int index = 0;
     for (const Tensor &value : {x, w1, b1, w2, b2})
-        uploaded[index++] = value.to(target);
+        uploaded[index++] = upload_transfer(value, target);
     return transfer_result(
         mlp_public(uploaded[0], uploaded[1], uploaded[2], uploaded[3], uploaded[4], algorithm),
-        memory);
+        memory, completion);
 }
 
 Tensor attention_transfer(const Tensor &q, const Tensor &k, const Tensor &v,
@@ -809,9 +1086,11 @@ Tensor attention_transfer(const Tensor &q, const Tensor &k, const Tensor &v,
         validate_transfer(value, q);
     c10::cuda::CUDAGuard guard(device);
     validate_transfer_stream();
+    HostCompletion completion(device);
     c10::Device target(c10::kCUDA, device);
-    Tensor qc = q.to(target), kc = k.to(target), vc = v.to(target);
-    return transfer_result(attention_public(qc, kc, vc, scale, algorithm), memory);
+    Tensor qc = upload_transfer(q, target), kc = upload_transfer(k, target),
+           vc = upload_transfer(v, target);
+    return transfer_result(attention_public(qc, kc, vc, scale, algorithm), memory, completion);
 }
 
 Tensor matmul_host(const Tensor &a, const Tensor &b, const std::optional<Tensor> &output,
@@ -930,6 +1209,26 @@ void close_all()
 
 PYBIND11_MODULE(_camblas_cuda_torch, module)
 {
+    module.attr("quantized_tile_rows") = 16;
+    py::class_<QuantizedGroups>(
+        module, "QuantizedGroups",
+        "Capture CUDA quantized weight storages and retain their lifetimes. In-place value "
+        "updates are visible; recreate the group after storage relocation. Keep the object "
+        "alive while its captured graphs may replay.")
+        .def(py::init<const std::vector<Tensor> &, const std::vector<Tensor> &>(),
+             py::arg("weights"), py::arg("scales"))
+        .def("matmul", &QuantizedGroups::matmul, py::arg("input"), py::arg("input_scale"),
+             py::arg("active"), py::arg("counts"), py::kw_only(), py::arg("activation_block") = 32,
+             "Multiply [groups,rows,inner] FP8 input with selected captured weights. Invalid "
+             "active indices and padding return zero; counts clip to [0,rows]. Inference only.");
+    module.def("route_groups", &route_groups_public, py::arg("experts"), py::arg("active"),
+               py::kw_only(), py::arg("first_expert") = 0, py::arg("rows"),
+               "Return slots, reverse mapping and counts for expert/choice IDs. Excess rows "
+               "are discarded and unassigned slots are -1; execution uses the active stream.");
+    module.def("reduce_groups", &reduce_groups_public, py::arg("input"), py::arg("experts"),
+               py::arg("reverse"),
+               "Sum BF16 contributions into FP32 in expert/choice order. "
+               "Invalid IDs/rows are ignored; requires inference and contiguous CUDA tensors.");
     module.def("matmul", &matmul);
     module.def("matmul_public", &matmul_public, py::arg("a"), py::arg("b"), py::kw_only(),
                py::arg("out") = py::none(), py::arg("alpha") = 1., py::arg("beta") = 0.,
@@ -960,11 +1259,22 @@ PYBIND11_MODULE(_camblas_cuda_torch, module)
                "Upload every attention operand and return fresh CPU output synchronously.");
     module.def("silu_multiply", &silu_multiply_public, py::arg("gate"), py::arg("up"),
                "Compute SiLU(gate)*up with storage rounding, for inference.");
+    module.def("swiglu", &swiglu_public, py::arg("gate"), py::arg("up"), py::kw_only(),
+               py::arg("routing") = py::none(), py::arg("limit") = 0.,
+               "Compute SiLU(gate)*up in FP32 with final storage rounding. Positive limit "
+               "clips gate above and up on both sides; optional FP32 routing scales each row.");
+    module.def("quantized_matmul", &quantized_matmul_public, py::arg("input"),
+               py::arg("input_scale"), py::arg("weight"), py::arg("weight_scale"), py::kw_only(),
+               py::arg("activation_block") = 32,
+               "Multiply block-scaled FP8 input by FP8 or packed FP4 weights, returning BF16. "
+               "Requires contiguous CUDA operands, E8M0 scales and an SM90+ binary.");
     module.def("add_rms_norm", &add_rms_norm_public, py::arg("x"), py::arg("residual"),
                py::arg("weight"), py::arg("epsilon") = 1e-6,
                "Return fresh residual sum and RMS-normalised output.");
     module.def("rms_norm", &rms_norm_public, py::arg("input"), py::arg("weight"),
-               py::arg("epsilon") = 1e-6, "Apply RMS normalisation with FP32 arithmetic.");
+               py::arg("epsilon") = 1e-6, py::kw_only(), py::arg("round_before_weight") = true,
+               "Apply RMS normalisation in FP32. Set round_before_weight=False to multiply "
+               "by BF16/FP32 weight before the final storage conversion.");
     module.def("gated_mlp", &gated_mlp_public, py::arg("input"), py::arg("gate_weight"),
                py::arg("up_weight"), py::arg("down_weight"), py::kw_only(),
                py::arg("algorithm") = -1, "Apply a bias-free SiLU gated MLP for inference.");

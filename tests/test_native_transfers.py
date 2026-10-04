@@ -91,6 +91,22 @@ class NativeTransferTests(unittest.TestCase):
                 self.check(output, x @ w, True)
             self.assertEqual(torch.cuda.current_device(), original_device)
 
+    def test_dense_transposes_and_padded_cpu_views(self):
+        """Preserve dense transpose storage and materialise irregular input strides."""
+        storage = torch.randn((13, 34), dtype=torch.float64) / 4
+        for x in (storage.T, storage[:, ::2], storage[::2, 1:]):
+            weight = torch.randn((x.size(1), 11), dtype=x.dtype) / 4
+            for memory in ("pageable", "prefault", "pinned"):
+                for changed in (False, True):
+                    if changed:
+                        x.mul_(-0.5).add_(0.125)
+                        weight.add_(0.25)
+                    self.check(
+                        self.binding.matmul_transfer(x, weight, output_memory=memory),
+                        x @ weight,
+                        memory == "pinned",
+                    )
+
     def test_empty_and_invalid_arguments(self):
         """Check zero inner dimensions and reject incompatible arguments."""
         x = torch.empty((13, 0), dtype=torch.float64)
@@ -117,6 +133,27 @@ class NativeTransferTests(unittest.TestCase):
             self.binding.matmul_transfer(x.requires_grad_(), w)
         with self.assertRaises((ValueError, RuntimeError)):
             self.binding.matmul_transfer(x.detach().cuda(), w)
+
+    def test_cpu_input_reuse_after_empty_results_and_errors(self):
+        """Complete queued CPU reads even when the output is empty or validation fails late."""
+        for pinned in (False, True):
+            x = torch.ones((1, 512), dtype=torch.float64, pin_memory=pinned)
+            weight = torch.ones((512, 2048), dtype=torch.float64, pin_memory=pinned)
+            stream = torch.cuda.Stream()
+            with torch.cuda.stream(stream):
+                output = self.binding.matmul_transfer(x, weight)
+                self.assertTrue(stream.query())
+                weight.fill_(2)
+                self.check(
+                    output, torch.full((1, 2048), 512, dtype=torch.float64), True
+                )
+                empty = self.binding.matmul_transfer(x[:0], weight)
+                self.assertEqual(empty.shape, (0, 2048))
+                self.assertTrue(stream.query())
+                with self.assertRaises(ValueError):
+                    self.binding.matmul_transfer(x, weight, output_memory="invalid")
+                self.assertTrue(stream.query())
+                weight.fill_(-3)
 
 
 if __name__ == "__main__":
