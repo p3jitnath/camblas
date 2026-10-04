@@ -95,6 +95,8 @@ def main():
     sources = [
         source,
         ROOT / "src/cuda/fusion.cuh",
+        ROOT / "src/cuda/attention_short.cuh",
+        ROOT / "src/cuda/strassen_four.cuh",
         ROOT / "include/camblas_cuda.h",
         Path(__file__).resolve(),
     ]
@@ -125,6 +127,7 @@ def main():
             str(ROOT / "include"),
         ]:
             binding_command.append("-I" + path)
+        binding_command.append("-Wl,-rpath,$ORIGIN")
         for path in library_paths() + [str(output), str(cuda_root / "lib64")]:
             binding_command.extend(["-L" + path, "-Wl,-rpath," + path])
         binding_command.extend(

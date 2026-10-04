@@ -23,10 +23,25 @@ def main():
             "square1024",
             "square4096",
             "square8192",
+            "square12288",
+            "square16384",
+            "square24576",
+            "square32768",
             "transpose",
             "gram",
             "mlp",
             "attention",
+            "attention32",
+            "attention64",
+            "attention256",
+            "attention512",
+            "attention2048",
+            "attention4096",
+            "attention8192",
+            "attention64x1024",
+            "attention1024x64",
+            "attention64x32",
+            "attention1024x32",
             "backward",
         ],
     )
@@ -62,7 +77,16 @@ def main():
     parser.add_argument(
         "--algorithm",
         default="auto",
-        choices=["auto", "classical", "lt", "strassen", "strassen2", "symmetric"],
+        choices=[
+            "auto",
+            "classical",
+            "lt",
+            "strassen",
+            "strassen2",
+            "strassen3",
+            "strassen4",
+            "symmetric",
+        ],
     )
     args = parser.parse_args()
     if args.host_access and (args.engine != "camblas" or args.workload == "backward"):
@@ -133,8 +157,12 @@ def main():
         array((4096, 1024), 4096**-0.5, gradient)
         array((1024,), 0.01, gradient)
     else:
-        for _ in range(3):
-            array((1024, 256), 256**-0.5)
+        dimensions = args.workload.removeprefix("attention") or "1024"
+        queries, _, keys = dimensions.partition("x")
+        queries, keys = int(queries), int(keys or queries)
+        array((queries, 256), 256**-0.5)
+        array((keys, 256), 256**-0.5)
+        array((keys, 256), 256**-0.5)
 
     # Dedicated linear APIs normally own contiguous [outputs, inputs] weights.
     # Preserve the mathematical arrays while storing those transposes densely.
@@ -313,6 +341,9 @@ def main():
             output = call()
         torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats()
+        free_after_warmup, total_device_bytes = torch.cuda.mem_get_info()
+        reserved_after_warmup = torch.cuda.memory_reserved()
+        allocated_after_warmup = torch.cuda.memory_allocated()
         seconds = []
         for _ in range(args.repetitions):
             torch.cuda.synchronize()
@@ -323,7 +354,20 @@ def main():
         measurements[mode] = dict(
             seconds=seconds,
             outputs=[signature(value) for value in output],
+            output_layouts=[
+                dict(
+                    shape=list(value.shape),
+                    stride=list(value.stride()),
+                    dtype=str(value.dtype),
+                    device=str(value.device),
+                )
+                for value in output
+            ],
             peak_allocated_bytes=torch.cuda.max_memory_allocated(),
+            device_free_bytes_after_warmup=free_after_warmup,
+            device_total_bytes=total_device_bytes,
+            torch_reserved_bytes_after_warmup=reserved_after_warmup,
+            torch_allocated_bytes_after_warmup=allocated_after_warmup,
             input_transfer_bytes=sum(x.numel() * x.element_size() for x in host_inputs)
             if mode == "transfer"
             else 0,

@@ -16,7 +16,9 @@ enum camblas_cuda_algorithm {
     CAMBLAS_CUDA_STRASSEN = 2,
     CAMBLAS_CUDA_LT = 3,
     CAMBLAS_CUDA_SYMMETRIC = 4,
-    CAMBLAS_CUDA_STRASSEN_TWO = 5
+    CAMBLAS_CUDA_STRASSEN_TWO = 5,
+    CAMBLAS_CUDA_STRASSEN_THREE = 6,
+    CAMBLAS_CUDA_STRASSEN_FOUR = 7
 };
 
 /*
@@ -29,7 +31,8 @@ enum camblas_cuda_algorithm {
  * Warm up scratch-using operations before graph capture. Replay on the context
  * stream, or explicitly serialise replay with all context work. Captured scratch
  * addresses survive later growth until context destruction; destroy graphs before
- * their context. Low-memory Strassen scratch allocation falls back to classical GEMM.
+ * their context. Low-memory third-level scratch allocation tries two levels, then classical GEMM.
+ * Four-level scratch allocation failure falls back to classical GEMM.
  * Return codes: 0 success; negative failure, described by camblas_cuda_error().
  */
 int camblas_cuda_create(int device, void *stream, camblas_cuda_context **out);

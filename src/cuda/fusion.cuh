@@ -59,6 +59,39 @@ template <typename T> __global__ void softmax_rows(T *scores, int columns, T sca
         row[column] /= sum;
 }
 
+/* Retain modest score rows in registers between the two reductions. This
+ * removes the intermediate exponential write and final score reread. */
+template <typename T, int Items>
+__global__ void softmax_rows_cached(T *scores, int columns, T scale)
+{
+    __shared__ T shared[8];
+    T *row = scores + size_t(blockIdx.x) * columns;
+    T values[Items], maximum = -T(CUDART_INF_F);
+#pragma unroll
+    for (int item = 0; item < Items; ++item) {
+        int column = int(threadIdx.x) + item * 256;
+        values[item] = column < columns ? row[column] * scale : -T(CUDART_INF_F);
+        maximum = fmax(maximum, values[item]);
+    }
+    maximum = block_reduce<T, true>(maximum, shared);
+    T sum = 0;
+#pragma unroll
+    for (int item = 0; item < Items; ++item) {
+        int column = int(threadIdx.x) + item * 256;
+        values[item] = column < columns ? exponential(values[item] - maximum) : T(0);
+        sum += values[item];
+    }
+    sum = block_reduce<T, false>(sum, shared);
+#pragma unroll
+    for (int item = 0; item < Items; ++item) {
+        int column = int(threadIdx.x) + item * 256;
+        if (column < columns)
+            row[column] = values[item] / sum;
+    }
+}
+
+#include "attention_short.cuh"
+
 template <typename T>
 int attention(camblas_cuda_context *context, int queries, int keys, int depth, int values, T scale,
               const T *q, const T *k, const T *v, T *output)
@@ -73,6 +106,27 @@ int attention(camblas_cuda_context *context, int queries, int keys, int depth, i
     if (keys > 0 && size_t(queries) > std::numeric_limits<size_t>::max() / sizeof(T) / size_t(keys))
         return fail(context, "attention scratch size overflow", 2);
     context->counts[6]++;
+    if constexpr (std::is_same_v<T, double>) {
+        if (context->short_attention_supported && context->algorithm == CAMBLAS_CUDA_AUTO &&
+            depth == 256 && values == 256 && queries <= 1024 && queries % 8 == 0 && keys > 0 &&
+            keys <= 64 && keys % 32 == 0) {
+            uintptr_t destination = reinterpret_cast<uintptr_t>(output);
+            size_t destination_bytes = size_t(queries) * values * sizeof(T);
+            auto overlaps = [&](const T *pointer, size_t bytes) {
+                uintptr_t source = reinterpret_cast<uintptr_t>(pointer);
+                return destination >= source ? destination - source < bytes
+                                             : source - destination < destination_bytes;
+            };
+            if (!overlaps(q, size_t(queries) * depth * sizeof(T)) &&
+                !overlaps(k, size_t(keys) * depth * sizeof(T)) &&
+                !overlaps(v, size_t(keys) * values * sizeof(T))) {
+                attention_short_fp64<<<queries / 8, 256, short_attention_shared_bytes,
+                                       context->stream>>>(q, k, v, keys, scale, output);
+                cudaError_t error = cudaGetLastError();
+                return error == cudaSuccess ? 0 : fail(context, "short attention", error);
+            }
+        }
+    }
     int status = reserve_scratch(context, size_t(queries) * keys * sizeof(T));
     if (status)
         return status;
@@ -82,7 +136,18 @@ int attention(camblas_cuda_context *context, int queries, int keys, int depth, i
     if (status)
         return status;
     if (keys > 0) {
-        softmax_rows<<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        if (keys <= 256)
+            softmax_rows_cached<T, 1><<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        else if (keys <= 512)
+            softmax_rows_cached<T, 2><<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        else if (keys <= 1024)
+            softmax_rows_cached<T, 4><<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        else if (keys <= 2048)
+            softmax_rows_cached<T, 8><<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        else if (keys <= 4096)
+            softmax_rows_cached<T, 16><<<queries, 256, 0, context->stream>>>(scores, keys, scale);
+        else
+            softmax_rows<<<queries, 256, 0, context->stream>>>(scores, keys, scale);
         cudaError_t error = cudaGetLastError();
         if (error != cudaSuccess)
             return fail(context, "attention softmax", error);

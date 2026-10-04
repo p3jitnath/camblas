@@ -21,6 +21,8 @@ _ALGORITHMS = {
     "lt": 3,
     "symmetric": 4,
     "strassen2": 5,
+    "strassen3": 6,
+    "strassen4": 7,
 }
 _COUNTERS = (
     "classical",
@@ -37,15 +39,20 @@ _COUNTERS = (
 @lru_cache(maxsize=1)
 def tensor_module():
     """Load the optional native tensor binding to minimise host call overhead."""
-    directory = Path(
-        os.environ.get(
-            "CAMBLAS_CUDA_LIBRARY",
-            Path(__file__).resolve().parents[1] / "build/cuda/libcamblas_cuda.so",
-        )
-    ).parent
+    override = os.environ.get("CAMBLAS_CUDA_LIBRARY")
+    core = Path(
+        override
+        or Path(__file__).resolve().parents[1] / "build/cuda/libcamblas_cuda.so"
+    )
+    directory = core.parent
     candidates = list(directory.glob("_camblas_cuda_torch*.so"))
     if not candidates:
         return None
+    if override:
+        # Honour the requested core even when a copied binding retains the
+        # build directory's RUNPATH. Fresh control processes must load the
+        # control's SONAME before resolving the tensor binding's dependency.
+        ct.CDLL(str(core), mode=ct.RTLD_GLOBAL)
     spec = importlib.util.spec_from_file_location("_camblas_cuda_torch", candidates[0])
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

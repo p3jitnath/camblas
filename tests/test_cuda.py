@@ -149,6 +149,37 @@ for dtype in (torch.float32, torch.float64):
     with cb.algorithm('strassen'):
         cb.matmul(a, b, out=output)
     torch.testing.assert_close(output, reference, rtol=1e-5, atol=2e-6)
+    cb.stats(reset=True)
+    injector.camblas_test_fail_next_allocation()
+    with cb.algorithm('strassen3'):
+        cb.matmul(a, b, out=output)
+    torch.cuda.synchronize()
+    assert injector.camblas_test_allocation_pending() == 0
+    counts = cb.stats()
+    assert counts['guard_fallback'] == 1 and counts['strassen'] == 1, counts
+    assert counts['classical'] == 0, counts
+    torch.testing.assert_close(output, reference, rtol=1e-5, atol=2e-6)
+    with cb.algorithm('strassen3'):
+        cb.matmul(a, b, out=output)
+    torch.testing.assert_close(output, reference, rtol=1e-5, atol=2e-6)
+    _native.close()
+    # Four levels need less storage than the earlier arenas. Start a new
+    # context so the injected failure reaches its first scratch allocation.
+    with cb.algorithm('classical'):
+        cb.matmul(a, b, out=output)
+    cb.stats(reset=True)
+    injector.camblas_test_fail_next_allocation()
+    with cb.algorithm('strassen4'):
+        cb.matmul(a, b, out=output)
+    torch.cuda.synchronize()
+    assert injector.camblas_test_allocation_pending() == 0
+    counts = cb.stats()
+    assert counts['guard_fallback'] == 1 and counts['classical'] == 1, counts
+    assert counts['strassen'] == 0, counts
+    torch.testing.assert_close(output, reference)
+    with cb.algorithm('strassen4'):
+        cb.matmul(a, b, out=output)
+    torch.testing.assert_close(output, reference, rtol=1e-5, atol=2e-6)
     _native.close()
 """
         with tempfile.TemporaryDirectory(prefix="camblas-cuda-oom-") as directory:
@@ -211,7 +242,15 @@ for dtype in (torch.float32, torch.float64):
         bound = size * epsilon / (1 - size * epsilon)
         tf32_error = (expected - size).abs() / magnitude
         self.assertGreater(tf32_error.max().item(), 10 * bound)
-        for policy in ("classical", "lt", "auto", "strassen", "strassen2"):
+        for policy in (
+            "classical",
+            "lt",
+            "auto",
+            "strassen",
+            "strassen2",
+            "strassen3",
+            "strassen4",
+        ):
             with cb.algorithm(policy):
                 actual = cb.matmul(a, b).double().cpu()
             error = (actual - expected).abs() / magnitude
@@ -325,6 +364,63 @@ for dtype in (torch.float32, torch.float64):
                     expected = torch.relu(expected)
                 self.assert_close(cb.affine(x, w1, b1, relu=relu), expected)
 
+    def test_affine_epilogue_inputs_and_exceptional_values(self):
+        """Check bias/ReLU plans against CPU doubles after inputs and policies change."""
+        for dtype in (torch.float32, torch.float64):
+            for rows, inner, columns in ((1, 17, 23), (13, 17, 1), (13, 17, 23)):
+                x = torch.randn((rows, inner), dtype=dtype) * 0.1
+                weight = torch.randn((inner, columns), dtype=dtype) * 0.1
+                bias = torch.randn((columns,), dtype=dtype) * 0.1
+                for policy in ("auto", "lt", "classical"):
+                    with cb.algorithm(policy):
+                        for relu in (False, True, False):
+                            for changed in (False, True):
+                                actual_x = x + (0.03 if changed else 0)
+                                actual_weight = weight * (0.7 if changed else 1)
+                                actual_bias = bias + (0.04 if changed else 0)
+                                expected = (
+                                    actual_x.double() @ actual_weight.double()
+                                    + actual_bias.double()
+                                )
+                                if relu:
+                                    expected = torch.relu(expected)
+                                self.assert_close(
+                                    cb.affine(
+                                        actual_x.cuda(),
+                                        actual_weight.cuda(),
+                                        actual_bias.cuda(),
+                                        relu=relu,
+                                    ).cpu(),
+                                    expected.to(dtype),
+                                )
+                        for value in (float("nan"), float("inf"), -float("inf")):
+                            for operand in ("x", "weight", "bias"):
+                                actual_x, actual_weight, actual_bias = (
+                                    tensor.clone() for tensor in (x, weight, bias)
+                                )
+                                target = {
+                                    "x": actual_x,
+                                    "weight": actual_weight,
+                                    "bias": actual_bias,
+                                }[operand]
+                                target.reshape(-1)[0] = value
+                                expected = (
+                                    actual_x.double() @ actual_weight.double()
+                                    + actual_bias.double()
+                                )
+                                for relu in (False, True):
+                                    self.assert_close(
+                                        cb.affine(
+                                            actual_x.cuda(),
+                                            actual_weight.cuda(),
+                                            actual_bias.cuda(),
+                                            relu=relu,
+                                        ).cpu(),
+                                        (torch.relu(expected) if relu else expected).to(
+                                            dtype
+                                        ),
+                                    )
+
     def test_gradcheck_and_gradgradcheck(self):
         """Check analytical matmul derivatives against finite differences."""
         a = torch.randn((3, 4), device="cuda", dtype=torch.float64, requires_grad=True)
@@ -367,6 +463,11 @@ for dtype in (torch.float32, torch.float64):
             self.assertEqual(torch.cuda.current_device(), original)
             with self.assertRaises(ValueError):
                 cb.matmul(a, b.to(f"cuda:{original}"))
+        host = [torch.randn((64, 256), dtype=torch.float64) / 16 for _ in range(3)]
+        expected = torch.softmax((host[0] @ host[1].T) / 16, -1) @ host[2]
+        inputs = [value.to(f"cuda:{other}") for value in host]
+        self.assert_close(cb.attention(*inputs).cpu(), expected)
+        self.assertEqual(torch.cuda.current_device(), original)
 
     def test_affine_higher_derivatives(self):
         """Preserve differentiable affine gradients away from the ReLU boundary."""
@@ -389,8 +490,8 @@ for dtype in (torch.float32, torch.float64):
             stream.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(stream):
                 q = torch.randn((17, 16), device="cuda", dtype=dtype)
-                k = torch.randn((23, 16), device="cuda", dtype=dtype)
-                v = torch.randn((23, 13), device="cuda", dtype=dtype)
+                k = torch.randn((513, 16), device="cuda", dtype=dtype)
+                v = torch.randn((513, 13), device="cuda", dtype=dtype)
                 for _ in range(3):
                     cb.attention(q, k, v)
             stream.synchronize()
@@ -400,8 +501,8 @@ for dtype in (torch.float32, torch.float64):
                 captured = cb.attention(q, k, v)
             with torch.cuda.stream(stream):
                 larger_q = torch.randn((129, 16), device="cuda", dtype=dtype)
-                larger_k = torch.randn((193, 16), device="cuda", dtype=dtype)
-                larger_v = torch.randn((193, 13), device="cuda", dtype=dtype)
+                larger_k = torch.randn((4097, 16), device="cuda", dtype=dtype)
+                larger_v = torch.randn((4097, 13), device="cuda", dtype=dtype)
                 cb.attention(larger_q, larger_k, larger_v)
                 for _ in range(3):
                     q.add_(0.1)
@@ -538,6 +639,13 @@ for dtype in (torch.float32, torch.float64):
             q.add_(0.1)
             expected = cb.attention(q.cuda(), k.cuda(), v.cuda(), scale=0.25).cpu()
             self.assert_close(module.attention_host(q, k, v, scale=0.25), expected)
+        q, k, v = [torch.randn((64, 256), dtype=torch.float64) / 16 for _ in range(3)]
+        expected = torch.softmax((q @ k.T) / 16, -1) @ v
+        self.assert_close(module.attention_host(q, k, v), expected)
+        q.add_(0.03)
+        v.mul_(0.7)
+        expected = torch.softmax((q @ k.T) / 16, -1) @ v
+        self.assert_close(module.attention_host(q, k, v), expected)
         with self.assertRaises(ValueError):
             module.matmul_host(a.requires_grad_(True), b)
 
@@ -564,6 +672,222 @@ for dtype in (torch.float32, torch.float64):
         v = torch.randn((5, 2), device="cuda", dtype=torch.float64, requires_grad=True)
         self.assertTrue(torch.autograd.gradcheck(cb.attention, (q, k, v)))
 
+    def test_attention_cached_row_boundaries(self):
+        """Compare complete attention outputs at register and loop-path boundaries."""
+        widths = (
+            1,
+            17,
+            255,
+            256,
+            257,
+            511,
+            512,
+            513,
+            1023,
+            1024,
+            1025,
+            2047,
+            2048,
+            2049,
+            4095,
+            4096,
+            4097,
+        )
+        for dtype in (torch.float32, torch.float64):
+            for keys in widths:
+                q = torch.randn((7, 17), dtype=dtype) * 0.1
+                k = torch.randn((keys, 17), dtype=dtype) * 0.1
+                v = torch.randn((keys, 23), dtype=dtype) * 0.1
+                for scale in (0.25, -0.5, 0, 256):
+                    expected = (
+                        torch.softmax((q.double() @ k.double().T) * scale, dim=-1)
+                        @ v.double()
+                    )
+                    self.assert_close(
+                        cb.attention(q.cuda(), k.cuda(), v.cuda(), scale=scale).cpu(),
+                        expected.to(dtype),
+                    )
+                q.add_(0.03)
+                v.mul_(0.7)
+                expected = (
+                    torch.softmax((q.double() @ k.double().T) * 0.25, dim=-1)
+                    @ v.double()
+                )
+                self.assert_close(
+                    cb.attention(q.cuda(), k.cuda(), v.cuda(), scale=0.25).cpu(),
+                    expected.to(dtype),
+                )
+                if keys in (257, 1025, 4096, 4097):
+                    q[0, 0] = float("nan")
+                    expected = (
+                        torch.softmax((q.double() @ k.double().T) * 0, dim=-1)
+                        @ v.double()
+                    )
+                    self.assert_close(
+                        cb.attention(q.cuda(), k.cuda(), v.cuda(), scale=0).cpu(),
+                        expected.to(dtype),
+                    )
+
+    def test_attention_short_fp64_oracle(self):
+        """Check complete CPU-double outputs, boundaries and exceptional short inputs."""
+        for queries, keys in (
+            (8, 32),
+            (24, 32),
+            (64, 64),
+            (1024, 64),
+            (9, 32),
+            (64, 31),
+            (64, 65),
+            (64, 128),
+        ):
+            host = [
+                torch.randn((rows, 256), dtype=torch.float64) / 16
+                for rows in (queries, keys, keys)
+            ]
+            inputs = [value.cuda() for value in host]
+            for scale in (0, 1 / 16, -0.25, 256):
+                expected = torch.softmax((host[0] @ host[1].T) * scale, -1) @ host[2]
+                self.assert_close(cb.attention(*inputs, scale=scale).cpu(), expected)
+            inputs[0].add_(0.03)
+            inputs[1].mul_(0.7)
+            inputs[2].sub_(0.01)
+            host = [value.cpu() for value in inputs]
+            expected = torch.softmax((host[0] @ host[1].T) / 16, -1) @ host[2]
+            self.assert_close(cb.attention(*inputs).cpu(), expected)
+            if (queries, keys) == (64, 64):
+                for index, value, scale in (
+                    (0, float("nan"), 0),
+                    (1, float("inf"), 1 / 16),
+                    (2, float("nan"), 1 / 16),
+                    (2, float("inf"), 1 / 16),
+                ):
+                    exceptional = [item.clone() for item in host]
+                    exceptional[index][0, 0] = value
+                    expected = (
+                        torch.softmax((exceptional[0] @ exceptional[1].T) * scale, -1)
+                        @ exceptional[2]
+                    )
+                    self.assert_close(
+                        cb.attention(
+                            *(item.cuda() for item in exceptional), scale=scale
+                        ).cpu(),
+                        expected,
+                    )
+
+    def test_attention_short_fp64_range_and_mantissa(self):
+        """Keep large finite averages finite and retain FP64 input mantissas."""
+        for keys in (32, 64):
+            q = torch.zeros((64, 256), dtype=torch.float64)
+            k = torch.zeros((keys, 256), dtype=torch.float64)
+            v = torch.full_like(k, torch.finfo(torch.float64).max / 8)
+            expected = torch.full_like(q, torch.finfo(torch.float64).max / 8)
+            actual = cb.attention(q.cuda(), k.cuda(), v.cuda()).cpu()
+            self.assert_close(actual, expected)
+            q[:, 0] = 2.0**40
+            k[:, 0] = 1 + torch.arange(keys, dtype=torch.float64) * 2.0**-40
+            v = (
+                torch.arange(keys, dtype=torch.float64)[:, None]
+                .expand(-1, 256)
+                .contiguous()
+                / keys
+            )
+            scores = q @ k.T
+            expected = torch.softmax(scores, -1) @ v
+            actual = cb.attention(q.cuda(), k.cuda(), v.cuda(), scale=1).cpu()
+            self.assert_close(actual, expected)
+            rounded = torch.softmax(q.float().double() @ k.float().double().T, -1) @ v
+            self.assertGreater((expected - rounded).abs().max().item(), 0.1)
+
+    def test_attention_short_graph_and_alias(self):
+        """Recompute graph inputs and preserve supported C-API output overlaps."""
+        host = [torch.randn((64, 256), dtype=torch.float64) / 16 for _ in range(3)]
+        q, k, v = [value.cuda() for value in host]
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):
+            for _ in range(3):
+                cb.attention(q, k, v)
+        stream.synchronize()
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph, stream=stream):
+            captured = cb.attention(q, k, v)
+        with torch.cuda.stream(stream):
+            q.add_(0.03)
+            k.mul_(0.7)
+            v.sub_(0.01)
+            graph.replay()
+        stream.synchronize()
+        host = [value.cpu() for value in (q, k, v)]
+        expected = torch.softmax((host[0] @ host[1].T) / 16, -1) @ host[2]
+        self.assert_close(captured.cpu(), expected)
+        native = _native.context(0)
+        call = _native.library().camblas_cuda_attention
+        for partial in (False, True):
+            storage = torch.empty((64 * 256 + 8,), device="cuda", dtype=torch.float64)
+            source = storage[: 64 * 256].view(64, 256)
+            source.copy_(k)
+            output = storage[8:].view(64, 256) if partial else source
+            _native._check(
+                call(
+                    native.handle,
+                    1,
+                    64,
+                    64,
+                    256,
+                    256,
+                    1 / 16,
+                    q.data_ptr(),
+                    source.data_ptr(),
+                    v.data_ptr(),
+                    output.data_ptr(),
+                ),
+                native.handle,
+            )
+            self.assert_close(output.cpu(), expected)
+
+    def test_native_control_override_routes_copied_binding(self):
+        """Load a saved core even when its copied binding points at the build directory."""
+        module = _native.tensor_module()
+        if module is None:
+            self.skipTest("The optional native tensor binding is required")
+        root = Path(__file__).resolve().parents[1]
+        code = """
+import os
+from pathlib import Path
+import torch
+import camblas_gpu as cb
+directory = Path(os.environ['CAMBLAS_TEST_CONTROL_DIRECTORY'])
+a = torch.ones((2, 2), device='cuda', dtype=torch.float64)
+torch.testing.assert_close(cb.matmul(a, a), torch.full_like(a, 2))
+paths = {line.split()[-1] for line in Path('/proc/self/maps').read_text().splitlines()
+         if 'libcamblas_cuda.so' in line or '_camblas_cuda_torch' in line}
+assert paths and all(Path(path).parent == directory for path in paths), paths
+assert len(paths) == 2, paths
+"""
+        with tempfile.TemporaryDirectory(prefix="camblas-native-control-") as temporary:
+            directory = Path(temporary).resolve()
+            core = directory / "libcamblas_cuda.so"
+            shutil.copy2(_native.library()._name, core)
+            binding = directory / Path(module.__file__).name
+            # Exercise older copied bindings with an absolute build RUNPATH.
+            # Replace the optional sibling search component without resizing ELF data.
+            binding.write_bytes(
+                Path(module.__file__).read_bytes().replace(b"$ORIGIN", b"/absent")
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                cwd=root,
+                env=dict(
+                    os.environ,
+                    CAMBLAS_CUDA_LIBRARY=str(core),
+                    CAMBLAS_TEST_CONTROL_DIRECTORY=str(directory),
+                ),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_cancellation_against_cpu_oracle(self):
         """Bound Strassen error by product magnitudes for cancelling dot products."""
         for dtype in (torch.float32, torch.float64):
@@ -574,7 +898,7 @@ for dtype in (torch.float32, torch.float64):
             b[0, 0] += 0.1
             expected = a.double() @ b.double()
             magnitudes = a.double().abs() @ b.double().abs()
-            for policy in ("strassen", "strassen2"):
+            for policy in ("strassen", "strassen2", "strassen3", "strassen4"):
                 with cb.algorithm(policy):
                     actual = cb.matmul(a.cuda(), b.cuda()).cpu().double()
                 scaled = (actual - expected).abs() / magnitudes.clamp_min(1)
@@ -596,45 +920,148 @@ for dtype in (torch.float32, torch.float64):
                 self.assert_close(cb.matmul(a, b), a @ b)
                 self.assertEqual(cb.stats()["guard_fallback"], 1)
 
-    def test_two_level_strassen_padding(self):
-        """Cover odd quarter sizes, C padding, alpha/beta and changed operands."""
-        for dtype, scalar in ((torch.float32, "sgemm"), (torch.float64, "dgemm")):
-            for n in (508, 516):
-                a = torch.randn((n, n + 3), device="cuda", dtype=dtype) / n**0.5
-                b = torch.randn((n, n + 5), device="cuda", dtype=dtype) / n**0.5
-                c = torch.full((n, n + 7), 1234.0, device="cuda", dtype=dtype)
-                expected = 0.3 * (a[:, :n].T @ b[:, :n].T) + 0.2 * c[:, :n].T
-                with cb.algorithm("strassen2"):
-                    native = _native.context(0)
-                    call = getattr(_native.library(), "camblas_cuda_" + scalar)
-                    _native._check(
-                        call(
-                            native.handle,
-                            b"N",
-                            b"N",
-                            n,
-                            n,
-                            n,
-                            0.3,
-                            a.data_ptr(),
-                            n + 3,
-                            b.data_ptr(),
-                            n + 5,
-                            0.2,
-                            c.data_ptr(),
-                            n + 7,
-                        ),
-                        native.handle,
+    def test_three_level_strassen(self):
+        """Check CPU-double accuracy, level boundaries, alpha/beta and changed inputs."""
+        for dtype in (torch.float32, torch.float64):
+            for n in (504, 512, 514, 516):
+                host_a = torch.randn((n, n + 3), dtype=dtype) / n**0.5
+                host_b = torch.randn((n, n + 5), dtype=dtype) / n**0.5
+                a, b = host_a.cuda()[:, :n], host_b.cuda()[:, :n]
+                expected = host_a[:, :n].double() @ host_b[:, :n].double()
+                with cb.algorithm("strassen3"):
+                    self.assert_close(
+                        cb.matmul(a, b).cpu(), expected.to(dtype), strassen=True
                     )
-                    self.assert_close(c[:, :n].T, expected, strassen=True)
-                    self.assertTrue((c[:, n:] == 1234).all().item())
+                    c = torch.randn((n, n), device="cuda", dtype=dtype)
+                    reference = 0.3 * expected + 0.2 * c.double().cpu()
+                    cb.matmul(a, b, out=c, alpha=0.3, beta=0.2)
+                    self.assert_close(c.cpu(), reference.to(dtype), strassen=True)
                     a.add_(0.02)
                     b.mul_(0.8)
+                    expected = a.double().cpu() @ b.double().cpu()
                     self.assert_close(
-                        cb.matmul(a[:, :n], b[:, :n]),
-                        a[:, :n] @ b[:, :n],
-                        strassen=True,
+                        cb.matmul(a, b).cpu(), expected.to(dtype), strassen=True
                     )
+                if n == 512:
+                    for value in (
+                        float("nan"),
+                        float("inf"),
+                        torch.finfo(dtype).max / 2,
+                    ):
+                        exceptional = a.clone()
+                        exceptional[0, 0] = value
+                        with cb.algorithm("classical"):
+                            reference = cb.matmul(exceptional, b)
+                        cb.stats(reset=True)
+                        with cb.algorithm("strassen3"):
+                            self.assert_close(cb.matmul(exceptional, b), reference)
+                        counts = cb.stats()
+                        self.assertEqual(counts["guard_fallback"], 1)
+                        self.assertEqual(counts["classical"], 1)
+                        self.assertEqual(counts["strassen"], 0)
+
+    def test_four_level_strassen(self):
+        """Check CPU-double accuracy, level boundaries, alpha/beta and changed inputs."""
+        for dtype in (torch.float32, torch.float64):
+            for n in (504, 512, 514, 516, 528):
+                host_a = torch.randn((n, n + 3), dtype=dtype) / n**0.5
+                host_b = torch.randn((n, n + 5), dtype=dtype) / n**0.5
+                a, b = host_a.cuda()[:, :n], host_b.cuda()[:, :n]
+                expected = host_a[:, :n].double() @ host_b[:, :n].double()
+                with cb.algorithm("strassen4"):
+                    self.assert_close(
+                        cb.matmul(a, b).cpu(), expected.to(dtype), strassen=True
+                    )
+                    c = torch.randn((n, n), device="cuda", dtype=dtype)
+                    reference = 0.3 * expected + 0.2 * c.double().cpu()
+                    cb.matmul(a, b, out=c, alpha=0.3, beta=0.2)
+                    self.assert_close(c.cpu(), reference.to(dtype), strassen=True)
+                    a.add_(0.02)
+                    b.mul_(0.8)
+                    expected = a.double().cpu() @ b.double().cpu()
+                    self.assert_close(
+                        cb.matmul(a, b).cpu(), expected.to(dtype), strassen=True
+                    )
+                if n == 512:
+                    for value in (
+                        float("nan"),
+                        float("inf"),
+                        torch.finfo(dtype).max / 2,
+                    ):
+                        exceptional = a.clone()
+                        exceptional[0, 0] = value
+                        with cb.algorithm("classical"):
+                            reference = cb.matmul(exceptional, b)
+                        cb.stats(reset=True)
+                        with cb.algorithm("strassen4"):
+                            self.assert_close(cb.matmul(exceptional, b), reference)
+                        counts = cb.stats()
+                        self.assertEqual(counts["guard_fallback"], 1)
+                        self.assertEqual(counts["classical"], 1)
+                        self.assertEqual(counts["strassen"], 0)
+
+    def test_four_level_large_existing_output(self):
+        """Apply beta to C only after cancelling unscaled Strassen contributions."""
+        n = 512
+        for dtype, exponent in ((torch.float32, 52), (torch.float64, 498)):
+            magnitude = 2.0**exponent
+            a_host = torch.full((n, n), magnitude, dtype=dtype)
+            b_host = torch.full((n, n), magnitude, dtype=dtype)
+            b_host[n // 2 :] = -magnitude
+            c_host = torch.full((n, n), torch.finfo(dtype).max, dtype=dtype)
+            product = a_host.double() @ b_host.double()
+            self.assertEqual(product.count_nonzero().item(), 0)
+            a, b = a_host.cuda(), b_host.cuda()
+            for alpha, beta in ((1, 1), (-0.5, 1), (0.03125, -1), (1, 0)):
+                c = (c_host if beta else torch.full_like(c_host, float("nan"))).cuda()
+                cb.stats(reset=True)
+                with cb.algorithm("strassen4"):
+                    cb.matmul(a, b, out=c, alpha=alpha, beta=beta)
+                expected = alpha * product + (beta * c_host.double() if beta else 0)
+                torch.testing.assert_close(c.cpu(), expected.to(dtype), rtol=0, atol=0)
+                self.assertEqual(cb.stats()["strassen"], 1)
+                self.assertEqual(cb.stats()["guard_fallback"], 0)
+
+    def test_recursive_strassen_padding(self):
+        """Cover recursive leaf boundaries, C padding, alpha/beta and changed operands."""
+        for dtype, scalar in ((torch.float32, "sgemm"), (torch.float64, "dgemm")):
+            for policy in ("strassen2", "strassen3", "strassen4"):
+                for n in (504, 508, 512, 514, 516, 528):
+                    a = torch.randn((n, n + 3), device="cuda", dtype=dtype) / n**0.5
+                    b = torch.randn((n, n + 5), device="cuda", dtype=dtype) / n**0.5
+                    c = torch.full((n, n + 7), 1234.0, device="cuda", dtype=dtype)
+                    expected = 0.3 * (a[:, :n].T @ b[:, :n].T) + 0.2 * c[:, :n].T
+                    with cb.algorithm(policy):
+                        native = _native.context(0)
+                        call = getattr(_native.library(), "camblas_cuda_" + scalar)
+                        _native._check(
+                            call(
+                                native.handle,
+                                b"N",
+                                b"N",
+                                n,
+                                n,
+                                n,
+                                0.3,
+                                a.data_ptr(),
+                                n + 3,
+                                b.data_ptr(),
+                                n + 5,
+                                0.2,
+                                c.data_ptr(),
+                                n + 7,
+                            ),
+                            native.handle,
+                        )
+                        self.assert_close(c[:, :n].T, expected, strassen=True)
+                        self.assertTrue((c[:, n:] == 1234).all().item())
+                        a.add_(0.02)
+                        b.mul_(0.8)
+                        self.assert_close(
+                            cb.matmul(a[:, :n], b[:, :n]),
+                            a[:, :n] @ b[:, :n],
+                            strassen=True,
+                        )
 
     def test_out_tensor_versions(self):
         """Reject differentiable out tensors and detect mutation of saved operands."""
@@ -828,6 +1255,129 @@ torch.testing.assert_close(cb.matmul(a, a), a)
             actual.sum().backward()
             expected.sum().backward()
             self.assert_close(inputs[index].grad, reference_inputs[index].grad)
+
+
+@unittest.skipUnless(CUDA_AVAILABLE, "A CUDA-enabled PyTorch is required")
+class CudaLargeTests(unittest.TestCase):
+    """Optional complete-output verification at the four-level automatic threshold."""
+
+    @unittest.skipUnless(
+        os.environ.get("CAMBLAS_TEST_LARGE_CUDA") == "1",
+        "Set CAMBLAS_TEST_LARGE_CUDA=1 for complete large-output checks",
+    )
+    def test_four_level_first_automatic_sizes(self):
+        """Check exact identity products at the first FP32/FP64 automatic sizes."""
+        if torch.cuda.get_device_properties(0).total_memory < 40 * 2**30:
+            self.skipTest("The complete FP64 boundary check requires 40 GiB")
+        torch.set_num_threads(1)
+        for dtype, n in ((torch.float32, 12288), (torch.float64, 24576)):
+            _native.close()
+            torch.cuda.empty_cache()
+            indices = torch.arange(n, device="cuda")
+            blocks = indices.div(n // 16, rounding_mode="floor").to(dtype)
+            a = torch.eye(n, device="cuda", dtype=dtype)
+            b = 16 * blocks[:, None] + blocks[None, :] + 1
+            c = torch.full_like(a, float("nan"))
+            cb.stats(reset=True)
+            torch.cuda.synchronize()
+            before = torch.cuda.mem_get_info()[0]
+            with cb.algorithm("auto"):
+                cb.matmul(a, b, out=c)
+            torch.cuda.synchronize()
+            arena = 3 * 343 * (n // 16) ** 2 * a.element_size()
+            used = before - torch.cuda.mem_get_info()[0]
+            self.assertGreaterEqual(used, arena)
+            self.assertLessEqual(used, arena + 512 * 2**20)
+            self.assertTrue(torch.equal(c, b))
+            self.assertEqual(cb.stats()["strassen"], 1)
+            self.assertEqual(cb.stats()["guard_fallback"], 0)
+            a.mul_(2)
+            b.add_(0.5)
+            with cb.algorithm("auto"):
+                cb.matmul(a, b, out=c, alpha=0.5)
+            self.assertTrue(torch.equal(c, b))
+            self.assertEqual(cb.stats()["strassen"], 2)
+            del a, b, c, indices, blocks
+            _native.close()
+            torch.cuda.empty_cache()
+
+    @unittest.skipUnless(
+        os.environ.get("CAMBLAS_TEST_LARGE_CUDA") == "1",
+        "Set CAMBLAS_TEST_LARGE_CUDA=1 for complete large-output checks",
+    )
+    def test_four_level_distinct_quadrants(self):
+        """Check every output with distinct quadrants, changed inputs and alpha/beta."""
+        if torch.cuda.get_device_properties(0).total_memory < 40 * 2**30:
+            self.skipTest("The complete FP64 alpha/beta check requires 40 GiB")
+        torch.set_num_threads(1)
+        n = 16384
+        for dtype in (torch.float32, torch.float64):
+            _native.close()
+            torch.cuda.empty_cache()
+            indices = torch.arange(n, device="cuda")
+            rows = (1 + indices.div(n // 4, rounding_mode="floor")).to(dtype)
+            columns = (1 + indices.div(n // 16, rounding_mode="floor")).to(dtype)
+            keys = indices.div(n // 16, rounding_mode="floor").to(dtype)
+            a = (rows[:, None] / n).expand(n, n).contiguous()
+            b = keys[:, None] + columns[None, :]
+            c = torch.full_like(a, float("nan"))
+            expected = rows[:, None] * (columns[None, :] + 7.5)
+            cb.stats(reset=True)
+            with cb.algorithm("strassen4"):
+                cb.matmul(a, b, out=c)
+            self.assertTrue(torch.equal(c, expected))
+            a.mul_(2)
+            b.add_(0.5)
+            with cb.algorithm("strassen4"):
+                cb.matmul(a, b, out=c, alpha=-0.5, beta=0.125)
+            changed = -rows[:, None] * (columns[None, :] + 8) + 0.125 * expected
+            self.assertTrue(torch.equal(c, changed))
+            self.assertEqual(cb.stats()["strassen"], 2)
+            self.assertEqual(cb.stats()["guard_fallback"], 0)
+            del a, b, c, expected, changed, indices, rows, columns, keys
+            _native.close()
+            torch.cuda.empty_cache()
+
+    @unittest.skipUnless(
+        os.environ.get("CAMBLAS_TEST_LARGE_CUDA") == "1",
+        "Set CAMBLAS_TEST_LARGE_CUDA=1 for the 32768-square full-output check",
+    )
+    def test_four_level_automatic_full_output(self):
+        """Check all billion entries against an analytic oracle and observe arena size."""
+        if torch.cuda.get_device_properties(0).total_memory < 85 * 2**30:
+            self.skipTest("The complete FP64 check requires an allocated 96-GiB GPU")
+        torch.set_num_threads(1)
+        n = 32768
+        for dtype in (torch.float32, torch.float64):
+            _native.close()
+            torch.cuda.empty_cache()
+            a = torch.full((n, n), 1 / n, device="cuda", dtype=dtype)
+            pattern = torch.arange(n, device="cuda", dtype=dtype).remainder(32) / 32
+            b = pattern.expand(n, n).contiguous()
+            c = torch.empty_like(a)
+            torch.cuda.synchronize()
+            before = torch.cuda.mem_get_info()[0]
+            cb.stats(reset=True)
+            with cb.algorithm("auto"):
+                cb.matmul(a, b, out=c)
+            torch.cuda.synchronize()
+            arena = 3 * 343 * (n // 16) ** 2 * a.element_size()
+            used = before - torch.cuda.mem_get_info()[0]
+            self.assertGreaterEqual(used, arena)
+            self.assertLessEqual(used, arena + 512 * 2**20)
+            self.assertTrue(torch.equal(c, pattern.expand(n, n)))
+            self.assertEqual(cb.stats()["strassen"], 1)
+            self.assertEqual(cb.stats()["guard_fallback"], 0)
+            a.mul_(2)
+            b.add_(1 / 32)
+            with cb.algorithm("auto"):
+                cb.matmul(a, b, out=c)
+            expected = 2 * (pattern + 1 / 32)
+            self.assertTrue(torch.equal(c, expected.expand(n, n)))
+            self.assertEqual(cb.stats()["strassen"], 2)
+            del a, b, c, pattern, expected
+            _native.close()
+            torch.cuda.empty_cache()
 
 
 @unittest.skipUnless(CUDA_AVAILABLE, "A CUDA-enabled PyTorch is required")

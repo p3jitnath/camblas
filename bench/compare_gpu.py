@@ -21,11 +21,90 @@ from compare_cuda import check_outputs, validate_cuda_record
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKENDS = ("pytorch", "camblas", "classical")
+GPU_WORKLOADS = (
+    *WORKLOADS,
+    "square12288",
+    "square16384",
+    "square24576",
+    "square32768",
+    "attention32",
+    "attention64",
+    "attention256",
+    "attention512",
+    "attention2048",
+    "attention4096",
+    "attention8192",
+    "attention64x1024",
+    "attention1024x64",
+    "attention64x32",
+    "attention1024x32",
+)
 
 
 def digest(path):
     """Return a content identity for a source or binary artefact."""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def control_identity(library):
+    """Identify a saved core and its optional sibling tensor binding.
+
+    Parameters
+    ----------
+    library : pathlib.Path
+        Saved CUDA core to load in separate control processes.
+
+    Returns
+    -------
+    dict
+        Resolved binary paths, content hashes and an optional build record.
+    """
+    library = Path(library).resolve(strict=True)
+    bindings = sorted(library.parent.glob("_camblas_cuda_torch*.so"))
+    if len(bindings) > 1:
+        raise ValueError("Keep exactly one tensor binding beside the control core")
+    binding = bindings[0] if bindings else None
+    build = library.parent / "build.json"
+    source = library.parent / "source"
+    return dict(
+        library=str(library),
+        library_sha256=digest(library),
+        tensor_binding=str(binding) if binding else None,
+        tensor_binding_sha256=digest(binding) if binding else None,
+        build=json.loads(build.read_text()) if build.is_file() else None,
+        source_sha256={
+            str(path.relative_to(source)): digest(path)
+            for path in sorted(source.rglob("*"))
+            if path.is_file()
+        },
+    )
+
+
+def validate_native_libraries(record, identity, *, control=False):
+    """Reject missing, mismatched or incorrectly routed native binaries.
+
+    Parameters
+    ----------
+    record : dict
+        Worker's observed loaded-library hashes.
+    identity : dict
+        Expected CUDA core and tensor-binding identities.
+    control : bool, optional
+        Require the exact saved paths in addition to content hashes.
+    """
+    hashes = record["library_sha256"]
+    for name, expected in (
+        ("libcamblas_cuda", identity["library_sha256"]),
+        ("_camblas_cuda_torch", identity["tensor_binding_sha256"]),
+    ):
+        actual = [sha for path, sha in hashes.items() if name in Path(path).name]
+        if expected is not None and actual != [expected]:
+            raise ValueError(f"Unexpected native binary: {name}")
+    if control:
+        for field in ("library", "tensor_binding"):
+            path = identity[field]
+            if path and hashes.get(path) != identity[field + "_sha256"]:
+                raise ValueError(f"Control binary was not loaded: {path}")
 
 
 def report(directory, rows, manifest):
@@ -47,6 +126,7 @@ def report(directory, rows, manifest):
         "graph replay, input staging and call overhead are included in timing.",
         "",
         "Speedup = PyTorch time / CAMBLAS time; values above 1 favour CAMBLAS.",
+        f"Candidate algorithm: {manifest.get('camblas_algorithm', 'auto')}. "
         "Resident timings include tensor allocation, dispatch and stream completion. "
         "Transfer timings also copy every input/weight from pageable CPU memory "
         "and every result/parameter gradient back on every call. Tuning and "
@@ -97,6 +177,26 @@ def report(directory, rows, manifest):
                     "",
                     f"{dtype}, {mode}: geometric-mean speedup {geomean:.3f}×; {wins}/{len(ratios)} median wins.",
                 ]
+            )
+    if manifest.get("control"):
+        lines.extend(
+            [
+                "",
+                "## Saved native control",
+                "",
+                "The saved core and sibling binding run with automatic dispatch in "
+                "separate fresh processes, using the same current Python adapter. "
+                "Loaded binary paths and hashes are checked on every process. "
+                "Speedup = saved control / candidate; values below 1 report regressions.",
+                "",
+                "| Workload | Precision | Control resident ms | Candidate resident ms | Speedup | Control transfers ms | Candidate transfers ms | Speedup |",
+                "|---|---|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for row in rows:
+            value = row["medians_ms"]
+            lines.append(
+                f"| {row['workload']} | {row['dtype']} | {value['control_resident']:.4f} | {value['camblas_resident']:.4f} | {row['speedup_control_resident']:.3f}× | {value['control_transfer']:.4f} | {value['camblas_transfer']:.4f} | {row['speedup_control_transfer']:.3f}× |"
             )
     if manifest.get("coherent_host"):
         lines.extend(
@@ -169,6 +269,10 @@ def report(directory, rows, manifest):
         value.update(row["medians_ms"])
         if "speedup_host" in row:
             value["speedup_host"] = row["speedup_host"]
+        for mode in ("resident", "transfer"):
+            key = "speedup_control_" + mode
+            if key in row:
+                value[key] = row[key]
         for key, bounds in row["ranges_ms"].items():
             value[key + "_min"] = bounds[0]
             value[key + "_max"] = bounds[1]
@@ -185,7 +289,7 @@ def main():
     parser.add_argument("--threads", type=int, default=64)
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument(
-        "--workloads", nargs="+", choices=WORKLOADS, default=list(WORKLOADS)
+        "--workloads", nargs="+", choices=GPU_WORKLOADS, default=list(WORKLOADS)
     )
     parser.add_argument(
         "--dtypes",
@@ -197,8 +301,27 @@ def main():
     parser.add_argument(
         "--python", type=Path, default=ROOT / ".frameworks/envs/cuda/bin/python"
     )
+    parser.add_argument(
+        "--camblas-algorithm",
+        choices=[
+            "auto",
+            "classical",
+            "lt",
+            "strassen",
+            "strassen2",
+            "strassen3",
+            "strassen4",
+        ],
+        default="auto",
+        help="Select the candidate algorithm; saved controls retain automatic dispatch",
+    )
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--repetitions", type=int)
+    parser.add_argument(
+        "--control-library",
+        type=Path,
+        help="Add an unchanged saved CUDA core and its sibling binding as an automatic-dispatch control",
+    )
     parser.add_argument(
         "--pytorch-baseline",
         choices=["eager", "fused", "compiled", "compiled-fused"],
@@ -241,6 +364,8 @@ def main():
             "Unset preload, allocator, wait-policy and CUDA compute overrides before default comparisons"
         )
     backends = ("pytorch", "camblas", "coherent") if args.coherent_host else BACKENDS
+    if args.control_library:
+        backends = (*backends, "control")
     if args.coherent_host and "backward" in args.workloads:
         if "--workloads" in os.sys.argv:
             parser.error("Coherent host access supports inference; omit backward")
@@ -252,6 +377,7 @@ def main():
         parser.error("Requested host cores are not available")
     directory = args.output.resolve()
     manifest = dict(
+        camblas_algorithm=args.camblas_algorithm,
         timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         hostname=socket.gethostname(),
         command=os.sys.argv,
@@ -266,6 +392,9 @@ def main():
         if args.pytorch_baseline.startswith("compiled")
         else None,
         build=json.loads((ROOT / "build/cuda/build.json").read_text()),
+        control=control_identity(args.control_library)
+        if args.control_library
+        else None,
     )
     for name, expected in manifest["build"]["source_sha256"].items():
         if digest(ROOT / name) != expected:
@@ -324,6 +453,12 @@ def main():
             target = directory / "source" / source.relative_to(ROOT)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.read_bytes())
+        if manifest["control"]:
+            control_source = Path(manifest["control"]["library"]).parent / "source"
+            for name in manifest["control"]["source_sha256"]:
+                target = directory / "control_source" / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((control_source / name).read_bytes())
         (directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         rows = []
         for workload, dtype in itertools.product(args.workloads, args.dtypes):
@@ -340,7 +475,13 @@ def main():
                     key = f"{workload}_{dtype}_r{round_id + 1}_{backend}"
                     output = directory / (key + ".json")
                     engine = "pytorch" if backend == "pytorch" else "camblas"
-                    algorithm = "classical" if backend == "classical" else "auto"
+                    algorithm = (
+                        "classical"
+                        if backend == "classical"
+                        else args.camblas_algorithm
+                        if backend in ("camblas", "coherent")
+                        else "auto"
+                    )
                     command = [
                         str(args.python),
                         str(ROOT / "bench/cuda_workload.py"),
@@ -378,6 +519,11 @@ def main():
                         OPENBLAS_NUM_THREADS=str(args.threads),
                         MKL_NUM_THREADS=str(args.threads),
                     )
+                    environment.pop("CAMBLAS_CUDA_LIBRARY", None)
+                    if backend == "control":
+                        environment["CAMBLAS_CUDA_LIBRARY"] = manifest["control"][
+                            "library"
+                        ]
                     pinned = [
                         "taskset",
                         "-c",
@@ -433,20 +579,14 @@ def main():
                             )
                         if not any(record["camblas_cuda_stats"].values()):
                             raise ValueError("No native CAMBLAS launch was observed")
-                        binaries = {
-                            "libcamblas_cuda": manifest["build"]["library_sha256"],
-                            "_camblas_cuda_torch": manifest["build"][
-                                "tensor_binding_sha256"
-                            ],
-                        }
-                        for name, expected in binaries.items():
-                            actual = [
-                                sha
-                                for path, sha in record["library_sha256"].items()
-                                if name in path
-                            ]
-                            if expected is not None and expected not in actual:
-                                raise ValueError(f"Unexpected native binary: {name}")
+                        build = (
+                            manifest["control"]
+                            if backend == "control"
+                            else manifest["build"]
+                        )
+                        validate_native_libraries(
+                            record, build, control=backend == "control"
+                        )
                         if (
                             workload == "backward"
                             and not record["camblas_cuda_stats"]["backward"]
@@ -515,6 +655,11 @@ def main():
                 row["speedup_host"] = (
                     medians["pytorch_transfer"] / medians["coherent_host"]
                 )
+            if manifest["control"]:
+                for mode in ("resident", "transfer"):
+                    row["speedup_control_" + mode] = (
+                        medians["control_" + mode] / medians["camblas_" + mode]
+                    )
             (directory / "summary.json").write_text(json.dumps(rows, indent=2) + "\n")
             print(
                 f"{workload} {dtype}: resident {row['speedup_resident']:.3f}x, transfers {row['speedup_transfer']:.3f}x",
@@ -539,6 +684,9 @@ def main():
             != manifest["build"]["tensor_binding_sha256"]
         ):
             raise ValueError("Tensor binding changed during measurement")
+        if manifest["control"]:
+            if control_identity(args.control_library) != manifest["control"]:
+                raise ValueError("Saved control changed during measurement")
         manifest["gpu_after"] = subprocess.check_output(
             [
                 "nvidia-smi",
