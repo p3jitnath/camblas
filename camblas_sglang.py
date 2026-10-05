@@ -1,0 +1,266 @@
+"""Opt-in CAMBLAS operations for SGLang's general plugin interface."""
+
+import functools
+import json
+import os
+from pathlib import Path
+
+_calls = {}
+
+
+def dispatch_counts():
+    """Return host dispatch counts, excluding replayed CUDA graph operations."""
+    return dict(_calls)
+
+
+def install_fp8_tiles(path):
+    """Apply common SGLang tile settings for single-token GH200 FP8 products."""
+    import torch
+    from sglang.srt.plugins.hook_registry import HookRegistry, HookType
+
+    settings = json.loads(Path(path).read_text())
+    if settings["block_shape"] != [32, 32]:
+        raise ValueError("Only the original 32 by 32 FP8 scaling is supported")
+    tiles = settings["tiles"]
+    for tile in tiles.values():
+        if tile["BLOCK_SIZE_K"] != 32 or tile.get("SPLIT_K", 1) != 1:
+            raise ValueError("FP8 tiles must preserve the original reduction order")
+
+    @functools.lru_cache
+    def lookup(original, n, k, block_n, block_k, device):
+        existing = original(n, k, block_n, block_k)
+        tile = tiles.get(f"{n},{k}")
+        if (
+            existing is not None
+            or tile is None
+            or [block_n, block_k] != settings["block_shape"]
+            or device != settings["device"]
+        ):
+            return existing
+        baseline = dict(
+            BLOCK_SIZE_M=64,
+            BLOCK_SIZE_N=block_n,
+            BLOCK_SIZE_K=block_k,
+            GROUP_SIZE_M=32,
+            num_warps=4,
+            num_stages=3,
+        )
+        # The nearest-key lookup selects the upstream default for M >= 2.
+        return {1: tile, 2: baseline}
+
+    def configured(original, N, K, block_n, block_k):
+        if torch._dynamo.is_compiling():
+            return original(N, K, block_n, block_k)
+        return lookup(original, N, K, block_n, block_k, torch.cuda.get_device_name())
+
+    HookRegistry.register(
+        "sglang.kernels.ops.quantization.fp8_kernel.get_w8a8_block_fp8_configs",
+        configured,
+        HookType.AROUND,
+    )
+
+
+def canonical_moe_tokens(token_ids, expert_ids, count, block_size, choices):
+    """Order token choices within pre-sorted expert blocks, retaining padding."""
+    import torch
+
+    span = choices + 1
+    labels = expert_ids.to(torch.int64).repeat_interleave(block_size)
+    keys = (labels[: token_ids.numel()] + 1) * span + token_ids.to(torch.int64)
+    live = torch.arange(token_ids.numel(), device=token_ids.device) < count
+    sentinel = torch.iinfo(torch.int64).max
+    keys = torch.where(live, keys, sentinel).sort().values
+    return torch.where(keys == sentinel, choices, keys % span).to(token_ids.dtype)
+
+
+def install_stable_moe():
+    """Give Marlin prefill a repeatable token order without changing decode."""
+    from sglang.srt.plugins.hook_registry import HookRegistry, HookType
+
+    def aligned(original, topk_ids, block_size, num_experts, *args, **kwargs):
+        ids, experts, count = original(
+            topk_ids, block_size, num_experts, *args, **kwargs
+        )
+        if topk_ids.shape[0] > 1:
+            ids = canonical_moe_tokens(
+                ids, experts, count, block_size, topk_ids.numel()
+            )
+        return ids, experts, count
+
+    HookRegistry.register(
+        "sglang.srt.layers.moe.moe_runner.triton_utils."
+        "moe_align_block_size.moe_align_block_size",
+        aligned,
+        HookType.AROUND,
+    )
+
+
+def install():
+    """Register selected inference operations through SGLang's hook registry.
+
+    ``CAMBLAS_SGLANG_OPS=linear,fp8`` enables unquantised CUDA linear
+    products and selected single-token block32 FP8 products.
+    CAMBLAS_SGLANG_FP8_TILES supplies common single-token tile settings,
+    independently of the selected CAMBLAS operations. Unsupported storage,
+    data types and gradient-enabled inputs use the original linear method.
+    """
+    if os.environ.get("CAMBLAS_SGLANG_STABLE_MOE") == "1":
+        install_stable_moe()
+    tiles = os.environ.get("CAMBLAS_SGLANG_FP8_TILES")
+    if tiles:
+        install_fp8_tiles(tiles)
+    selected = set(filter(None, os.environ.get("CAMBLAS_SGLANG_OPS", "").split(",")))
+    if not selected:
+        return
+    if selected - {"linear", "fp8"}:
+        raise ValueError(f"Unknown CAMBLAS SGLang operations: {sorted(selected)}")
+
+    import torch
+    from sglang.srt.plugins.hook_registry import HookRegistry, HookType
+
+    import camblas_gpu as cb
+
+    cb.set_algorithm(os.environ.get("CAMBLAS_SGLANG_ALGORITHM", "auto"))
+
+    def linear(original, method, layer, x, bias=None):
+        weight = layer.weight
+        operands = (x, weight) if bias is None else (x, weight, bias)
+        if (
+            x.is_cuda
+            and x.ndim >= 2
+            and weight.ndim == 2
+            and x.dtype in (torch.float32, torch.bfloat16)
+            and all(t.is_contiguous() and t.device == x.device for t in operands)
+            and all(t.dtype == x.dtype for t in operands)
+            and not (torch.is_grad_enabled() and any(t.requires_grad for t in operands))
+        ):
+            _calls["linear"] = _calls.get("linear", 0) + 1
+            output = cb.linear(x.view(-1, x.shape[-1]), weight, bias)
+            return output.view(*x.shape[:-1], weight.shape[0])
+        return original(method, layer, x, bias)
+
+    if "linear" in selected:
+        HookRegistry.register(
+            "sglang.srt.layers.quantization.unquant.UnquantizedLinearMethod.apply",
+            linear,
+            HookType.AROUND,
+        )
+
+    if "fp8" in selected:
+        fused_shapes = {
+            (1152, 5120),
+            (1792, 5120),
+            (4096, 1280),
+            (5120, 2048),
+            (5120, 576),
+            (8192, 1280),
+        }
+        split_shapes = fused_shapes - {(5120, 576)}
+        fused_split_shapes = fused_shapes
+        shapes = fused_shapes | {(25600, 6144)}
+
+        @functools.lru_cache
+        def supported(device):
+            return cb.fp8_decode_supported(device)
+
+        def fp8_product(original, A, B, As, Bs, block_size, output_dtype=torch.float16):
+            operands = (A, B, As, Bs)
+            if (
+                not torch._dynamo.is_compiling()
+                and A.is_cuda
+                and A.ndim >= 2
+                and B.ndim == 2
+                and As.ndim == A.ndim
+                and Bs.ndim == 2
+                and A.numel() == A.shape[-1]
+                and tuple(B.shape) in shapes
+                and list(block_size) == [32, 32]
+                and output_dtype == torch.bfloat16
+                and A.dtype == B.dtype == torch.float8_e4m3fn
+                and As.dtype == Bs.dtype == torch.float32
+                and A.is_contiguous()
+                and B.is_contiguous()
+                and A.data_ptr() % 4 == B.data_ptr() % 4 == 0
+                and all(t.device == A.device for t in operands)
+                and all(
+                    0 < stride <= 2147483647 for stride in (As.stride(-1), *Bs.stride())
+                )
+                and not (
+                    torch.is_grad_enabled() and any(t.requires_grad for t in operands)
+                )
+                and supported(A.get_device())
+            ):
+                _calls["fp8"] = _calls.get("fp8", 0) + 1
+                name = f"fp8_decode:{B.shape[0]},{B.shape[1]}"
+                _calls[name] = _calls.get(name, 0) + 1
+                if tuple(B.shape) in split_shapes:
+                    _calls["fp8_split"] = _calls.get("fp8_split", 0) + 1
+                return cb.fp8_decode(A, As, B, Bs)
+            return original(A, B, As, Bs, block_size, output_dtype)
+
+        HookRegistry.register(
+            "sglang.kernels.ops.quantization.fp8_kernel.w8a8_block_fp8_matmul_triton",
+            fp8_product,
+            HookType.AROUND,
+        )
+
+        def fp8_linear(
+            original,
+            input,
+            weight,
+            block_size,
+            weight_scale,
+            input_scale=None,
+            bias=None,
+            act_scale_ue8m0=False,
+            weight_bf16=None,
+        ):
+            operands = (input, weight, weight_scale)
+            if (
+                not torch._dynamo.is_compiling()
+                and input.is_cuda
+                and input.ndim >= 2
+                and weight.ndim == 2
+                and weight_scale.ndim == 2
+                and input.numel() == input.shape[-1]
+                and tuple(weight.shape) in fused_shapes
+                and list(block_size) == [32, 32]
+                and act_scale_ue8m0
+                and input_scale is None
+                and bias is None
+                and input.dtype == torch.bfloat16
+                and weight.dtype == torch.float8_e4m3fn
+                and weight_scale.dtype == torch.float32
+                and input.is_contiguous()
+                and weight.is_contiguous()
+                and input.data_ptr() % 4 == weight.data_ptr() % 4 == 0
+                and all(t.device == input.device for t in operands)
+                and all(0 < stride <= 2147483647 for stride in weight_scale.stride())
+                and not (
+                    torch.is_grad_enabled() and any(t.requires_grad for t in operands)
+                )
+                and supported(input.get_device())
+            ):
+                _calls["fp8"] = _calls.get("fp8", 0) + 1
+                _calls["fp8_linear"] = _calls.get("fp8_linear", 0) + 1
+                name = f"fp8_linear:{weight.shape[0]},{weight.shape[1]}"
+                _calls[name] = _calls.get(name, 0) + 1
+                if tuple(weight.shape) in fused_split_shapes:
+                    _calls["fp8_split"] = _calls.get("fp8_split", 0) + 1
+                return cb.fp8_linear(input, weight, weight_scale)
+            return original(
+                input,
+                weight,
+                block_size,
+                weight_scale,
+                input_scale,
+                bias,
+                act_scale_ue8m0,
+                weight_bf16,
+            )
+
+        HookRegistry.register(
+            "sglang.srt.layers.quantization.fp8_utils.triton_w8a8_block_fp8_linear",
+            fp8_linear,
+            HookType.AROUND,
+        )

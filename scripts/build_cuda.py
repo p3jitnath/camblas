@@ -87,6 +87,8 @@ def main():
         "-o",
         str(library),
     ]
+    if args.architecture == "sm_90a":
+        command.insert(4, "-DCAMBLAS_CUDA_WGMMA=1")
     print(shlex.join(command), flush=True)
     if args.dry_run:
         return
@@ -99,6 +101,7 @@ def main():
         ROOT / "src/cuda/inference_fusion.cuh",
         ROOT / "src/cuda/decode_float.cuh",
         ROOT / "src/cuda/quantized.cuh",
+        ROOT / "src/cuda/fp8_decode.cuh",
         ROOT / "src/cuda/routing.cuh",
         ROOT / "src/cuda/strassen_four.cuh",
         ROOT / "src/cuda/bfloat16.cuh",

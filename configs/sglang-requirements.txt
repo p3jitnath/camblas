@@ -1,0 +1,18 @@
+# Measured CUDA 12.9 profile; upstream SGLang metadata targets CUDA 13.
+# Install serving dependencies separately, then apply these pins with --no-deps.
+# PyTorch uses the official cu129 index; rebuild native extensions against it.
+torch==2.13.0+cu129
+sglang @ git+https://github.com/sgl-project/sglang.git@42b9b99490dce025ff56afa0467c9b3b42595e42#subdirectory=python
+sglang-kernel==0.4.7
+flashinfer-python[cu12]==0.6.18
+triton==3.7.1
+tilelang==0.1.12
+sgl-deep-gemm==0.2.0
+transformers==5.12.1
+tokenizers==0.22.2
+numpy==2.3.5
+safetensors==0.8.0
+apache-tvm-ffi==0.1.11
+z3-solver==4.15.4.0
+cuda-python==12.9.4
+ninja==1.13.2

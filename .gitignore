@@ -5,6 +5,7 @@
 *.so.*
 *.a
 *.whl
+*.egg-info/
 
 # local benchmark tooling and results
 /bench/results/

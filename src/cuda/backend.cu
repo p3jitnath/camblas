@@ -4,6 +4,7 @@
 #include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda_bf16.h>
+#include <cuda_fp8.h>
 #include <cuda_runtime.h>
 #include <math_constants.h>
 #include <mma.h>
@@ -66,6 +67,7 @@ struct camblas_cuda_context {
     bool scratch_captured = false;
     bool short_attention_supported = false;
     bool quantized_supported = false;
+    bool fp8_decode_supported = false;
     std::vector<void *> retired_allocations;
     unsigned *guard = nullptr;
     unsigned *host_guard = nullptr;
@@ -434,6 +436,7 @@ int reserve_scratch(camblas_cuda_context *context, size_t required)
 #include "strassen_four.cuh"
 #include "decode_float.cuh"
 #include "quantized.cuh"
+#include "fp8_decode.cuh"
 #include "routing.cuh"
 
 template <typename T>
@@ -1006,6 +1009,7 @@ extern "C" int camblas_cuda_create(int device, void *stream, camblas_cuda_contex
     }
     context->short_attention_supported = initialise_short_attention(device);
     context->quantized_supported = initialise_quantized();
+    context->fp8_decode_supported = initialise_fp8_decode(device);
     *out = context;
     return 0;
 }
@@ -1183,6 +1187,71 @@ extern "C" int camblas_cuda_quantized_matmul(camblas_cuda_context *context, int 
                                                input, input_scale, weight, weight_scale, output)
                       : launch_quantized<false>(context, rows, outputs, inner, activation_block,
                                                 input, input_scale, weight, weight_scale, output);
+    });
+}
+
+extern "C" int camblas_cuda_fp8_decode_supported(const camblas_cuda_context *context)
+{
+    return context && context->fp8_decode_supported;
+}
+
+extern "C" int camblas_cuda_fp8_decode(camblas_cuda_context *context, int outputs, int inner,
+                                       const void *input, const float *input_scale,
+                                       const void *weight, const float *weight_scale,
+                                       int input_scale_stride, int weight_scale_row_stride,
+                                       int weight_scale_column_stride, void *workspace,
+                                       size_t workspace_bytes, void *output)
+{
+    return execute(context, [&] {
+        if (outputs < 16 || outputs % 16 || inner < 32 || inner > 8192 || inner % 32 ||
+            input_scale_stride < 1 || weight_scale_row_stride < 1 || weight_scale_column_stride < 1)
+            return fail(context, "invalid FP8 decode dimensions or scale strides", 1);
+        if (!context->fp8_decode_supported)
+            return fail(context, "FP8 decode requires an SM90a binary on an SM90 device", 1);
+        if (!input || !input_scale || !weight || !weight_scale || !output ||
+            (uintptr_t(input) & 3) || (uintptr_t(weight) & 3) || (uintptr_t(input_scale) & 3) ||
+            (uintptr_t(weight_scale) & 3) || (uintptr_t(output) & 1) || output == input ||
+            output == weight || output == input_scale || output == weight_scale)
+            return fail(context, "invalid FP8 decode buffers", 1);
+        size_t required = fp8_workspace_size(0, outputs, inner);
+        if (required && (!workspace || workspace_bytes < required || (uintptr_t(workspace) & 3) ||
+                         workspace == input || workspace == input_scale || workspace == weight ||
+                         workspace == weight_scale || workspace == output))
+            return fail(context, "invalid FP8 decode workspace", 1);
+        return launch_fp8_product<false>(context, outputs, inner, input, input_scale, weight,
+                                         weight_scale, input_scale_stride, weight_scale_row_stride,
+                                         weight_scale_column_stride, workspace, output);
+    });
+}
+extern "C" size_t camblas_cuda_fp8_workspace_size(int quantise, int outputs, int inner)
+{
+    return fp8_workspace_size(quantise, outputs, inner);
+}
+
+extern "C" int camblas_cuda_fp8_linear(camblas_cuda_context *context, int outputs, int inner,
+                                       const void *input, const void *weight,
+                                       const float *weight_scale, int weight_scale_row_stride,
+                                       int weight_scale_column_stride, void *workspace,
+                                       size_t workspace_bytes, void *output)
+{
+    return execute(context, [&] {
+        if (outputs < 16 || outputs % 16 || inner < 32 || inner > 8192 || inner % 32 ||
+            weight_scale_row_stride < 1 || weight_scale_column_stride < 1)
+            return fail(context, "invalid FP8 decode dimensions or scale strides", 1);
+        if (!context->fp8_decode_supported)
+            return fail(context, "FP8 decode requires an SM90a binary on an SM90 device", 1);
+        if (!input || !weight || !weight_scale || !output || (uintptr_t(input) & 3) ||
+            (uintptr_t(weight) & 3) || (uintptr_t(weight_scale) & 3) || (uintptr_t(output) & 1) ||
+            output == input || output == weight || output == weight_scale)
+            return fail(context, "invalid FP8 decode buffers", 1);
+        size_t required = fp8_workspace_size(1, outputs, inner);
+        if (required && (!workspace || workspace_bytes < required || (uintptr_t(workspace) & 3) ||
+                         workspace == input || workspace == weight || workspace == weight_scale ||
+                         workspace == output))
+            return fail(context, "invalid FP8 linear workspace", 1);
+        return launch_fp8_product<true>(context, outputs, inner, input, nullptr, weight,
+                                        weight_scale, 1, weight_scale_row_stride,
+                                        weight_scale_column_stride, workspace, output);
     });
 }
 

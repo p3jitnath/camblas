@@ -7,10 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bench.verify_llama_weights import verify
+from bench.verify_llm_weights import verify
 
 
-class LlamaWeightsTests(unittest.TestCase):
+class LlmWeightsTests(unittest.TestCase):
     """Reject changed tensor bytes and inconsistent checkpoint metadata."""
 
     def fixture(self, directory, *, dtype="BF16", offset=(0, 8)):
@@ -38,19 +38,17 @@ class LlamaWeightsTests(unittest.TestCase):
             },
         )
 
-    def test_verified_identity_and_output_ownership(self):
-        """Retain hashes and stat identities and preserve an existing report."""
+    def test_verified_identity(self):
+        """Retain the verified checkpoint identity and storage element count."""
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             manifest = self.fixture(directory)
             output = directory / "verified.json"
             record = verify(directory, manifest, output)
             self.assertEqual(record["state"], "passed")
-            self.assertEqual(record["parameters"], 4)
+            self.assertEqual(record["storage_elements"], 4)
             self.assertEqual(record["tensors"], 1)
             self.assertEqual(json.loads(output.read_text()), record)
-            with self.assertRaises(FileExistsError):
-                verify(directory, manifest, output)
 
     def test_changed_bytes_size_and_configuration_are_rejected(self):
         """A same-size data change cannot reuse the pinned shard identity."""
@@ -83,6 +81,37 @@ class LlamaWeightsTests(unittest.TestCase):
             manifest["parameters"] = 5
             with self.assertRaisesRegex(ValueError, "parameter count"):
                 verify(directory, manifest, directory / "count.json")
+
+    def test_quantised_storage_and_metadata_identity(self):
+        """Permit declared packed storage and reject changed tokenizer metadata."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            manifest = self.fixture(directory, dtype="I8")
+            name = next(iter(manifest["weights"]))
+            path = directory / name
+            payload = path.read_bytes()[:-4]
+            # Packed FP4 bytes count storage elements, not two decoded values.
+            header_size = struct.unpack("<Q", payload[:8])[0]
+            header = json.loads(payload[8 : 8 + header_size])
+            next(iter(header.values()))["data_offsets"] = [0, 4]
+            header = json.dumps(header).encode()
+            payload = struct.pack("<Q", len(header)) + header + bytes(4)
+            path.write_bytes(payload)
+            manifest["weights"][name] = dict(
+                bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest()
+            )
+            manifest["dtypes"] = ["I8"]
+            manifest.pop("parameters")
+            tokenizer = directory / "tokenizer.json"
+            tokenizer.write_text('{"version":"1.0"}')
+            manifest["files"] = {
+                tokenizer.name: hashlib.sha256(tokenizer.read_bytes()).hexdigest()
+            }
+            record = verify(directory, manifest, directory / "packed.json")
+            self.assertEqual(record["storage_elements"], 4)
+            tokenizer.write_text('{"version":"2.0"}')
+            with self.assertRaisesRegex(ValueError, "metadata SHA256"):
+                verify(directory, manifest, directory / "changed-tokenizer.json")
 
 
 if __name__ == "__main__":

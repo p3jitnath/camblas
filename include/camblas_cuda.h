@@ -2,6 +2,7 @@
 #ifndef CAMBLAS_CUDA_H
 #define CAMBLAS_CUDA_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -120,6 +121,39 @@ int camblas_cuda_quantized_matmul(camblas_cuda_context *context, int packed, int
                                   int inner, int activation_block, const void *input,
                                   const void *input_scale, const void *weight,
                                   const void *weight_scale, void *output);
+/* Single-token FP8 E4M3 [inner] times contiguous [outputs,inner] weights.
+ * FP32 input scales [inner/32] and weight scales [ceil(outputs/32),inner/32]
+ * have positive element strides. Each block32 product uses FP32 scaling and
+ * ordered FP32 accumulation, with final BF16 output [outputs]. inner is a
+ * multiple of 32 in [32,8192]; outputs is a positive multiple of 16.
+ * Requires an SM90a build on SM90 hardware. Buffers are device-resident,
+ * disjoint and caller-owned; input/weight/scales are four-byte aligned.
+ * Both operations use the workspace query below. Workspace must be
+ * disjoint, four-byte aligned, on this device and live until the stream finishes.
+ * The capability query returns one when the context supports this operation. */
+int camblas_cuda_fp8_decode_supported(const camblas_cuda_context *context);
+int camblas_cuda_fp8_decode(camblas_cuda_context *context, int outputs, int inner,
+                            const void *input, const float *input_scale, const void *weight,
+                            const float *weight_scale, int input_scale_stride,
+                            int weight_scale_row_stride, int weight_scale_column_stride,
+                            void *workspace, size_t workspace_bytes, void *output);
+
+/* BF16 single-token input uses dynamic block32 E4M3 activation quantisation.
+ * The FP32 scale is 2^ceil(log2(max(abs(input),1e-10)/448)); output accumulation,
+ * dimensions and device/stream requirements are as for fp8_decode above.
+ * Input values must be finite. No activation data or scales are cached.
+ * Allocate the workspace size returned below, or pass null/zero when no
+ * workspace is required. Workspace is four-byte aligned, device-resident,
+ * disjoint from every operand/output and caller-owned until the stream finishes.
+ * Its contents are overwritten on every call; concurrent streams require
+ * separate workspaces. Query with quantise=0 for FP8 decode or 1 for BF16 linear;
+ * it returns zero when that operation uses the single-kernel route. */
+size_t camblas_cuda_fp8_workspace_size(int quantise, int outputs, int inner);
+int camblas_cuda_fp8_linear(camblas_cuda_context *context, int outputs, int inner,
+                            const void *input, const void *weight, const float *weight_scale,
+                            int weight_scale_row_stride, int weight_scale_column_stride,
+                            void *workspace, size_t workspace_bytes, void *output);
+
 /* Batched quantized products: input [groups,rows,inner], output [groups,rows,outputs].
  * metadata is device uint64 [weight_groups,2] containing weight/scale addresses
  * in the preceding operation's layouts. active/counts are device int32 [groups].

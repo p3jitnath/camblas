@@ -1,0 +1,72 @@
+{
+  "device": "NVIDIA GH200 120GB",
+  "block_shape": [
+    32,
+    32
+  ],
+  "tiles": {
+    "1152,5120": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 128,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 3,
+      "SWAP_AB": true
+    },
+    "1792,5120": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 128,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 3,
+      "SWAP_AB": true
+    },
+    "25600,6144": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 64,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 3,
+      "SWAP_AB": true
+    },
+    "4096,1280": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 64,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 2,
+      "SWAP_AB": true
+    },
+    "5120,2048": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 128,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 2,
+      "SWAP_AB": true
+    },
+    "5120,576": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 128,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 2,
+      "SWAP_AB": true
+    },
+    "8192,1280": {
+      "BLOCK_SIZE_M": 16,
+      "BLOCK_SIZE_N": 128,
+      "BLOCK_SIZE_K": 32,
+      "GROUP_SIZE_M": 32,
+      "num_warps": 4,
+      "num_stages": 3,
+      "SWAP_AB": true
+    }
+  }
+}

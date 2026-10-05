@@ -47,11 +47,12 @@ def main():
                 "scripts",
                 "tests",
                 "camblas_gpu",
+                "camblas_sglang.py",
             ],
             cwd=ROOT,
             text=True,
         ).splitlines()
-        if Path(path).suffix == ".py"
+        if Path(path).suffix == ".py" and (ROOT / path).is_file()
     ]
     c_files = sorted(
         str(path.relative_to(ROOT))

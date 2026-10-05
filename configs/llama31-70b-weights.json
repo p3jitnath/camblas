@@ -144,5 +144,11 @@
       "sha256": "d7ab65186aa6cb9123672ef9612033688a5156e7823fbea2ffefc1144d96c152",
       "bytes": 2101346432
     }
+  },
+  "files": {
+    "config.json": "37653c55ea907be0dc75070afd416fc77e20981c60b7c7e9521ba343678c5349",
+    "tokenizer.json": "76e48799b099d43365bd24ccd8ecc5aedac831718da780552f03b0a6eb4412aa",
+    "tokenizer_config.json": "8004530facf809ac432114de2a4dcc65fcb632da5ec16d666091aeb6a2ee444a",
+    "model.safetensors.index.json": "2abe0910e23770a30ccf9b1b91804c64831c47f9c98defaa5293aa999433fc2b"
   }
 }

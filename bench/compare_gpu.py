@@ -318,6 +318,9 @@ def main():
         "--python", type=Path, default=ROOT / ".frameworks/envs/cuda/bin/python"
     )
     parser.add_argument(
+        "--camblas-library", type=Path, default=ROOT / "build/cuda/libcamblas_cuda.so"
+    )
+    parser.add_argument(
         "--camblas-algorithm",
         choices=[
             "auto",
@@ -393,6 +396,7 @@ def main():
     if len(cpus) != args.threads:
         parser.error("Requested host cores are not available")
     directory = args.output.resolve()
+    library = args.camblas_library.resolve()
     manifest = dict(
         camblas_algorithm=args.camblas_algorithm,
         output_memory=args.output_memory,
@@ -410,7 +414,8 @@ def main():
         compile_mode=args.compile_mode
         if args.pytorch_baseline.startswith("compiled")
         else None,
-        build=json.loads((ROOT / "build/cuda/build.json").read_text()),
+        native_library=str(library),
+        build=json.loads((library.parent / "build.json").read_text()),
         control=control_identity(args.control_library)
         if args.control_library
         else None,
@@ -553,6 +558,8 @@ def main():
                         environment["CAMBLAS_CUDA_LIBRARY"] = manifest["control"][
                             "library"
                         ]
+                    elif engine == "camblas":
+                        environment["CAMBLAS_CUDA_LIBRARY"] = str(library)
                     pinned = [
                         "taskset",
                         "-c",
@@ -701,10 +708,7 @@ def main():
                 != manifest["source_sha256"][str(source.relative_to(ROOT))]
             ):
                 raise ValueError(f"Source changed during measurement: {source}")
-        if (
-            digest(ROOT / "build/cuda/libcamblas_cuda.so")
-            != manifest["build"]["library_sha256"]
-        ):
+        if digest(library) != manifest["build"]["library_sha256"]:
             raise ValueError("Native binary changed during measurement")
         binding_command = manifest["build"].get("tensor_binding_command")
         if (

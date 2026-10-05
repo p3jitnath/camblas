@@ -121,6 +121,85 @@ class QuantizedTests(unittest.TestCase):
                         )
                         self.assertEqual(actual.dtype, torch.bfloat16)
 
+    def test_fp8_decode_tail_graph_and_guards(self):
+        """Keep tail outputs fresh on another device/stream and reject invalid batching."""
+        device = torch.cuda.device_count() - 1
+        if not hasattr(
+            _native.tensor_module(), "fp8_decode_supported"
+        ) or not cb.fp8_decode_supported(device):
+            self.skipTest("Requires an SM90a build on SM90 hardware")
+        for fused, n, k in (
+            (False, 48, 96),
+            (True, 48, 96),
+            (False, 1152, 5120),
+            (True, 1152, 5120),
+            (True, 5120, 576),
+        ):
+            with self.subTest(fused=fused, outputs=n):
+                dtype = torch.bfloat16 if fused else torch.float8_e4m3fn
+                x = torch.zeros(1, k, device=device).to(dtype)
+                weight = torch.ones(n, k, device=device).to(torch.float8_e4m3fn)
+                sx = torch.ones(1, k // 32, device=device)
+                sw = torch.ones((n + 31) // 32, k // 32, device=device)
+                sw[-1].mul_(2)
+
+                def product():
+                    return (
+                        cb.fp8_linear(x, weight, sw)
+                        if fused
+                        else cb.fp8_decode(x, sx, weight, sw)
+                    )
+
+                stream = torch.cuda.Stream(device=device)
+                stream.wait_stream(torch.cuda.current_stream(device))
+                with torch.inference_mode(), torch.cuda.stream(stream):
+                    before = product()
+                    graph = torch.cuda.CUDAGraph()
+                    with torch.cuda.graph(graph, stream=stream):
+                        output = product()
+                    if fused:
+                        x.fill_(0.5)
+                    else:
+                        x.view(torch.uint8).fill_(0x38)
+                    weight.view(torch.uint8).fill_(0x40)
+                    sx.mul_(0.5)
+                    sw.mul_(2)
+                    graph.replay()
+                stream.synchronize()
+                expected = torch.full((1, n), float(k * 2), dtype=torch.bfloat16)
+                expected[:, ((n + 31) // 32 - 1) * 32 :] *= 2
+                self.assertTrue(
+                    torch.equal(
+                        output.cpu().view(torch.int16), expected.view(torch.int16)
+                    )
+                )
+                self.assertTrue((before == 0).all())
+                graph.reset()
+                weight.view(torch.uint8).fill_(0x7F)
+                with torch.inference_mode():
+                    self.assertTrue(product().isnan().all())
+                if fused:
+                    for operands in (
+                        (x.expand(2, -1).contiguous(), weight, sw),
+                        (x, weight, sw[:, :2]),
+                        (x.requires_grad_(), weight, sw),
+                    ):
+                        with self.assertRaises(ValueError):
+                            cb.fp8_linear(*operands)
+                else:
+                    for operands in (
+                        (
+                            x.expand(2, -1).contiguous(),
+                            sx.expand(2, -1).contiguous(),
+                            weight,
+                            sw,
+                        ),
+                        (x, sx[:, :2], weight, sw),
+                        (x, sx[:, :1].expand_as(sx), weight, sw),
+                    ):
+                        with self.assertRaises(ValueError):
+                            cb.fp8_decode(*operands)
+
     def test_scale_extremes_and_nan(self):
         """Check scale extremes and NaNs across vector, tile and partial-tile paths."""
         with torch.inference_mode():

@@ -373,6 +373,91 @@ Tensor quantized_matmul_public(const Tensor &x, const Tensor &x_scale, const Ten
     return result;
 }
 
+bool fp8_decode_supported_public(int device_id)
+{
+    check_process();
+    if (device_id < 0)
+        device_id = c10::cuda::current_device();
+    c10::cuda::CUDAGuard guard(c10::Device(c10::kCUDA, device_id));
+    return camblas_cuda_fp8_decode_supported(get_context(device_id, default_algorithm)) != 0;
+}
+
+Tensor fp8_product_public(const Tensor &x, const c10::optional<Tensor> &x_scale,
+                          const Tensor &weight, const Tensor &weight_scale)
+{
+    check_process();
+    bool quantise = !x_scale.has_value();
+    require(x.is_cuda() &&
+                x.scalar_type() == (quantise ? at::kBFloat16 : at::ScalarType::Float8_e4m3fn) &&
+                weight.scalar_type() == at::ScalarType::Float8_e4m3fn,
+            "FP8 linear requires CUDA BF16/FP8 input and E4M3 weight");
+    require(x.dim() >= 1 && weight.dim() == 2 && weight_scale.dim() == 2 && x.is_contiguous() &&
+                weight.is_contiguous(),
+            "FP8 linear requires contiguous matrices and rank-two weight scales");
+    require(weight_scale.scalar_type() == at::kFloat, "FP8 weight scales must be FP32");
+    for (const Tensor *tensor : {&x, &weight, &weight_scale}) {
+        require(tensor->device() == x.device() &&
+                    (!c10::GradMode::is_enabled() || !tensor->requires_grad()),
+                "FP8 operands must share a CUDA device and support inference only");
+        for (int64_t size : tensor->sizes())
+            require(size <= INT_MAX, "LP64 dimension overflow");
+    }
+    int64_t inner = x.size(-1), outputs = weight.size(0);
+    require(inner >= 32 && inner <= 8192 && inner % 32 == 0 && outputs >= 16 && outputs % 16 == 0 &&
+                x.numel() == inner && weight.size(1) == inner,
+            "Invalid FP8 linear matrix dimensions");
+    require(weight_scale.size(0) == (outputs + 31) / 32 && weight_scale.size(1) == inner / 32,
+            "FP8 weight scale shape does not match its blocks");
+    int64_t sx = 1, sn = weight_scale.stride(0), sk = weight_scale.stride(1);
+    if (!quantise) {
+        require(x_scale->device() == x.device() && x_scale->scalar_type() == at::kFloat &&
+                    x_scale->dim() == x.dim() &&
+                    (!c10::GradMode::is_enabled() || !x_scale->requires_grad()),
+                "FP8 input scales require matching CUDA device/rank and FP32 inference storage");
+        for (int64_t index = 0; index + 1 < x.dim(); ++index)
+            require(x_scale->size(index) == x.size(index), "FP8 input scale shape mismatch");
+        require(x_scale->size(-1) == inner / 32, "FP8 input scale shape mismatch");
+        sx = x_scale->stride(-1);
+    }
+    require(sx > 0 && sx <= INT_MAX && sn > 0 && sn <= INT_MAX && sk > 0 && sk <= INT_MAX,
+            "FP8 scale strides must be positive LP64 values");
+    c10::cuda::CUDAGuard guard(x.device());
+    auto *context = get_context(x.get_device(), default_algorithm);
+    auto shape = x.sizes().vec();
+    shape.back() = outputs;
+    Tensor result = at::empty(shape, x.options().dtype(at::kBFloat16));
+    size_t workspace_bytes =
+        camblas_cuda_fp8_workspace_size(int(quantise), int(outputs), int(inner));
+    Tensor workspace;
+    if (workspace_bytes)
+        workspace =
+            at::empty({int64_t(workspace_bytes / sizeof(float))}, x.options().dtype(at::kFloat));
+    void *scratch = workspace_bytes ? workspace.mutable_data_ptr() : nullptr;
+    int status =
+        quantise
+            ? camblas_cuda_fp8_linear(context, int(outputs), int(inner), x.const_data_ptr(),
+                                      weight.const_data_ptr(), weight_scale.const_data_ptr<float>(),
+                                      int(sn), int(sk), scratch, workspace_bytes,
+                                      result.mutable_data_ptr())
+            : camblas_cuda_fp8_decode(context, int(outputs), int(inner), x.const_data_ptr(),
+                                      x_scale->const_data_ptr<float>(), weight.const_data_ptr(),
+                                      weight_scale.const_data_ptr<float>(), int(sx), int(sn),
+                                      int(sk), scratch, workspace_bytes, result.mutable_data_ptr());
+    check(status, context);
+    return result;
+}
+
+Tensor fp8_decode_public(const Tensor &x, const Tensor &x_scale, const Tensor &weight,
+                         const Tensor &weight_scale)
+{
+    return fp8_product_public(x, x_scale, weight, weight_scale);
+}
+
+Tensor fp8_linear_public(const Tensor &x, const Tensor &weight, const Tensor &weight_scale)
+{
+    return fp8_product_public(x, c10::nullopt, weight, weight_scale);
+}
+
 struct QuantizedGroups {
     std::vector<Tensor> weights, scales;
     std::vector<const void *> pointers;
@@ -549,6 +634,12 @@ Tensor rms_norm_public(const Tensor &x, const Tensor &weight, double epsilon,
                                            result.mutable_data_ptr()),
               context);
         return result;
+    }
+    if (!known_reduction && rows == 1 && x.scalar_type() == at::kFloat && round_before_weight) {
+        // ATen may change its reduction tree between releases. Preserve the
+        // reference order until a native decode reduction is verified for it.
+        Tensor scale = xc.pow(2).mean(at::IntArrayRef{-1}, true).add(epsilon).rsqrt();
+        return wc.mul(xc.mul(scale));
     }
     if (!round_before_weight) {
         Tensor values = xc.to(at::kFloat);
@@ -1268,6 +1359,18 @@ PYBIND11_MODULE(_camblas_cuda_torch, module)
                py::arg("activation_block") = 32,
                "Multiply block-scaled FP8 input by FP8 or packed FP4 weights, returning BF16. "
                "Requires contiguous CUDA operands, E8M0 scales and an SM90+ binary.");
+    module.def("fp8_decode_supported", &fp8_decode_supported_public, py::arg("device") = -1,
+               "Return whether this CUDA build and device support native FP8 decode.");
+    module.def("fp8_decode", &fp8_decode_public, py::arg("input"), py::arg("input_scale"),
+               py::arg("weight"), py::arg("weight_scale"),
+               "Multiply one block32 E4M3 token by E4M3 weights, using FP32 scales and "
+               "ordered FP32 accumulation. Return fresh BF16 output on the current stream. "
+               "Requires an SM90a binary on SM90 hardware; positive scale strides are allowed.");
+    module.def("fp8_linear", &fp8_linear_public, py::arg("input"), py::arg("weight"),
+               py::arg("weight_scale"),
+               "Quantise one finite BF16 token to block32 E4M3 with power-of-two FP32 scales "
+               "and multiply E4M3 weights with ordered FP32 accumulation. Return fresh BF16 "
+               "output on the current stream. Requires an SM90a build on SM90 hardware.");
     module.def("add_rms_norm", &add_rms_norm_public, py::arg("x"), py::arg("residual"),
                py::arg("weight"), py::arg("epsilon") = 1e-6,
                "Return fresh residual sum and RMS-normalised output.");

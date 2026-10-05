@@ -1,0 +1,101 @@
+{
+  "source_repository": "https://github.com/sgl-project/sglang",
+  "source_revision": "42b9b99490dce025ff56afa0467c9b3b42595e42",
+  "torch": "2.13.0+cu129",
+  "sgl_kernel": "0.4.7",
+  "flashinfer": "0.6.18",
+  "engine_args": {
+    "tp_size": 4,
+    "dtype": "bfloat16",
+    "model_impl": "sglang",
+    "enable_multimodal": false,
+    "context_length": 4096,
+    "max_total_tokens": 4096,
+    "max_running_requests": 1,
+    "chunked_prefill_size": 2048,
+    "mem_fraction_static": 0.9,
+    "disable_radix_cache": true,
+    "cuda_graph_bs_decode": [
+      1
+    ],
+    "cuda_graph_max_bs_decode": 1,
+    "skip_tokenizer_init": true,
+    "enable_metrics": true,
+    "stream_interval": 1,
+    "load_format": "safetensors",
+    "log_level": "info",
+    "random_seed": 42
+  },
+  "environment": {
+    "SGLANG_RUST_BUILD_MODE": "never",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "CAMBLAS_SGLANG_ALGORITHM": "lt"
+  },
+  "models": {
+    "meta-llama/Llama-3.1-70B": {
+      "precision": "BF16 weights and activations, FP32 accumulation",
+      "atol": 0.02,
+      "rtol": 0.02,
+      "camblas_operations": "linear",
+      "engine_args": {
+        "attention_backend": "flashinfer",
+        "cuda_graph_bs_prefill": [
+          128,
+          512
+        ],
+        "mem_fraction_static": 0.85
+      }
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash": {
+      "precision": "Original checkpoint: FP4 routed experts, block-scaled FP8 dense weights, BF16 activations, FP32 accumulation; SGLang FP8 E4M3 KV cache",
+      "atol": 0,
+      "rtol": 0,
+      "camblas_operations": "linear,fp8",
+      "engine_args": {
+        "moe_runner_backend": "marlin"
+      },
+      "environment": {
+        "SGLANG_ENABLE_DSV41_ENGRAM_HOST_TABLE": "1",
+        "SGLANG_DSV41_ENGRAM_HOST_TABLE_LAYOUT": "per_rank",
+        "CAMBLAS_SGLANG_STABLE_MOE": "1"
+      },
+      "fp8_tiles": "configs/sglang-gh200-fp8.json"
+    }
+  },
+  "sglang": "0.5.20",
+  "packages": {
+    "torch": "2.13.0+cu129",
+    "sglang": "0.5.20",
+    "sglang-kernel": "0.4.7",
+    "flashinfer-python": "0.6.18",
+    "triton": "3.7.1",
+    "tilelang": "0.1.12",
+    "sgl-deep-gemm": "0.2.0",
+    "transformers": "5.12.1",
+    "tokenizers": "0.22.2",
+    "numpy": "2.3.5",
+    "safetensors": "0.8.0",
+    "apache-tvm-ffi": "0.1.11",
+    "z3-solver": "4.15.4.0",
+    "cuda-python": "12.9.4",
+    "ninja": "1.13.2"
+  },
+  "native_sources": {
+    "sgl_kernel": {
+      "repository": "https://github.com/sgl-project/sglang",
+      "revision": "94602c9c2b7cbdb8efd5c52802dac6a1c180089e",
+      "architecture": "SM90",
+      "cuda": "12.9.1"
+    },
+    "flashmla": {
+      "repository": "https://github.com/sgl-project/FlashMLA",
+      "revision": "3e18517fb055a6c9608eef5a1f1347fb1a047bbd"
+    },
+    "deep_gemm": {
+      "repository": "https://github.com/sgl-project/DeepGEMM",
+      "revision": "1ff3932f0f9d9187b92afb476da4e3ade10a6575"
+    }
+  }
+}
