@@ -147,22 +147,6 @@ def main():
                     args.jobs,
                 ]
             )
-        patch = ROOT / "patches/pytorch-2.8.0.patch"
-        source = base / "src/pytorch"
-        if args.dry_run:
-            run(["git", "-C", source, "apply", "--check", patch])
-            run(["git", "-C", source, "apply", patch])
-        else:
-            applied = (
-                subprocess.run(
-                    ["git", "-C", source, "apply", "--reverse", "--check", patch],
-                    capture_output=True,
-                ).returncode
-                == 0
-            )
-            if not applied:
-                run(["git", "-C", source, "apply", "--check", patch])
-                run(["git", "-C", source, "apply", patch])
         if not python.exists():
             run([sys.executable, "-m", "venv", base / "build-env"])
         run(
@@ -280,19 +264,6 @@ def main():
             PYTORCH_BUILD_VERSION="2.8.0",
             PYTORCH_BUILD_NUMBER="1",
         )
-        if not args.dry_run:
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    source,
-                    "apply",
-                    "--reverse",
-                    "--check",
-                    ROOT / "patches/pytorch-2.8.0.patch",
-                ],
-                check=True,
-            )
         command = [python, "setup.py", "bdist_wheel", "--dist-dir", wheel_dir]
     env = dict(os.environ, **settings)
     env["PATH"] = str(python.parent) + os.pathsep + env["PATH"]

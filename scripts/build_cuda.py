@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the standalone CAMBLAS CUDA backend without rebuilding PyTorch."""
+"""Build the CAMBLAS CUDA kernels and the optional PyTorch backend."""
 
 import argparse
 import hashlib
@@ -124,7 +124,7 @@ def main():
         binding_command = [
             args.cxx,
             "-O3",
-            "-std=c++17",
+            "-std=c++20",
             "-shared",
             "-fPIC",
             "-D_GLIBCXX_USE_CXX11_ABI=" + str(int(torch._C._GLIBCXX_USE_CXX11_ABI)),
@@ -143,6 +143,7 @@ def main():
                 str(binding_source),
                 "-lcamblas_cuda",
                 "-ltorch_python",
+                "-ltorch_cuda",
                 "-ltorch_cpu",
                 "-ltorch",
                 "-lc10",
@@ -154,7 +155,7 @@ def main():
         )
         print(shlex.join(binding_command), flush=True)
         compile_library(binding_command, binding_library)
-        sources.append(binding_source)
+        sources.extend([binding_source, ROOT / "src/cuda/torch_backend.cuh"])
         torch_version = torch.__version__
     record = dict(
         command=command,

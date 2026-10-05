@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from camblas_gpu import _native
+from _camblas import _native
 
 
 class QKVTests(unittest.TestCase):

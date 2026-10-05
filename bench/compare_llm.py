@@ -264,7 +264,8 @@ def main():
         Path(__file__),
         ROOT / "bench/llm_workload.py",
         ROOT / "camblas_sglang.py",
-        *sorted((ROOT / "camblas_gpu").glob("*.py")),
+        ROOT / "_camblas_backend.py",
+        *sorted((ROOT / "_camblas").glob("*.py")),
         ROOT / "bench/verify_llm_weights.py",
         args.runtime,
         args.weights_manifest,
@@ -417,6 +418,7 @@ def main():
                             + os.pathsep
                             + str(ROOT),
                             "SGLANG_PLUGINS": "camblas",
+                            "CAMBLAS_ENABLE": "1" if backend == "camblas" else "0",
                             "CAMBLAS_CUDA_LIBRARY": str(
                                 args.camblas_library.absolute()
                             ),

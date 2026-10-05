@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import torch
 
-import camblas_gpu as cb
+import _camblas as cb
 from camblas_sglang import canonical_moe_tokens
 
 

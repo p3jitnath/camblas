@@ -10,7 +10,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-import torch
 
 
 def main():
@@ -56,12 +55,6 @@ def main():
         default="pageable",
         help="Allocate each CPU output inside transfer timing; prefault includes zero-fill",
     )
-    parser.add_argument(
-        "--transfer-entry",
-        choices=["python", "native"],
-        default="python",
-        help="CAMBLAS CPU-to-GPU-to-CPU inference entry; every allocation and copy remains timed",
-    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--engine", choices=["pytorch", "camblas"], default="pytorch")
     parser.add_argument(
@@ -82,11 +75,6 @@ def main():
         help="PyTorch compiler mode; compilation is excluded from timed calls",
     )
     parser.add_argument(
-        "--host-access",
-        action="store_true",
-        help="Measure a separate coherent CPU-memory inference pipeline, without explicit copies",
-    )
-    parser.add_argument(
         "--algorithm",
         default="auto",
         choices=[
@@ -101,8 +89,10 @@ def main():
         ],
     )
     args = parser.parse_args()
-    if args.host_access and (args.engine != "camblas" or args.workload == "backward"):
-        parser.error("--host-access requires CAMBLAS inference, excluding backward")
+    os.environ["CAMBLAS_ENABLE"] = "1" if args.engine == "camblas" else "0"
+    os.environ["CAMBLAS_CUDA_ALGORITHM"] = args.algorithm
+    import torch
+
     if not torch.cuda.is_available():
         parser.error("A CUDA-enabled PyTorch build and accessible GPU are required")
     if args.repetitions < 5 or args.warmups < 3:
@@ -117,10 +107,12 @@ def main():
     cb = None
     if args.engine == "camblas":
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        import camblas_gpu
+        import _camblas
 
-        cb = camblas_gpu
-        cb.set_algorithm(args.algorithm)
+        cb = _camblas
+        from _camblas_backend import _autoload
+
+        _autoload()
     rng = np.random.default_rng(20260906)
     dtype = np.dtype(args.dtype)
     host_inputs = []
@@ -179,13 +171,13 @@ def main():
     # Dedicated linear APIs normally own contiguous [outputs, inputs] weights.
     # Preserve the mathematical arrays while storing those transposes densely.
     # This one-time CPU preparation is outside timing; each transfer call still
-    # copies every weight, and CAMBLAS keeps its natural [inputs, outputs] layout.
-    if cb is None and dedicated_api and args.workload in ("mlp", "backward"):
+    # copies every weight. Both backends use the same prepared layouts.
+    if dedicated_api and args.workload in ("mlp", "backward"):
         for index in (1, 3):
             host_inputs[index] = host_inputs[index].T.contiguous().T
 
     pytorch_function = None
-    if cb is None and args.pytorch_baseline != "eager":
+    if args.pytorch_baseline != "eager":
         from torch.nn import functional
 
         def pytorch_expression(*inputs):
@@ -225,72 +217,36 @@ def main():
             for i, value in enumerate(host_inputs)
         ]
 
-    def operation(inputs, host=False):
-        """Evaluate the matching mathematical operation in ``workload.py``.
+    def operation(inputs):
+        """Evaluate the same PyTorch expression for every selected backend.
 
         Parameters
         ----------
         inputs : list of torch.Tensor
-            Prepared CUDA inputs, with leaf tensors for gradient parameters.
-        host : bool, optional
-            Use coherent CPU tensors instead of the explicit-copy CUDA pipeline.
+            Prepared CUDA tensors, with leaf parameters for gradients.
 
         Returns
         -------
         list of torch.Tensor
-            Output followed by parameter gradients, if requested.
+            Output followed by requested parameter gradients.
         """
-        native = cb._tensor_binding if host else None
-        if host and native is None:
-            raise RuntimeError(
-                "Coherent host access requires the native tensor binding"
-            )
-        mm = (
-            native.matmul_host
-            if host
-            else cb.matmul
-            if cb is not None
-            else torch.matmul
-        )
-        if args.workload.startswith("square") or args.workload == "transpose":
+        for index in gradient_indices:
+            inputs[index].grad = None
+        if pytorch_function is not None:
+            output = pytorch_call(inputs)
+        elif args.workload.startswith("square") or args.workload == "transpose":
             x, y = inputs
-            output = (
-                pytorch_call(inputs)
-                if pytorch_function is not None
-                else mm(x.T if args.workload == "transpose" else x, y)
-            )
+            output = torch.matmul(x.T if args.workload == "transpose" else x, y)
         elif args.workload == "gram":
-            output = (
-                pytorch_call(inputs)
-                if pytorch_function is not None
-                else mm(inputs[0].T, inputs[0])
-            )
+            output = torch.matmul(inputs[0].T, inputs[0])
         elif args.workload in ("mlp", "backward"):
             x, w1, b1, w2, b2 = inputs
-            for index in gradient_indices:
-                inputs[index].grad = None
-            output = (
-                native.mlp_host(*inputs)
-                if host
-                else cb.mlp(*inputs)
-                if cb is not None
-                else pytorch_call(inputs)
-                if pytorch_function is not None
-                else torch.relu(x @ w1 + b1) @ w2 + b2
-            )
-            if gradient_indices:
-                (output * output).mean().backward()
+            output = torch.relu(x @ w1 + b1) @ w2 + b2
         else:
             q, k, v = inputs
-            output = (
-                native.attention_host(q, k, v, scale=1 / 16)
-                if host
-                else cb.attention(q, k, v, scale=1 / 16)
-                if cb is not None
-                else pytorch_call(inputs)
-                if pytorch_function is not None
-                else torch.softmax((q @ k.T) / 16, dim=-1) @ v
-            )
+            output = torch.softmax((q @ k.T) / 16, dim=-1) @ v
+        if gradient_indices:
+            (output * output).mean().backward()
         return [output] + [inputs[index].grad for index in gradient_indices]
 
     def pytorch_call(inputs):
@@ -326,44 +282,15 @@ def main():
 
     measurements = {}
     modes = (
-        ["host"]
-        if args.host_access
-        else ["transfer", "resident"]
-        if args.transfer_first
-        else ["resident", "transfer"]
+        ["transfer", "resident"] if args.transfer_first else ["resident", "transfer"]
     )
     for mode in modes:
         resident = device_inputs() if mode == "resident" else None
 
         def call():
             """Run one complete operation, copying results when transfers are timed."""
-            if (
-                mode == "transfer"
-                and args.transfer_entry == "native"
-                and cb is not None
-                and not gradient_indices
-            ):
-                options = dict(output_memory=args.output_memory)
-                if args.workload.startswith("square") or args.workload == "transpose":
-                    a, b = host_inputs
-                    return [
-                        cb.matmul_transfer(
-                            a.T if args.workload == "transpose" else a, b, **options
-                        )
-                    ]
-                if args.workload == "gram":
-                    return [cb.gram_transfer(host_inputs[0], **options)]
-                if args.workload == "mlp":
-                    return [cb.mlp_transfer(*host_inputs, **options)]
-                return [cb.attention_transfer(*host_inputs, scale=1 / 16, **options)]
-            inputs = (
-                host_inputs
-                if mode == "host"
-                else resident
-                if resident is not None
-                else device_inputs()
-            )
-            results = operation(inputs, host=mode == "host")
+            inputs = resident if resident is not None else device_inputs()
+            results = operation(inputs)
             if mode == "transfer":
                 outputs = []
                 for value in results:
@@ -421,10 +348,10 @@ def main():
             if mode == "transfer"
             else 0,
             host_input_bytes=sum(x.numel() * x.element_size() for x in host_inputs)
-            if mode in ("transfer", "host")
+            if mode == "transfer"
             else 0,
             host_output_bytes=sum(x.numel() * x.element_size() for x in output)
-            if mode in ("transfer", "host")
+            if mode == "transfer"
             else 0,
         )
         if mode == "resident":
@@ -444,16 +371,7 @@ def main():
     # Independent scalar dot-product checks use the already prepared host inputs.
     oracle = None
     if args.workload.startswith("square") or args.workload in ("transpose", "gram"):
-        result = (
-            (
-                operation(host_inputs, host=True)
-                if args.host_access
-                else operation(device_inputs())
-            )[0]
-            .detach()
-            .cpu()
-            .numpy()
-        )
+        result = operation(device_inputs())[0].detach().cpu().numpy()
         left = host_inputs[0].numpy()
         right = host_inputs[1].numpy() if len(host_inputs) == 2 else left
         if args.workload in ("transpose", "gram"):
@@ -472,7 +390,7 @@ def main():
         oracle = dict(sampled_entries=64, max_absolute_error=max(errors))
 
     operator_names = None
-    if cb is None and args.pytorch_baseline != "eager":
+    if args.pytorch_baseline != "eager":
         # CPU operator names identify SDPA's selected implementation without
         # requiring CUPTI. Profiling happens after every timed measurement.
         with torch.profiler.profile(
@@ -494,14 +412,12 @@ def main():
     record = dict(
         backend="camblas_cuda" if cb is not None else "cuda",
         engine=args.engine,
-        memory_mode="coherent_host" if args.host_access else "explicit_copy",
+        memory_mode="explicit_copy",
         output_memory=args.output_memory,
-        transfer_entry=args.transfer_entry
-        if cb is not None and not gradient_indices
-        else "python",
+        transfer_entry="python",
         algorithm=args.algorithm if cb is not None else "pytorch",
-        pytorch_baseline=args.pytorch_baseline if cb is None else None,
-        compile_mode=args.compile_mode if cb is None and compiled else None,
+        pytorch_baseline=args.pytorch_baseline,
+        compile_mode=args.compile_mode if compiled else None,
         pytorch_operator_names=operator_names,
         camblas_cuda_stats=cb.stats(all_threads=True) if cb is not None else None,
         framework="pytorch",

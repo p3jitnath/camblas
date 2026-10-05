@@ -3,32 +3,27 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "camblas-gpu"
+name = "camblas"
 version = "0.1.0.dev0"
-description = "CAMBLAS CUDA operations and optional SGLang integration"
+description = "CAMBLAS PyTorch backend and optional SGLang integration"
 requires-python = ">=3.11"
 dependencies = ["torch>=2.8"]
 
 [project.entry-points."sglang.srt.plugins"]
 camblas = "camblas_sglang:install"
 
+[project.entry-points."torch.backends"]
+camblas = "_camblas_backend:_autoload"
+
 [tool.setuptools]
-packages = ["camblas_gpu"]
-py-modules = ["camblas_sglang"]
+packages = ["_camblas"]
+py-modules = ["_camblas_backend", "camblas_sglang"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-include = ["bench/*.py", "scripts/*.py", "tests/*.py", "camblas_gpu/*.py", "camblas_sglang.py"]
-extend-exclude = [
-    "bench/results",
-    "bench/build_final60_candidate.py",
-    "bench/compare_loss_frameworks.py",
-    "bench/framework_workload.py",
-    "bench/test_framework_*.py",
-    "bench/test_mlp_packing.py",
-    "bench/validate_final60_*.py",
-]
+include = ["bench/*.py", "scripts/*.py", "tests/*.py", "_camblas/*.py", "camblas_sglang.py", "_camblas_backend.py"]
+extend-exclude = ["bench/results"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "D"]

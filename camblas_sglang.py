@@ -118,9 +118,13 @@ def install():
     import torch
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
-    import camblas_gpu as cb
+    import _camblas as cb
 
-    cb.set_algorithm(os.environ.get("CAMBLAS_SGLANG_ALGORITHM", "auto"))
+    cb.set_algorithm(os.environ.get("CAMBLAS_SGLANG_ALGORITHM", "lt"))
+    if "linear" in selected:
+        cb.tensor_module().install_torch_backend(
+            cb._native._ALGORITHMS[os.environ.get("CAMBLAS_SGLANG_ALGORITHM", "lt")]
+        )
 
     def linear(original, method, layer, x, bias=None):
         weight = layer.weight
@@ -135,7 +139,7 @@ def install():
             and not (torch.is_grad_enabled() and any(t.requires_grad for t in operands))
         ):
             _calls["linear"] = _calls.get("linear", 0) + 1
-            output = cb.linear(x.view(-1, x.shape[-1]), weight, bias)
+            output = torch.nn.functional.linear(x.view(-1, x.shape[-1]), weight, bias)
             return output.view(*x.shape[:-1], weight.shape[0])
         return original(method, layer, x, bias)
 

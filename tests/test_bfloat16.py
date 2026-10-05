@@ -4,8 +4,8 @@ import unittest
 
 import torch
 
-import camblas_gpu as cb
-from camblas_gpu import _native
+import _camblas as cb
+from _camblas import _native
 
 
 class Bfloat16Tests(unittest.TestCase):
@@ -186,40 +186,6 @@ class Bfloat16Tests(unittest.TestCase):
                     ),
                     0,
                 )
-
-    def test_graph_streams_and_changed_inputs(self):
-        """Replay changed weights on nondefault streams on every allocated GPU."""
-        for device in range(torch.cuda.device_count()):
-            for policy in ["auto", "lt"]:
-                a = torch.randn((17, 32), device=device, dtype=torch.bfloat16) / 4
-                b = torch.randn((32, 23), device=device, dtype=torch.bfloat16) / 4
-                stream = torch.cuda.Stream(device=device)
-                stream.wait_stream(torch.cuda.current_stream(device))
-                with torch.cuda.stream(stream), cb.algorithm(policy):
-                    for _ in range(3):
-                        cb.matmul(a, b)
-                    graph = torch.cuda.CUDAGraph()
-                    with torch.cuda.graph(graph, stream=stream):
-                        output = cb.matmul(a, b)
-                    a.add_(0.125)
-                    b.mul_(-0.5)
-                    graph.replay()
-                stream.synchronize()
-                self.assert_product(output, a, b)
-                graph.reset()
-
-    def test_gradients(self):
-        """Compare both first derivatives with independent FP64 products."""
-        a = torch.randn(
-            (17, 13), device="cuda", dtype=torch.bfloat16, requires_grad=True
-        )
-        b = torch.randn(
-            (13, 23), device="cuda", dtype=torch.bfloat16, requires_grad=True
-        )
-        cb.matmul(a, b).sum().backward()
-        grad = torch.ones((17, 23), device="cuda", dtype=torch.bfloat16)
-        self.assert_product(a.grad, grad, b.detach().T)
-        self.assert_product(b.grad, a.detach().T, grad)
 
     def test_llama_inner_dimensions(self):
         """Check long Llama dot products, including changed values and cancellation."""

@@ -5,8 +5,8 @@ import unittest
 
 import torch
 
-import camblas_gpu as cb
-from camblas_gpu import _native
+import _camblas as cb
+from _camblas import _native
 
 
 def dequantize(x, scales, block, packed=False, weight=False):

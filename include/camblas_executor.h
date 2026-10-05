@@ -1,113 +1,55 @@
 /*
- * CAMBLAS execution-context executor — caller-owned parallelism contract.
+ * CAMBLAS uses a caller-owned executor to dispatch independent GEMM tasks.
+ * Each camblas_ctx_t references its executor through ctx->executor, so callers
+ * can use different pools or reuse an application's pool without changing
+ * process-wide BLAS thread settings. The default camblas_executor_serial runs
+ * tasks in order on the calling thread.
  *
- * The per-call execution context can use a caller-provided executor without
- * introducing process-wide threading state into the native interface.
+ * Tasks write disjoint regions of C, with rows [i0,i1) and columns [j0,j1), and
+ * only read A/B through gctx. They can run concurrently in any order without
+ * racing on C. Partitioning preserves each element's accumulation sequence;
+ * serial scalar output therefore matches the preceding monolithic scalar
+ * kernel bitwise, and concurrency preserves that per-element sequence.
  *
- * PROBLEM IT SOLVES
- *   Conventional BLAS libraries (OpenBLAS, BLIS, Cray LibSci) drive internal
- *   parallelism through PROCESS-GLOBAL state: openblas_set_num_threads(),
- *   OMP_NUM_THREADS, bli_global_rntm(), etc. In a concurrently threaded
- *   application, every BLAS call contends for the same global knob, so
- *   nested/parallel callers cannot independently control their BLAS threading
- *   without racing on that global state. This is the core composability
- *   failure mode CAMBLAS targets (RQ1/RQ2).
+ * Scalar and packed kernels, including the Grace kernels, use this interface.
+ * Packing and compute complete synchronously, and independent calls require
+ * distinct mutable workspaces. Scalar execution currently partitions M with
+ * the full column range per task; the packed correctness gate uses M x N
+ * rectangles. K decomposition and reduction tasks remain future work. The
+ * caller sets affinity and NUMA policy; camblas_topology_t describes placement.
  *
- * CAMBLAS DESIGN
- *   The GEMM execution path partitions the output matrix into independent
- *   TILE TASKS and hands them to an EXECUTOR. The executor is referenced
- *   PER-CALL from the camblas_ctx_t (ctx->executor), NOT from any global. So:
- *     - Two callers can issue GEMM concurrently with DIFFERENT executors
- *       (e.g. different thread pools) without interfering.
- *     - A caller that already owns a thread pool / task system can plug it in
- *       as the executor, so BLAS parallelism COMPOSES with the caller's
- *       parallelism rather than fighting it (no oversubscription).
- *     - The default executor (camblas_executor_serial) runs tasks in the
- *       calling thread, in order. Scalar execution remains the portable
- *       deterministic path; the correctness-gated packed branch also uses
- *       the same interface when a caller supplies an executor.
+ * run() must finish every fn invocation before returning. On success, task
+ * writes to C must be visible to the calling thread through a happens-before
+ * relationship, for example pthread_join or mutex synchronisation. The caller
+ * can then read C immediately.
  *
- * TASK INDEPENDENCE CONTRACT
- *   Every task describes a DISJOINT region of the output C: rows [i0,i1) and
- *   columns [j0,j1). Two different tasks never write the same C element, and
- *   each task only READS its A/B operands. Therefore an executor MAY run tasks
- *   concurrently and in any order without data races. The serial executor
- *   produces bitwise-identical output to the prior monolithic scalar kernel
- *   because the per-element operation sequence is unchanged (only the loop
- *   partitioning differs). A concurrent executor also produces a correct
- *   result; whether it is bitwise-identical depends only on each element's
- *   independent accumulation, which is unchanged.
+ * run() must call fn(&tasks[k], gctx) exactly once for each k in [0,n_tasks).
+ * It must not call fn outside that range or after returning. Each task pointer
+ * remains valid during its fn call, and gctx remains valid throughout run().
+ * fn writes only its task's C region and reads A/B through gctx.
  *
- * CURRENT SCOPE / NOT CLAIMED
- *   - Scalar and packed execution use this interface, including the tuned
- *     Grace kernels. Packing and compute phases complete synchronously;
- *     callers must not share mutable workspace between independent calls.
- *   - Scalar execution currently splits only M (full column range per task).
- *     The packed correctness gate uses 2D M x N rectangles; K decomposition
- *     and reduction tasks remain future work.
- *   - The executor does not set affinity or NUMA policy; that is the caller's
- *     responsibility (the caller owns the threads). Topology-aware placement is
- *     surfaced separately via camblas_topology_t.
+ * Return 0 on success and -1 on failure. If all tasks cannot be guaranteed to
+ * complete successfully, return -1; GEMM then returns -1 and leaves plan_out
+ * untouched. C may contain partial results after an error and is unspecified.
+ * Negative n_tasks is invalid and must return -1. For n_tasks == 0, tasks may
+ * be NULL, and run() must return 0 without calling fn.
  *
- * CONTRACT SEMANTICS
+ * Keep the executor handle, tasks and gctx valid throughout run(), and keep
+ * ctx->executor valid throughout the GEMM call. The executor must not retain
+ * tasks, gctx or fn after returning.
  *
- *   Synchronous completion:
- *     run() MUST return only after every invocation of fn has fully completed.
- *     When run() returns 0, all writes to C by every task invocation are
- *     visible to the calling thread (the executor establishes a happens-before
- *     relationship between task completion and run() return — e.g. via
- *     pthread_join, mutex release, or equivalent). The caller may immediately
- *     read the result matrix C. An executor that dispatches asynchronously
- *     and returns before tasks finish violates the contract.
+ * The interface has no global mutable state, and the serial executor supports
+ * nested GEMM calls. A shared caller-owned executor requires its own
+ * synchronisation. A fixed-size pool can deadlock when a task submits a nested
+ * GEMM to the same pool without spare workers; provide capacity for nesting or
+ * document the restriction.
  *
- *   Callback ("exactly once") semantics:
- *     run() MUST call fn(&tasks[k], gctx) exactly once for every k in
- *     [0, n_tasks). It MUST NOT call fn for k outside [0, n_tasks). It MUST
- *     NOT call fn after run() has returned. Each task pointer passed to fn
- *     remains valid for the duration of that fn call; gctx remains valid for
- *     the duration of run(). fn writes only the C elements in the task's
- *     [i0,i1) x [j0,j1) region and reads only A/B via gctx.
- *
- *   Error / fail-closed semantics:
- *     run() returns 0 on success, -1 on failure. If run() returns -1, the
- *     GEMM returns -1 to its caller (fail-closed): the operation is treated
- *     as failed and plan_out is not written. The state of C after an error is
- *     UNSPECIFIED — partial computation may have occurred, so the caller must
- *     not rely on C. An executor that cannot guarantee all tasks completed
- *     successfully MUST return -1.
- *     A negative n_tasks value is invalid and must return -1. For n_tasks == 0,
- *     tasks may be NULL and the executor must return 0 without invoking fn.
- *
- *   Lifetime:
- *     The executor handle (camblas_executor_t), the tasks array, and gctx
- *     must remain valid for the entire duration of the run() call. The
- *     executor MUST NOT retain pointers to tasks, gctx, or fn after run()
- *     returns (no asynchronous escape of GEMM-internal state). The executor
- *     handle itself (ctx->executor) must remain valid for the duration of
- *     the GEMM call that reads it.
- *
- *   Reentrancy:
- *     The executor interface uses no global mutable state. The default serial
- *     executor is reentrant (it is a plain in-order loop), so a GEMM call
- *     issued from within a task fn (nested GEMM) is safe with the serial
- *     executor. A caller-provided executor is responsible for its own
- *     synchronization if shared across threads. A fixed-size thread-pool
- *     executor may DEADLOCK if a task fn issues a nested GEMM that dispatches
- *     to the same pool with no spare workers — such executors should either
- *     document this limitation or provide enough workers for nesting.
- *
- *   n_tasks == 0:
- *     After the public arguments and execution context have been validated,
- *     the GEMM does NOT invoke run() when there are no output tasks (m == 0
- *     or n == 0): it returns 0 directly for a valid executor. A non-NULL
- *     caller-owned executor whose run callback is NULL remains invalid and is
- *     rejected before this no-op rule; plan_out is left untouched on that
- *     error. The same executor validity rule applies to positive-output
- *     alpha==0 or zero-K, beta==1 no-read/no-write calls: a valid executor is
- *     not invoked, while a malformed caller-owned executor is rejected.
- *     Executor authors should still handle n_tasks == 0 defensively by
- *     returning 0 without calling fn; a NULL tasks pointer is acceptable in
- *     this zero-task case. Negative counts are invalid.
+ * GEMM validates arguments and context before either no-op form. With a valid
+ * executor, m == 0 or n == 0 returns 0 without calling run(). A non-NULL executor
+ * with a NULL callback is invalid, and plan_out remains untouched on rejection.
+ * The same rule applies when positive-output alpha==0 or zero-K calls have
+ * beta==1: a valid executor is not invoked, and a malformed one is rejected.
+ * Executor implementations should still handle zero-task calls as specified.
  */
 #ifndef CAMBLAS_EXECUTOR_H
 #define CAMBLAS_EXECUTOR_H

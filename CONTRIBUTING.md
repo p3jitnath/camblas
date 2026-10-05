@@ -1,6 +1,6 @@
 # Contributing to CAMBLAS
 
-Start with the [README](README.md), create a branch from `main`, and keep each pull request focused. Discuss API, numerical-contract or dispatch-policy changes before implementing them.
+Start with the [README](README.md), create a branch from `main`, and keep each pull request focused. Describe proposed changes to the API, numerical contracts or dispatch policy before implementing them.
 
 ```bash
 git switch -c your-change
@@ -9,7 +9,9 @@ python3.11 -m compileall -q scripts bench tests
 git diff --check
 ```
 
-Use four-space indentation, descriptive names and comments explaining non-obvious choices. Document Python helpers in NumPy style and C interfaces with their layout, ownership and failure contracts. Check formatting with the pinned project-local tools; use `make format` with the same `PYTHON` to apply fixes.
+Use [ASD-STE100-CONV](https://github.com/p3jitnath/esm.md/blob/main/standards/ASD-STE100-CONV.md) for all documentation, comments, docstrings and work reports. Write connected technical prose in British English, give each paragraph a clear purpose, and preserve equations, units, identifiers and numerical contracts. Keep each prose paragraph or list item on one physical Markdown line, while preserving the layout of code, tables and equations.
+
+Use four-space indentation and descriptive names, with comments that explain choices the code cannot make clear. Preserve NumPy-style Python docstrings, and document the layout, ownership and failure contracts of C interfaces. The pinned project tools check formatting; use `make format` with the same `PYTHON` to apply fixes.
 
 ```bash
 python3.11 -m venv .frameworks/style-env
@@ -17,11 +19,11 @@ python3.11 -m venv .frameworks/style-env
 make format-check PYTHON=.frameworks/style-env/bin/python
 ```
 
-Include the following evidence and checks with each relevant change:
+Include the evidence needed to assess each change:
 
-- **Correctness:** add an independent regression test covering affected precisions, transposes, padding, alpha/beta, changed inputs and dispatch boundaries. For alternative multiplication algorithms, include cancellation and exceptional-input cases; overflow checks alone do not establish accuracy. Preserve caller-owned workspace and synchronous executor contracts; use sanitiser checks where relevant.
-- **Performance:** compare against an unchanged CAMBLAS control, OpenBLAS and NVPL with identical inputs, affinity and thread settings. Use at least three fresh-process rounds with rotated order; report medians, ranges and regressions. Record node-sharing conditions and confirm gains on idle allocated CPUs. Test affected cases first, identify rows not remeasured with the candidate, and report any non-default allocator or OpenMP settings separately.
-- **Reproduction:** include commands, compiler/dependency versions and library identities; verify actual backend calls. Explain the mechanism, limitations and any ABI or rounding changes.
-- **Hygiene:** keep binaries, wheels, dependencies, results, credentials and internal documents out of Git. Use ignored `build/`, `.frameworks/` and `results/` directories, and keep prose concise in British English.
+- **Correctness:** keep tests that protect required behaviour, and remove duplicate or obsolete cases. Extend an existing independent test where possible; cover the precisions, layouts, alpha/beta values, changed inputs and dispatch boundaries affected by the change. Alternative multiplication algorithms also require cancellation and exceptional-input checks, because overflow checks alone do not establish accuracy. Preserve caller-owned workspace and synchronous executor contracts, and use sanitiser checks when the change affects memory or synchronisation.
+- **Performance:** measure the candidate and an unchanged CAMBLAS control under the same inputs, precision, hardware, affinity, thread settings and transfer policy. Use OpenBLAS and NVPL for CPU comparisons, PyTorch for CUDA comparisons, and the same SGLang engine for LLM comparisons. Run at least three fresh processes with rotated backend order on quiet allocated nodes, then report medians, ranges and regressions. Identify results that were not remeasured, and record any allocator or OpenMP settings that differ from the defaults.
+- **Reproduction:** record commands, compiler and dependency versions, library identities and evidence of actual backend calls. Explain how the change works, where it applies, and whether it changes the ABI or rounding behaviour.
+- **Hygiene:** keep binaries, wheels, dependencies, results, credentials and internal records out of Git. Store them under ignored `build/`, `.frameworks/` or `results/` directories.
 
-Contributions are accepted under the [MIT licence](LICENSE); preserve copyright notices and any required third-party attribution.
+Contributions use the [MIT licence](LICENSE); preserve copyright notices and required third-party attribution.

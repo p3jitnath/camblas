@@ -16,8 +16,8 @@ except ImportError:
 
 CUDA_AVAILABLE = torch is not None and torch.cuda.is_available()
 if CUDA_AVAILABLE:
-    import camblas_gpu as cb
-    from camblas_gpu import _native
+    import _camblas as cb
+    from _camblas import _native
 
 
 @unittest.skipUnless(CUDA_AVAILABLE, "A CUDA-enabled PyTorch is required")
@@ -117,8 +117,8 @@ class CudaTests(unittest.TestCase):
         code = """
 import ctypes
 import torch
-import camblas_gpu as cb
-from camblas_gpu import _native
+import _camblas as cb
+from _camblas import _native
 ctypes.CDLL(_native.library()._name, mode=ctypes.RTLD_GLOBAL)
 injector = ctypes.CDLL(None)
 injector.camblas_test_fail_next_allocation.argtypes = []
@@ -855,7 +855,7 @@ for dtype in (torch.float32, torch.float64):
 import os
 from pathlib import Path
 import torch
-import camblas_gpu as cb
+import _camblas as cb
 directory = Path(os.environ['CAMBLAS_TEST_CONTROL_DIRECTORY'])
 a = torch.ones((2, 2), device='cuda', dtype=torch.float64)
 torch.testing.assert_close(cb.matmul(a, a), torch.full_like(a, 2))
@@ -1149,8 +1149,8 @@ assert len(paths) == 2, paths
         """Clean up autograd worker contexts before the CUDA runtime shuts down."""
         code = """
 import torch
-import camblas_gpu as cb
-from camblas_gpu._native import close, tensor_module
+import _camblas as cb
+from _camblas._native import close, tensor_module
 torch.set_num_threads(4)
 for repeat in range(2):
     for policy in ('classical', 'auto'):
@@ -1206,8 +1206,8 @@ for repeat in range(2):
         code = """
 import os
 import torch
-import camblas_gpu as cb
-from camblas_gpu._native import close
+import _camblas as cb
+from _camblas._native import close
 torch.set_num_threads(1)
 a = torch.eye(4, device='cuda')
 cb.matmul(a, a)

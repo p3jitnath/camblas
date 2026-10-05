@@ -115,27 +115,20 @@ def report(directory, rows, manifest):
         f"{manifest['hostname']}, {manifest['timestamp']}; one GPU, full FP32/FP64, "
         f"TF32 disabled, {manifest['rounds']} fresh processes per backend/case.",
         "",
-        f"PyTorch baseline: {manifest.get('pytorch_baseline', 'eager')}. "
-        "The fused baseline uses linear and scaled-dot-product attention APIs; "
-        f"compiled and compiled-fused use torch.compile(mode='{manifest.get('compile_mode') or 'reduce-overhead'}') "
-        "on eager expressions and dedicated APIs respectively. Dedicated PyTorch "
-        "baselines use contiguous linear "
-        "weights prepared once on the CPU; CAMBLAS retains its natural weight "
-        "layout. Mathematical values and transfer bytes match; physical input "
-        "strides are recorded. Compilation is excluded during warm-up; any "
-        "graph replay, input staging and call overhead are included in timing.",
+        f"PyTorch expression: {manifest.get('pytorch_baseline', 'eager')}. "
+        "Both routes use the same expressions and physical input layouts. "
+        "The fused expression uses standard linear and scaled-dot-product attention; "
+        "compiled modes apply torch.compile to both routes. Compilation is excluded, "
+        "while execution, input staging and graph replay remain timed.",
         "",
         "Speedup = PyTorch time / CAMBLAS time; values above 1 favour CAMBLAS.",
         f"CPU output allocation: {manifest.get('output_memory', 'pageable')}. "
         "Fresh allocation remains inside each timed call for every backend. "
         "Prefault includes a full CPU zero-fill; pinned uses PyTorch's warmed host allocator.",
-        f"Candidate transfer entry: {manifest.get('transfer_entry', 'python')}; saved controls use Python. "
         f"Candidate algorithm: {manifest.get('camblas_algorithm', 'auto')}. "
-        "Resident timings include tensor allocation, dispatch and stream completion. "
-        "Transfer timings also copy every input/weight from pageable CPU memory "
-        "and every result/parameter gradient back on every call. Tuning and "
-        "context allocation occur during warm-up. The classical control uses "
-        "CAMBLAS's native fusion with classical cuBLAS multiplication.",
+        "Resident calls include tensor allocation, dispatch and stream completion. "
+        "Transfer calls also copy every input, weight, output and gradient. "
+        "The classical control selects cuBLAS behind the same PyTorch interface.",
         "",
         "| Workload | Precision | PyTorch resident ms | CAMBLAS resident ms | Speedup | PyTorch transfers ms | CAMBLAS transfers ms | Speedup |",
         "|---|---|---:|---:|---:|---:|---:|---:|",
@@ -240,10 +233,10 @@ def report(directory, rows, manifest):
             "",
             "Strassen changes summation order and may worsen relative error under cancellation. "
             "Its range check selects classical GEMM for unsafe inputs. Native "
-            "attention and affine/backward fusions preserve FP32/FP64 compute "
+            "PyTorch expressions retain FP32/FP64 compute "
             "types. No TF32 or reduced-precision inputs are used. "
             + (
-                "PyTorch uses Inductor compilation; CAMBLAS executes ordinary eager calls. "
+                "Both routes use the selected PyTorch compilation mode. "
                 + (
                     "The selected compiler mode may use internal CUDA graphs."
                     if (manifest.get("compile_mode") or "reduce-overhead")
@@ -297,12 +290,6 @@ def main():
         choices=["pageable", "prefault", "pinned"],
         default="pageable",
         help="CPU output allocation policy applied identically to every backend",
-    )
-    parser.add_argument(
-        "--transfer-entry",
-        choices=["python", "native"],
-        default="python",
-        help="Use the native transfer entry for candidate inference; saved controls keep their existing Python entry",
     )
     parser.add_argument(
         "--workloads", nargs="+", choices=GPU_WORKLOADS, default=list(WORKLOADS)
@@ -359,11 +346,6 @@ def main():
         default="reduce-overhead",
         help="PyTorch compiler mode, excluding compilation from timing",
     )
-    parser.add_argument(
-        "--coherent-host",
-        action="store_true",
-        help="Add a separate coherent-host inference comparison in place of the classical control",
-    )
     args = parser.parse_args()
     policy_overrides = (
         "LD_PRELOAD",
@@ -383,13 +365,9 @@ def main():
         parser.error(
             "Unset preload, allocator, wait-policy and CUDA compute overrides before default comparisons"
         )
-    backends = ("pytorch", "camblas", "coherent") if args.coherent_host else BACKENDS
+    backends = BACKENDS
     if args.control_library:
         backends = (*backends, "control")
-    if args.coherent_host and "backward" in args.workloads:
-        if "--workloads" in os.sys.argv:
-            parser.error("Coherent host access supports inference; omit backward")
-        args.workloads.remove("backward")
     if args.rounds < 3:
         parser.error("Use at least three fresh-process rounds")
     cpus = sorted(os.sched_getaffinity(0))[: args.threads]
@@ -400,7 +378,7 @@ def main():
     manifest = dict(
         camblas_algorithm=args.camblas_algorithm,
         output_memory=args.output_memory,
-        transfer_entry=args.transfer_entry,
+        transfer_entry="python",
         timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         hostname=socket.gethostname(),
         command=os.sys.argv,
@@ -409,7 +387,7 @@ def main():
         affinity=cpus,
         slurm_job_id=os.environ.get("SLURM_JOB_ID"),
         backends=list(backends),
-        coherent_host=args.coherent_host,
+        coherent_host=False,
         pytorch_baseline=args.pytorch_baseline,
         compile_mode=args.compile_mode
         if args.pytorch_baseline.startswith("compiled")
@@ -441,6 +419,7 @@ def main():
     }
     sources = [
         ROOT / "bench/cuda_workload.py",
+        ROOT / "_camblas_backend.py",
         ROOT / "bench/compare_cuda.py",
         ROOT / "bench/compare.py",
         Path(__file__).resolve(),
@@ -450,7 +429,7 @@ def main():
         ROOT / "tests/cuda_fail_alloc.c",
         ROOT / "tests/test_tools.py",
         *sorted((ROOT / "src/cuda").glob("*")),
-        *sorted((ROOT / "camblas_gpu").glob("*.py")),
+        *sorted((ROOT / "_camblas").glob("*.py")),
     ]
     sources = [p for p in sources if p.is_file()]
     manifest["source_sha256"] = {str(p.relative_to(ROOT)): digest(p) for p in sources}
@@ -532,18 +511,8 @@ def main():
                         "--output",
                         str(output),
                     ]
-                    command.extend(
-                        [
-                            "--transfer-entry",
-                            args.transfer_entry
-                            if backend in ("camblas", "classical")
-                            else "python",
-                        ]
-                    )
                     if round_id % 2:
                         command.append("--transfer-first")
-                    if backend == "coherent":
-                        command.append("--host-access")
                     environment = dict(
                         os.environ,
                         CUDA_VISIBLE_DEVICES=os.environ.get(
@@ -553,6 +522,8 @@ def main():
                         OPENBLAS_NUM_THREADS=str(args.threads),
                         MKL_NUM_THREADS=str(args.threads),
                     )
+                    environment["CAMBLAS_ENABLE"] = "1" if engine == "camblas" else "0"
+                    environment["CAMBLAS_CUDA_ALGORITHM"] = algorithm
                     environment.pop("CAMBLAS_CUDA_LIBRARY", None)
                     if backend == "control":
                         environment["CAMBLAS_CUDA_LIBRARY"] = manifest["control"][
@@ -597,14 +568,11 @@ def main():
                         algorithm if engine == "camblas" else "pytorch"
                     ):
                         raise ValueError("Unexpected measured implementation")
-                    if record.get("pytorch_baseline") != (
-                        args.pytorch_baseline if engine == "pytorch" else None
-                    ):
+                    if record.get("pytorch_baseline") != args.pytorch_baseline:
                         raise ValueError("Unexpected PyTorch baseline")
                     if record.get("compile_mode") != (
                         args.compile_mode
-                        if engine == "pytorch"
-                        and args.pytorch_baseline.startswith("compiled")
+                        if args.pytorch_baseline.startswith("compiled")
                         else None
                     ):
                         raise ValueError("Unexpected PyTorch compiler mode")
@@ -623,11 +591,6 @@ def main():
                         validate_native_libraries(
                             record, build, control=backend == "control"
                         )
-                        if (
-                            workload == "backward"
-                            and not record["camblas_cuda_stats"]["backward"]
-                        ):
-                            raise ValueError("The native MLP backward was not observed")
                     identities.add(tuple(record["input_sha256"]))
                     vendor_identities.add(
                         tuple(
@@ -687,10 +650,6 @@ def main():
                 / medians["camblas_transfer"],
             )
             rows.append(row)
-            if args.coherent_host:
-                row["speedup_host"] = (
-                    medians["pytorch_transfer"] / medians["coherent_host"]
-                )
             if manifest["control"]:
                 for mode in ("resident", "transfer"):
                     row["speedup_control_" + mode] = (

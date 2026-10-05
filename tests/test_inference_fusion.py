@@ -5,7 +5,7 @@ import unittest
 import torch
 import torch.nn.functional as functional
 
-from camblas_gpu import _native
+from _camblas import _native
 
 
 class InferenceFusionTests(unittest.TestCase):

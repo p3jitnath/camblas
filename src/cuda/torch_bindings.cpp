@@ -2,6 +2,10 @@
 #include "camblas_cuda.h"
 
 #include <ATen/core/Tensor.h>
+#include <ATen/Context.h>
+#include <ATen/ops/mm_cuda_dispatch.h>
+#include <ATen/ops/addmm_cuda_dispatch.h>
+#include <torch/library.h>
 #include <ATen/ops/empty.h>
 #include <ATen/ops/softmax.h>
 #include <ATen/ops/where.h>
@@ -149,7 +153,7 @@ Operand operand(const Tensor &tensor)
 }
 
 Tensor matmul(const Tensor &a, const Tensor &b, const std::optional<Tensor> &output, double alpha,
-              double beta, int algorithm)
+              double beta, int algorithm, bool update_version = true)
 {
     validate(a, a, true);
     validate(b, a, true);
@@ -189,7 +193,7 @@ Tensor matmul(const Tensor &a, const Tensor &b, const std::optional<Tensor> &out
                                left.tensor.const_data_ptr(), left.ld, right.tensor.const_data_ptr(),
                                right.ld, float(beta), c.mutable_data_ptr(), std::max(1, n));
     check(status, context);
-    if (output && !c.is_inference())
+    if (output && update_version && !c.is_inference())
         torch::autograd::impl::bump_version(c);
     return c;
 }
@@ -1072,118 +1076,6 @@ struct HostCompletion {
     }
 };
 
-Tensor upload_transfer(const Tensor &value, c10::Device device)
-{
-    if (!value.is_non_overlapping_and_dense())
-        return value.to(device);
-    Tensor output = at::empty_strided(value.sizes(), value.strides(),
-                                      value.options().device(device).pinned_memory(false));
-    if (value.numel()) {
-        cudaError_t error = cudaMemcpyAsync(output.mutable_data_ptr(), value.const_data_ptr(),
-                                            value.nbytes(), cudaMemcpyHostToDevice,
-                                            c10::cuda::getCurrentCUDAStream(device.index()));
-        if (error != cudaSuccess)
-            throw std::runtime_error(cudaGetErrorString(error));
-    }
-    return output;
-}
-
-Tensor transfer_result(const Tensor &value, const std::string &memory, HostCompletion &completion)
-{
-    require(memory == "pageable" || memory == "prefault" || memory == "pinned",
-            "Unknown CPU output allocation policy");
-    Tensor output = at::empty(value.sizes(),
-                              value.options().device(at::kCPU).pinned_memory(memory == "pinned"));
-    if (memory == "prefault")
-        output.zero_();
-    if (value.numel()) {
-        // Every transfer operation produces a fresh contiguous CUDA result.
-        cudaError_t error =
-            cudaMemcpyAsync(output.mutable_data_ptr(), value.const_data_ptr(), value.nbytes(),
-                            cudaMemcpyDeviceToHost, completion.stream);
-        if (error != cudaSuccess)
-            throw std::runtime_error(cudaGetErrorString(error));
-    }
-    completion.finish();
-    return output;
-}
-
-void validate_transfer(const Tensor &value, const Tensor &reference)
-{
-    validate_host(value, reference);
-    require(!c10::GradMode::is_enabled() || !value.requires_grad(),
-            "Explicit transfer operations support inference only");
-}
-
-void validate_transfer_stream()
-{
-    cudaStreamCaptureStatus capture;
-    cudaError_t error = cudaStreamIsCapturing(c10::cuda::getCurrentCUDAStream(), &capture);
-    require(error == cudaSuccess && capture == cudaStreamCaptureStatusNone,
-            "Synchronous CPU transfers cannot run during CUDA graph capture");
-}
-
-Tensor matmul_transfer(const Tensor &a, const Tensor &b, int device, const std::string &memory,
-                       int algorithm)
-{
-    validate_transfer(a, a);
-    validate_transfer(b, a);
-    require(a.dim() == 2 && b.dim() == 2 && a.size(1) == b.size(0),
-            "matmul requires compatible rank-two operands");
-    c10::cuda::CUDAGuard guard(device);
-    validate_transfer_stream();
-    HostCompletion completion(device);
-    Tensor ac = upload_transfer(a, c10::Device(c10::kCUDA, device));
-    Tensor bc = upload_transfer(b, c10::Device(c10::kCUDA, device));
-    return transfer_result(matmul_public(ac, bc, std::nullopt, 1., 0., algorithm), memory,
-                           completion);
-}
-
-Tensor gram_transfer(const Tensor &a, int device, const std::string &memory, int algorithm)
-{
-    validate_transfer(a, a);
-    require(a.dim() == 2, "Gram requires a rank-two operand");
-    c10::cuda::CUDAGuard guard(device);
-    validate_transfer_stream();
-    HostCompletion completion(device);
-    Tensor ac = upload_transfer(a, c10::Device(c10::kCUDA, device));
-    return transfer_result(matmul_public(ac.t(), ac, std::nullopt, 1., 0., algorithm), memory,
-                           completion);
-}
-
-Tensor mlp_transfer(const Tensor &x, const Tensor &w1, const Tensor &b1, const Tensor &w2,
-                    const Tensor &b2, int device, const std::string &memory, int algorithm)
-{
-    for (const Tensor &value : {x, w1, b1, w2, b2})
-        validate_transfer(value, x);
-    c10::cuda::CUDAGuard guard(device);
-    validate_transfer_stream();
-    HostCompletion completion(device);
-    c10::Device target(c10::kCUDA, device);
-    std::array<Tensor, 5> uploaded;
-    int index = 0;
-    for (const Tensor &value : {x, w1, b1, w2, b2})
-        uploaded[index++] = upload_transfer(value, target);
-    return transfer_result(
-        mlp_public(uploaded[0], uploaded[1], uploaded[2], uploaded[3], uploaded[4], algorithm),
-        memory, completion);
-}
-
-Tensor attention_transfer(const Tensor &q, const Tensor &k, const Tensor &v,
-                          std::optional<double> scale, int device, const std::string &memory,
-                          int algorithm)
-{
-    for (const Tensor &value : {q, k, v})
-        validate_transfer(value, q);
-    c10::cuda::CUDAGuard guard(device);
-    validate_transfer_stream();
-    HostCompletion completion(device);
-    c10::Device target(c10::kCUDA, device);
-    Tensor qc = upload_transfer(q, target), kc = upload_transfer(k, target),
-           vc = upload_transfer(v, target);
-    return transfer_result(attention_public(qc, kc, vc, scale, algorithm), memory, completion);
-}
-
 Tensor matmul_host(const Tensor &a, const Tensor &b, const std::optional<Tensor> &output,
                    double alpha, double beta, int device)
 {
@@ -1275,6 +1167,7 @@ Tensor attention_host(const Tensor &q, const Tensor &k, const Tensor &v,
     completion.finish();
     return output;
 }
+#include "torch_backend.cuh"
 } // namespace
 
 void close_all()
@@ -1300,6 +1193,7 @@ void close_all()
 
 PYBIND11_MODULE(_camblas_cuda_torch, module)
 {
+    module.def("install_torch_backend", &install_torch_backend);
     module.attr("quantized_tile_rows") = 16;
     py::class_<QuantizedGroups>(
         module, "QuantizedGroups",
@@ -1334,20 +1228,6 @@ PYBIND11_MODULE(_camblas_cuda_torch, module)
     module.def("qkv_linear", &qkv_linear_public, py::arg("input"), py::arg("q_weight"),
                py::arg("k_weight"), py::arg("v_weight"), py::kw_only(), py::arg("algorithm") = -1,
                "Apply three bias-free linear projections in one inference dispatch.");
-    module.def("matmul_transfer", &matmul_transfer, py::arg("a"), py::arg("b"), py::kw_only(),
-               py::arg("device") = 0, py::arg("output_memory") = "pinned",
-               py::arg("algorithm") = -1, "Upload both CPU operands and return fresh CPU output.");
-    module.def("gram_transfer", &gram_transfer, py::arg("a"), py::kw_only(), py::arg("device") = 0,
-               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
-               "Upload a CPU matrix once and return its Gram matrix.");
-    module.def("mlp_transfer", &mlp_transfer, py::arg("x"), py::arg("w1"), py::arg("b1"),
-               py::arg("w2"), py::arg("b2"), py::kw_only(), py::arg("device") = 0,
-               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
-               "Upload every MLP operand and return fresh CPU output synchronously.");
-    module.def("attention_transfer", &attention_transfer, py::arg("q"), py::arg("k"), py::arg("v"),
-               py::kw_only(), py::arg("scale") = py::none(), py::arg("device") = 0,
-               py::arg("output_memory") = "pinned", py::arg("algorithm") = -1,
-               "Upload every attention operand and return fresh CPU output synchronously.");
     module.def("silu_multiply", &silu_multiply_public, py::arg("gate"), py::arg("up"),
                "Compute SiLU(gate)*up with storage rounding, for inference.");
     module.def("swiglu", &swiglu_public, py::arg("gate"), py::arg("up"), py::kw_only(),
