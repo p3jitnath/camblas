@@ -420,7 +420,11 @@ def install():
                 and weight.ndim == 2
                 and weight_scale.ndim == 2
                 and input.numel() == input.shape[-1]
-                and tuple(weight.shape) in fused_shapes
+                and tuple(weight.shape) in shapes
+                and (
+                    tuple(weight.shape) in fused_shapes
+                    or hopper_supported(input.device)
+                )
                 and list(block_size) == [32, 32]
                 and act_scale_ue8m0
                 and input_scale is None
@@ -444,6 +448,17 @@ def install():
                 _calls[name] = _calls.get(name, 0) + 1
                 if tuple(weight.shape) in fused_split_shapes:
                     _calls["fp8_split"] = _calls.get("fp8_split", 0) + 1
+                if (
+                    hopper_supported(input.device)
+                    and weight.data_ptr() % 16 == 0
+                    and weight_scale.shape[0] >= weight.shape[0] // 32
+                    and weight_scale.shape[1] >= weight.shape[1] // 32
+                ):
+                    from _camblas._hopper import block32
+
+                    output = block32(input.view(1, -1), weight, weight_scale)
+                    _calls["fp8_tma"] = _calls.get("fp8_tma", 0) + 1
+                    return output.view(*input.shape[:-1], weight.shape[0])
                 return cb.fp8_linear(input, weight, weight_scale)
             return original(
                 input,

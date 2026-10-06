@@ -374,6 +374,15 @@ class SglangFp8Tests(unittest.TestCase):
                                 fused_expected.view(torch.int16),
                             )
                         )
+                        from _camblas._hopper import block32
+
+                        fused = block32(bf16, b, b_scale)
+                        self.assertTrue(
+                            torch.equal(
+                                fused.view(torch.int16),
+                                fused_expected.view(torch.int16),
+                            )
+                        )
                         # Independently quantise on the CPU, including exact power-of-two scales.
                         values = bf16.float().cpu().view(1, k // 32, 32)
                         raw = values.abs().amax(-1).clamp_min(1.0e-10) * (1.0 / 448.0)

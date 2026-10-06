@@ -6,6 +6,8 @@ import triton.language as tl
 from triton.experimental import gluon
 from triton.experimental.gluon import language as gl
 from triton.experimental.gluon.language.nvidia import hopper
+from triton.experimental.gluon.language.nvidia.hopper import mbarrier, tma
+from triton.experimental.gluon.nvidia.hopper import TensorDescriptor
 
 
 @gluon.jit
@@ -374,4 +376,163 @@ def bmm(input, weight):
     output = torch.empty((2, 1, 2048), device=input.device, dtype=torch.bfloat16)
     with torch.cuda.device(input.device):
         _bmm[(32, 2)](input, weight, output, num_warps=4)
+    return output
+
+
+@triton.jit
+def _reduce32(
+    PART,
+    SCALE,
+    Y,
+    N: tl.constexpr,
+    G: tl.constexpr,
+    AS: tl.constexpr,
+    B: tl.constexpr,
+    U: tl.constexpr,
+):
+    """Apply the original ordered FP32 fused additions."""
+    rows = tl.program_id(0) * B + tl.arange(0, B)
+    acc = tl.full((B,), 0, tl.float32)
+    for start in range(0, G, U):
+        for j in tl.static_range(U):
+            group = start + j
+            value = tl.load(
+                PART + group * N + rows, mask=(rows < N) & (group < G), other=0.0
+            )
+            scale = tl.load(SCALE + group * AS, mask=group < G, other=0.0)
+            acc = tl.fma(value, scale, acc)
+    tl.store(Y + rows, acc, mask=rows < N)
+
+
+@gluon.jit
+def _input32(X, SCALE, group, K: gl.constexpr):
+    """Preserve the original power-of-two activation scales."""
+    input_layout: gl.constexpr = gl.BlockedLayout([1, 1], [32, 1], [1, 4], [0, 1])
+    pk = gl.arange(0, 32, layout=gl.SliceLayout(1, input_layout))
+    xf = gl.load(X + group * 32 + pk, mask=group < K // 32, other=0.0).to(gl.float32)
+    maximum = gl.maximum(gl.max(gl.abs(xf), 0), 1.0e-10)
+    magnitude = (maximum * (1.0 / 448.0)).to(gl.int32, bitcast=True)
+    exponent = (
+        ((magnitude >> 23) & 255) - 127 + gl.where((magnitude & 0x7FFFFF) != 0, 1, 0)
+    )
+    scale = ((exponent + 127) << 23).to(gl.float32, bitcast=True)
+    reciprocal = ((127 - exponent) << 23).to(gl.float32, bitcast=True)
+    quant = gl.minimum(xf * reciprocal, 448.0).to(gl.float8e4nv)
+    duplicated = gl.where(
+        gl.full((32, 8), True, gl.int1, layout=input_layout),
+        quant[:, None],
+        gl.full((32, 8), 0.0, gl.float8e4nv, layout=input_layout),
+    )
+    b = gl.allocate_shared_memory(
+        gl.float8e4nv,
+        (32, 8),
+        gl.NVMMASharedLayout(32, 8, rank=2, transposed=True),
+        duplicated,
+    )
+    if gl.program_id(0) == 0:
+        gl.store(SCALE + group, scale, mask=group < K // 32)
+    return b
+
+
+@gluon.jit
+def _products32(
+    X,
+    WD,
+    WS,
+    OUT,
+    SCALE,
+    N: gl.constexpr,
+    K: gl.constexpr,
+    SK: gl.constexpr,
+    SN: gl.constexpr,
+    R: gl.constexpr,
+    P: gl.constexpr,
+):
+    """Load four weight groups together and preserve each FP32 scale product."""
+    a = gl.allocate_shared_memory(WD.dtype, WD.block_type.shape, WD.layout)
+    bar = mbarrier.allocate_mbarrier()
+    mbarrier.init(bar, count=1)
+    mbarrier.expect(bar, WD.block_type.nbytes)
+    tma.async_copy_global_to_shared(
+        WD, [gl.program_id(0) * R, gl.program_id(1) * P * 32], bar, a
+    )
+    mma: gl.constexpr = gl.NVMMADistributedLayout([3, 0], [4, 1], [16, 8, 32])
+    zero = gl.full((R, 8), 0, gl.float32, layout=mma)
+    cr = gl.program_id(0) * R + gl.arange(0, R, layout=gl.SliceLayout(1, mma))
+    cc = gl.arange(0, 8, layout=gl.SliceLayout(0, mma))
+    inputs = ()
+    for p in gl.static_range(P):
+        b = _input32(X, SCALE, gl.program_id(1) * P + p, K)
+        inputs += (b,)
+    mbarrier.wait(bar, phase=0)
+    mbarrier.invalidate(bar)
+    gl.barrier()
+    hopper.fence_async_shared()
+    dots = ()
+    for p in gl.static_range(P):
+        dot = hopper.warpgroup_mma(
+            a.slice(p * 32, 32, dim=1),
+            inputs[p],
+            zero,
+            use_acc=False,
+            max_num_imprecise_acc=32,
+            is_async=True,
+        )
+        dots += (dot,)
+    for p in gl.static_range(P):
+        group = gl.program_id(1) * P + p
+        dot = hopper.warpgroup_mma_wait(0, deps=[dots[p]])
+        ws = gl.load(
+            WS + (cr // 32) * SN + group * SK,
+            mask=(cr < N) & (group < K // 32),
+            other=0.0,
+        )
+        gl.store(
+            OUT + group * N + cr[:, None] + cc[None, :] * 0,
+            dot * ws[:, None],
+            mask=(cr[:, None] < N) & (cc[None, :] == 0) & (group < K // 32),
+        )
+
+
+def block32(input, weight, weight_scale):
+    """Return the original UE8M0 block32 FP8 product.
+
+    Parameters
+    ----------
+    input : torch.Tensor
+        Contiguous BF16 input with one row.
+    weight : torch.Tensor
+        Contiguous E4M3 weights in [outputs, inputs] order.
+    weight_scale : torch.Tensor
+        FP32 weight scales; positive padded or column-major strides are supported.
+    """
+    n, k = weight.shape
+    rows = 64 if (n, k) in {(4096, 1280), (5120, 576)} else 128
+    groups = 4
+    desc = TensorDescriptor.from_tensor(
+        weight, [rows, groups * 32], gl.NVMMASharedLayout(32, 8, rank=2)
+    )
+    scratch = torch.empty(
+        (k // 32 * n + k // 32,), device=input.device, dtype=torch.float32
+    )
+    scales = scratch[k // 32 * n :]
+    output = torch.empty((1, n), device=input.device, dtype=torch.bfloat16)
+    with torch.cuda.device(input.device):
+        _products32[(triton.cdiv(n, rows), triton.cdiv(k // 32, groups))](
+            input,
+            desc,
+            weight_scale,
+            scratch,
+            scales,
+            n,
+            k,
+            weight_scale.stride(1),
+            weight_scale.stride(0),
+            rows,
+            groups,
+            num_warps=4,
+        )
+        _reduce32[(triton.cdiv(n, 128),)](
+            scratch, scales, output, n, k // 32, 1, 128, 16, num_warps=4, num_stages=1
+        )
     return output
