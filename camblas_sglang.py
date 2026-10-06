@@ -99,7 +99,7 @@ def install():
     """Register selected inference operations through SGLang's hook registry.
 
     ``CAMBLAS_SGLANG_OPS=linear,fp8`` enables unquantised CUDA linear
-    products and selected single-token block32 and block128 FP8 products.
+    and batched products and selected single-token block32 and block128 FP8 products.
     CAMBLAS_SGLANG_FP8_TILES supplies common single-token tile settings,
     independently of the selected CAMBLAS operations. Unsupported storage,
     data types and gradient-enabled inputs use the original linear method.
@@ -119,6 +119,14 @@ def install():
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
     import _camblas as cb
+
+    @functools.lru_cache
+    def hopper_supported(device):
+        import triton
+
+        return torch.cuda.get_device_capability(device) == (9, 0) and tuple(
+            map(int, triton.__version__.split(".")[:2])
+        ) == (3, 7)
 
     cb.set_algorithm(os.environ.get("CAMBLAS_SGLANG_ALGORITHM", "lt"))
     if "linear" in selected:
@@ -150,15 +158,35 @@ def install():
             HookType.AROUND,
         )
 
+        def batched(original, layer, input):
+            weight = layer.weight
+            if (
+                input.is_cuda
+                and input.shape == (2, 1, 128)
+                and weight.shape == (2, 2048, 128)
+                and input.dtype == weight.dtype == torch.bfloat16
+                and input.is_contiguous()
+                and weight.is_contiguous()
+                and weight.device == input.device
+                and not torch.is_grad_enabled()
+                and not torch._dynamo.is_compiling()
+                and not torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction
+                and hopper_supported(input.device)
+            ):
+                from _camblas._hopper import bmm
+
+                output = bmm(input, weight)
+                _calls["bmm"] = _calls.get("bmm", 0) + 1
+                return output
+            return original(layer, input)
+
+        HookRegistry.register(
+            "sglang.srt.layers.linear.ColumnParallelBatchedLinear.forward",
+            batched,
+            HookType.AROUND,
+        )
+
     if "fp8" in selected:
-
-        @functools.lru_cache
-        def moe_supported(device):
-            import triton
-
-            return torch.cuda.get_device_capability(device) == (9, 0) and tuple(
-                map(int, triton.__version__.split(".")[:2])
-            ) == (3, 7)
 
         def fp8_moe_fused(
             original,
@@ -226,9 +254,9 @@ def install():
                     for t in (hidden_states, w1, w2, ids, routing, *scales)
                 )
                 and not torch.is_grad_enabled()
-                and moe_supported(hidden_states.device)
+                and hopper_supported(hidden_states.device)
             ):
-                from _camblas._fp8_moe import fused
+                from _camblas._hopper import fused
 
                 output = (
                     hidden_states if cfg.inplace else torch.empty_like(hidden_states)
@@ -249,6 +277,70 @@ def install():
         HookRegistry.register(
             "sglang.srt.layers.moe.moe_runner.triton_utils.fused_moe.fused_experts",
             fp8_moe_fused,
+            HookType.AROUND,
+        )
+
+        dense_shapes = {
+            (2048, 4096),
+            (4096, 1536),
+            (4096, 4096),
+            (6144, 4096),
+            (4096, 3072),
+        }
+
+        def dense(
+            original,
+            input,
+            weight,
+            block_size,
+            weight_scale,
+            input_scale=None,
+            bias=None,
+        ):
+            if (
+                input.is_cuda
+                and input.ndim >= 2
+                and tuple(weight.shape) in dense_shapes
+                and input.dtype == torch.bfloat16
+                and input.numel() == weight.shape[1]
+                and weight.dtype == torch.float8_e4m3fn
+                and list(block_size) == [128, 128]
+                and weight_scale.dtype == torch.float32
+                and weight_scale.shape
+                == (weight.shape[0] // 128, weight.shape[1] // 128)
+                and input_scale is None
+                and bias is None
+                and all(
+                    t.is_contiguous() and t.device == input.device
+                    for t in (input, weight, weight_scale)
+                )
+                and not torch.is_grad_enabled()
+                and not torch._dynamo.is_compiling()
+                and hopper_supported(input.device)
+            ):
+                from _camblas._hopper import product
+
+                output = torch.empty(
+                    (1, weight.shape[0]), device=input.device, dtype=torch.bfloat16
+                )
+                product(
+                    input.view(1, -1),
+                    weight.unsqueeze(0),
+                    None,
+                    weight_scale.unsqueeze(0),
+                    None,
+                    None,
+                    output,
+                    False,
+                )
+                _calls["fp8"] = _calls.get("fp8", 0) + 1
+                _calls["fp8_dense_block128"] = _calls.get("fp8_dense_block128", 0) + 1
+                return output.view(*input.shape[:-1], weight.shape[0])
+            return original(input, weight, block_size, weight_scale, input_scale, bias)
+
+        HookRegistry.register(
+            "sglang.srt.layers.quantization.fp8_utils.deepgemm_w8a8_block_fp8_linear_with_fallback",
+            dense,
             HookType.AROUND,
         )
 

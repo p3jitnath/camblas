@@ -48,7 +48,7 @@ See [experimental results](RESULTS.md), [contribution and validation guidance](C
 <details>
 <summary>Runtime settings and reproduction</summary>
 
-The [SGLang runtime](configs/sglang.json) and [requirements](configs/sglang-requirements.txt) pin the measured GH200 environment. Enable its plugin with `SGLANG_PLUGINS=camblas` and `CAMBLAS_SGLANG_OPS=linear,fp8`; set `CAMBLAS_CUDA_LIBRARY` when the native library is outside `build/cuda/`. The plugin uses standard PyTorch linear calls and private native kernels for the checkpoint's existing FP8 operations.
+The [SGLang runtime](configs/sglang.json) and [requirements](configs/sglang-requirements.txt) pin the measured GH200 environment. Enable its plugin with `SGLANG_PLUGINS=camblas` and `CAMBLAS_SGLANG_OPS=linear,fp8`; set `CAMBLAS_CUDA_LIBRARY` when the native library is outside `build/cuda/`. The plugin uses standard PyTorch linear calls and private GPU kernels for the checkpoint's existing FP8 operations.
 
 Verify the original checkpoint against the [Llama manifest](configs/llama31-70b-weights.json), [DeepSeek manifest](configs/deepseek-v41-flash-weights.json) or [GLM manifest](configs/glm53-flash-weights.json), then compare the same pinned engine with and without CAMBLAS:
 

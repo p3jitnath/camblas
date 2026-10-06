@@ -57,6 +57,56 @@ class SglangFp8Tests(unittest.TestCase):
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
 
+    def test_hopper_dense_products(self):
+        """Preserve dense FP8 quantisation and the BF16 batched projection."""
+        from sglang.srt.layers.quantization.fp8_utils import (
+            deepgemm_w8a8_block_fp8_linear_with_fallback,
+        )
+
+        from _camblas._hopper import bmm, product
+
+        torch.manual_seed(717)
+        with torch.no_grad():
+            weight = (torch.randn(2048, 4096, device="cuda") * 0.6).to(
+                torch.float8_e4m3fn
+            )
+            scales = torch.rand((16, 32), device="cuda") * 0.02 + 0.001
+            batched_weight = torch.randn(
+                (2, 2048, 128), device="cuda", dtype=torch.bfloat16
+            )
+            for magnitude in (0.75, 80.0):
+                input = (
+                    torch.randn((1, 4096), device="cuda", dtype=torch.bfloat16)
+                    * magnitude
+                )
+                scales.mul_(1.25)
+                expected = deepgemm_w8a8_block_fp8_linear_with_fallback(
+                    input, weight, [128, 128], scales
+                )
+                actual = torch.empty_like(expected)
+                product(
+                    input,
+                    weight.unsqueeze(0),
+                    None,
+                    scales.unsqueeze(0),
+                    None,
+                    None,
+                    actual,
+                    False,
+                )
+                self.assertTrue(
+                    torch.equal(actual.view(torch.int16), expected.view(torch.int16))
+                )
+                batched_input = (
+                    torch.randn((2, 1, 128), device="cuda", dtype=torch.bfloat16)
+                    * magnitude
+                )
+                expected = torch.bmm(batched_input, batched_weight.transpose(1, 2))
+                actual = bmm(batched_input, batched_weight)
+                self.assertTrue(
+                    torch.equal(actual.view(torch.int16), expected.view(torch.int16))
+                )
+
     def test_block128_moe_reduction_order(self):
         """Preserve up and routed down products when inputs and scales change."""
         import triton.language as tl
@@ -72,7 +122,7 @@ class SglangFp8Tests(unittest.TestCase):
             moe_align_block_size,
         )
 
-        from _camblas._fp8_moe import fused, product
+        from _camblas._hopper import fused, product
 
         ids = torch.arange(9, device="cuda", dtype=torch.int32).view(1, 9)
         routing = torch.linspace(0.05, 1.0, 9, device="cuda").view(1, 9)

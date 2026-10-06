@@ -1,4 +1,4 @@
-"""Private block128 FP8 MoE products for single-token GH200 inference."""
+"""Private original-precision Hopper kernels for SGLang inference."""
 
 import torch
 import triton
@@ -19,11 +19,13 @@ def _products(
     CHOICES: gl.constexpr,
     DOWN: gl.constexpr,
     R: gl.constexpr,
+    SF=None,
+    QUANT: gl.constexpr = False,
 ):
     """Store each unscaled block128 Tensor Core contribution."""
     choice = gl.program_id(2)
     group = gl.program_id(1)
-    expert = gl.load(IDS + choice).to(gl.int64)
+    expert = 0 if CHOICES == 1 else gl.load(IDS + choice).to(gl.int64)
     input_layout: gl.constexpr = gl.BlockedLayout([1, 1], [32, 1], [1, 4], [0, 1])
     pk = gl.arange(0, 128, layout=gl.SliceLayout(1, input_layout))
     weight_layout: gl.constexpr = gl.BlockedLayout([1, 8], [2, 16], [4, 1], [1, 0])
@@ -35,6 +37,20 @@ def _products(
     cc = gl.arange(0, 8, layout=gl.SliceLayout(0, mma_layout))
     xrow = choice if DOWN else 0
     x = gl.load(X + xrow * K + group * 128 + pk)
+    if QUANT:
+        value = x.to(gl.float32)
+        maximum = gl.maximum(gl.max(gl.abs(value), 0), 1e-10)
+        scale = maximum * (1.0 / 448.0)
+        inv = gl.inline_asm_elementwise(
+            "div.approx.ftz.f32 $0,0f43E00000,$1;",
+            constraints="=f,f",
+            args=[maximum],
+            dtype=gl.float32,
+            is_pure=True,
+            pack=1,
+        )
+        x = gl.minimum(gl.maximum(value * inv, -448.0), 448.0).to(gl.float8e4nv)
+        gl.store(SF + group, scale, mask=(gl.program_id(0) == 0) & (choice == 0))
     duplicated = gl.where(
         gl.full((128, 8), True, gl.int1, layout=input_layout),
         x[:, None],
@@ -82,7 +98,7 @@ def _reduce(
     """Apply the original scale products and ordered FP32 fused additions."""
     choice = tl.program_id(1)
     cols = tl.program_id(0) * C + tl.arange(0, C)
-    expert = tl.load(IDS + choice).to(tl.int64)
+    expert = 0 if CHOICES == 1 else tl.load(IDS + choice).to(tl.int64)
     xrow = choice if DOWN else 0
     acc = tl.full((C,), 0, tl.float32)
     for group in tl.range(0, G, loop_unroll_factor=2):
@@ -109,29 +125,45 @@ def product(
     Parameters
     ----------
     input : torch.Tensor
-        Contiguous E4M3 input, with one row for up or nine rows for down.
+        Contiguous BF16 or E4M3 input, with one row for up or nine for down.
     weight : torch.Tensor
         Contiguous E4M3 expert weights in [experts, outputs, inputs] order.
     input_scale, weight_scale : torch.Tensor
         Contiguous FP32 dequantisation scales for the original 128-element blocks.
     expert_ids, routing : torch.Tensor
-        Nine local expert indices and FP32 router weights on the input device.
+        Local expert indices and FP32 router weights; use None for one dense product.
     output : torch.Tensor
-        Contiguous BF16 destination with nine output rows.
+        Contiguous BF16 destination with one row per selected expert.
     down : bool
         Apply router weights after the ordered FP32 accumulation when true.
     """
     _, n, k = weight.shape
-    choices = expert_ids.numel()
+    choices = 1 if expert_ids is None else expert_ids.numel()
     rows = 64
     columns = 256 if down else 32
+    quant_input = not down and input.dtype == torch.bfloat16
+    if quant_input:
+        input_scale = torch.empty(
+            (1, k // 128), device=input.device, dtype=torch.float32
+        )
     reduce_warps = 4 if down else 1
     scratch = torch.empty(
         (k // 128, choices, n), device=input.device, dtype=torch.float32
     )
     with torch.cuda.device(input.device):
         _products[(triton.cdiv(n, rows), k // 128, choices)](
-            input, weight, expert_ids, scratch, n, k, choices, down, rows, num_warps=4
+            input,
+            weight,
+            expert_ids,
+            scratch,
+            n,
+            k,
+            choices,
+            down,
+            rows,
+            input_scale,
+            quant_input,
+            num_warps=4,
         )
         _reduce[(triton.cdiv(n, columns), choices)](
             scratch,
@@ -200,7 +232,8 @@ def _activate_quant(
     quant = tl.minimum(tl.maximum(value * inv[:, None], -448.0), 448.0).to(
         tl.float8e4nv
     )
-    tl.store(ACT + row[:, None] * H + k, rounded, mask=row[:, None] < ROWS)
+    if ACT is not None:
+        tl.store(ACT + row[:, None] * H + k, rounded, mask=row[:, None] < ROWS)
     tl.store(Q + row[:, None] * H + k, quant, mask=row[:, None] < ROWS)
     tl.store(SF + group, scale, mask=row < ROWS)
 
@@ -274,25 +307,22 @@ def fused(
     factor : float
         Original scaling factor applied after the ordered expert sum.
     """
-    from sglang.kernels.ops.quantization.fp8_kernel import (
-        sglang_per_token_group_quant_fp8,
-    )
-
-    choices = expert_ids.numel()
+    choices = 1 if expert_ids is None else expert_ids.numel()
     _, n, k = weight_up.shape
     h = n // 2
     with torch.cuda.device(input.device):
-        quantised, scales = sglang_per_token_group_quant_fp8(input, 128)
+        quantised, scales = input, None
         up = torch.empty((choices, n), device=input.device, dtype=torch.bfloat16)
         product(quantised, weight_up, scales, scale_up, expert_ids, routing, up, False)
-        activated = torch.empty((choices, h), device=input.device, dtype=torch.bfloat16)
-        quantised = torch.empty_like(activated, dtype=torch.float8_e4m3fn)
+        quantised = torch.empty(
+            (choices, h), device=input.device, dtype=torch.float8_e4m3fn
+        )
         scales = torch.empty(
             (choices, h // 128), device=input.device, dtype=torch.float32
         )
         _activate_quant[(triton.cdiv(choices * (h // 128), 4),)](
             up,
-            activated,
+            None,
             quantised,
             scales,
             h,
@@ -333,3 +363,63 @@ def fused(
             num_warps=1,
             num_stages=1,
         )
+
+
+@gluon.jit
+def _bmm(X, W, OUT):
+    N: gl.constexpr = 2048
+    R: gl.constexpr = 64
+    """Write the original BF16 batched product with FP32 accumulation."""
+    batch = gl.program_id(1)
+    input_layout: gl.constexpr = gl.BlockedLayout([1, 1], [32, 1], [1, 4], [0, 1])
+    pk = gl.arange(0, 128, layout=gl.SliceLayout(1, input_layout))
+    weight_layout: gl.constexpr = gl.BlockedLayout([1, 16], [4, 8], [4, 1], [1, 0])
+    wr = gl.program_id(0) * R + gl.arange(0, R, layout=gl.SliceLayout(1, weight_layout))
+    wk = gl.arange(0, 128, layout=gl.SliceLayout(0, weight_layout))
+    mma_layout: gl.constexpr = gl.NVMMADistributedLayout([3, 0], [4, 1], [16, 8, 16])
+    zero = gl.full((R, 8), 0, gl.float32, layout=mma_layout)
+    cr = gl.program_id(0) * R + gl.arange(0, R, layout=gl.SliceLayout(1, mma_layout))
+    cc = gl.arange(0, 8, layout=gl.SliceLayout(0, mma_layout))
+    x = gl.load(X + batch * 128 + pk)
+    duplicated = gl.where(
+        gl.full((128, 8), True, gl.int1, layout=input_layout),
+        x[:, None],
+        gl.full((128, 8), 0.0, gl.bfloat16, layout=input_layout),
+    )
+    b = gl.allocate_shared_memory(
+        gl.bfloat16,
+        (128, 8),
+        gl.NVMMASharedLayout(32, 16, rank=2, transposed=True),
+        duplicated,
+    )
+    w = gl.load(
+        W + batch * (N * 128) + wr[:, None] * 128 + wk[None, :],
+        mask=wr[:, None] < N,
+        other=0.0,
+    )
+    a = gl.convert_layout(w, gl.DotOperandLayout(0, mma_layout, 2))
+    gl.barrier()
+    hopper.fence_async_shared()
+    dot = hopper.warpgroup_mma(a, b, zero, use_acc=False, is_async=True)
+    dot = hopper.warpgroup_mma_wait(0, deps=[dot])
+    gl.store(
+        OUT + batch * N + cr[:, None] + cc[None, :] * 0,
+        dot.to(gl.bfloat16),
+        mask=(cr[:, None] < N) & (cc[None, :] == 0),
+    )
+
+
+def bmm(input, weight):
+    """Return the original BF16 product for the selected batched projection.
+
+    Parameters
+    ----------
+    input : torch.Tensor
+        Contiguous BF16 input in [2, 1, 128] order.
+    weight : torch.Tensor
+        Contiguous BF16 weights in [2, 2048, 128] order.
+    """
+    output = torch.empty((2, 1, 2048), device=input.device, dtype=torch.bfloat16)
+    with torch.cuda.device(input.device):
+        _bmm[(32, 2)](input, weight, output, num_warps=4)
+    return output
