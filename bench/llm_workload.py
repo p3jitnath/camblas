@@ -30,6 +30,7 @@ def install_verifier():
     def capture(
         original, sampler, logits_output, sampling_info, return_logprob, *a, **k
     ):
+        """Record untimed raw vocabulary logits, then call the original sampler."""
         nonlocal step
         if return_logprob:
             if torch.cuda.is_current_stream_capturing():

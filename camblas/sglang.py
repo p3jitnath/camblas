@@ -45,6 +45,7 @@ def install_fp8_tiles(path):
 
     @functools.lru_cache
     def lookup(original, n, k, block_n, block_k, device):
+        """Return existing settings or the matching shared GH200 decode tile."""
         existing = original(n, k, block_n, block_k)
         tile = tiles.get(f"{n},{k}")
         if (
@@ -66,6 +67,7 @@ def install_fp8_tiles(path):
         return {1: tile, 2: baseline}
 
     def configured(original, N, K, block_n, block_k):
+        """Preserve the upstream lookup during PyTorch compilation."""
         if torch._dynamo.is_compiling():
             return original(N, K, block_n, block_k)
         return lookup(original, N, K, block_n, block_k, torch.cuda.get_device_name())
@@ -115,6 +117,7 @@ def install_stable_moe():
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
     def aligned(original, topk_ids, block_size, num_experts, *args, **kwargs):
+        """Order prefill token choices inside the existing expert blocks."""
         ids, experts, count = original(
             topk_ids, block_size, num_experts, *args, **kwargs
         )
@@ -159,6 +162,7 @@ def install():
 
     @functools.lru_cache
     def hopper_supported(device):
+        """Cache the Hopper hardware and Triton version requirements."""
         import triton
 
         return torch.cuda.get_device_capability(device) == (9, 0) and tuple(
@@ -172,6 +176,7 @@ def install():
         )
 
     def linear(original, method, layer, x, bias=None):
+        """Route eligible CUDA linear calls through the ordinary PyTorch interface."""
         weight = layer.weight
         operands = (x, weight) if bias is None else (x, weight, bias)
         if (
@@ -196,6 +201,7 @@ def install():
         )
 
         def batched(original, layer, input):
+            """Use the BF16 projection for its validated Hopper shape."""
             weight = layer.weight
             if (
                 input.is_cuda
@@ -235,6 +241,7 @@ def install():
             *args,
             **kwargs,
         ):
+            """Preserve the selected MoE activation, scales and rounding rules."""
             cfg = moe_runner_config
             ids, routing = topk_output.topk_ids, topk_output.topk_weights
             scales = (kwargs.get("w1_scale"), kwargs.get("w2_scale"))
@@ -334,6 +341,7 @@ def install():
             input_scale=None,
             bias=None,
         ):
+            """Apply ordered block128 FP8 products to eligible one-row projections."""
             if (
                 input.is_cuda
                 and input.ndim >= 2
@@ -395,9 +403,11 @@ def install():
 
         @functools.lru_cache
         def supported(device):
+            """Validate the FP8 storage, scale layout and CUDA decode shapes."""
             return cb.fp8_decode_supported(device)
 
         def fp8_product(original, A, B, As, Bs, block_size, output_dtype=torch.float16):
+            """Use native block32 decode only when all numerical guards hold."""
             operands = (A, B, As, Bs)
             if (
                 not torch._dynamo.is_compiling()
@@ -449,6 +459,7 @@ def install():
             act_scale_ue8m0=False,
             weight_bf16=None,
         ):
+            """Keep the original activation quantisation and FP32 reduction order."""
             operands = (input, weight, weight_scale)
             if (
                 not torch._dynamo.is_compiling()

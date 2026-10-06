@@ -165,6 +165,7 @@ class Context:
     """Own a native handle for one device, stream and Python host thread."""
 
     def __init__(self, device, stream):
+        """Create a native handle and retain its device, stream and process."""
         self.pid = os.getpid()
         self.device = device
         self.handle = ct.c_void_p()
@@ -190,12 +191,12 @@ def context(device):
 
     Parameters
     ----------
-    device : int or None, optional
-        CUDA device index; None selects the current device.
+    device : int
+        Required CUDA device index.
 
     Returns
     -------
-    _Context
+    Context
         Reused native context with the requested device and active stream.
     """
     if not hasattr(_LOCAL, "contexts"):

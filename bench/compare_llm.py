@@ -58,6 +58,7 @@ def load_verified_logits(directory, result):
     import torch
 
     def identical_bits(a, b):
+        """Compare tensor storage bitwise, including signed zeros."""
         return torch.equal(a.view(torch.int32), b.view(torch.int32))
 
     directory = Path(directory)
@@ -104,6 +105,7 @@ def compare_outputs(reference_directory, actual_directory, *, atol, rtol):
     import torch
 
     def identical_bits(a, b):
+        """Compare tensor storage bitwise, including signed zeros."""
         return torch.equal(a.view(torch.int32), b.view(torch.int32))
 
     directories = [Path(reference_directory), Path(actual_directory)]
@@ -320,6 +322,7 @@ def main():
     )
 
     def save():
+        """Write the current measurement and verification manifest."""
         temporary = directory / "manifest.tmp"
         temporary.write_text(json.dumps(manifest, indent=2) + "\n")
         temporary.replace(directory / "manifest.json")

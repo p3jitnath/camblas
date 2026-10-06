@@ -2,6 +2,7 @@
 
 from functools import partial
 
+from . import _native as _native
 from ._native import algorithm as algorithm
 from ._native import set_algorithm as set_algorithm
 from ._native import stats as stats

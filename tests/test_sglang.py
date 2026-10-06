@@ -1,5 +1,6 @@
 """Check the common SGLang numerical settings independently."""
 
+import importlib.metadata
 import importlib.util
 import json
 import unittest
@@ -56,6 +57,19 @@ class SglangFp8Tests(unittest.TestCase):
         torch.set_num_threads(1)
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
+        from sglang.srt.plugins.hook_registry import HookRegistry
+
+        plugin = next(
+            entry
+            for entry in importlib.metadata.entry_points(group="sglang.srt.plugins")
+            if entry.name == "camblas"
+        ).load()
+        with (
+            patch.dict("os.environ", CAMBLAS_SGLANG_OPS="linear,fp8"),
+            patch.object(HookRegistry, "register") as register,
+        ):
+            plugin()
+            assert register.call_count >= 2
 
     def test_hopper_dense_products(self):
         """Preserve dense FP8 quantisation and the BF16 batched projection."""
