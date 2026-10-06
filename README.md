@@ -59,7 +59,7 @@ CAMBLAS_ENABLE=0 SGLANG_PLUGINS=camblas CAMBLAS_SGLANG_OPS=fp8 \
   --kv-cache-dtype bfloat16 --tp 4 --ep 4 --trust-remote-code
 ```
 
-Use four GPUs for Flash and eight GPUs across two nodes for Pro. The pinned runtime preserves the checkpoint's quantisation.
+Use four GPUs for Flash. For Pro, set `--tp 8 --ep 8 --nnodes 2 --dist-init-addr HOST:PORT` and start the command on both nodes with `--node-rank 0` or `--node-rank 1`. The pinned runtime preserves the checkpoint's quantisation.
 
 See [contribution and validation guidance](CONTRIBUTING.md) and the [MIT licence](LICENSE).
 
