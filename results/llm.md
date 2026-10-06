@@ -12,6 +12,4 @@ GLM shares the tuned SGLang MoE tiles between backends. All 89.2 million measure
 
 DeepSeek retains FP4 experts, FP8 dense weights/KV and FP32 accumulation; 49.6 million measured logits matched bitwise. Fresh CAMBLAS rates ranged from 138.08 to 156.89 tokens/s; retain this variability when comparing the single reference pilot. Llama retains BF16 and showed no meaningful gain.
 
-The [runtime](configs/sglang.json) pins reproduction. [Archived results](https://github.com/p3jitnath/camblas/blob/ab838f2/README.md), including Llama, precede the PyTorch interface change.
-
-CPU: CAMBLAS won all 60 Grace FP32/FP64 cases against OpenBLAS and NVPL at 16/64 cores ([report](bench/reports/grace_20261002.json)). CUDA: transfer-inclusive 32,768-square FP64 reached 0.292× against PyTorch and 0.338× against unchanged CAMBLAS.
+The [runtime](../configs/sglang.json) pins reproduction. [Archived results](https://github.com/p3jitnath/camblas/blob/ab838f2/README.md), including Llama, precede the PyTorch interface change.

@@ -5,8 +5,8 @@ import unittest
 
 import torch
 
-import _camblas as cb
-from _camblas import _native
+import camblas._kernels as cb
+from camblas import _native
 
 
 def dequantize(x, scales, block, packed=False, weight=False):

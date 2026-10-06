@@ -14,7 +14,7 @@ def _autoload():
     if os.environ.get("CAMBLAS_ENABLE", "0") != "1":
         return
 
-    from _camblas._native import _ALGORITHMS, tensor_module
+    from camblas._native import _ALGORITHMS, tensor_module
 
     module = tensor_module()
     if module is None or not hasattr(module, "install_torch_backend"):

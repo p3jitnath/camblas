@@ -10,19 +10,18 @@ requires-python = ">=3.11"
 dependencies = ["torch>=2.8"]
 
 [project.entry-points."sglang.srt.plugins"]
-camblas = "camblas_sglang:install"
+camblas = "camblas.sglang:install"
 
 [project.entry-points."torch.backends"]
-camblas = "_camblas_backend:_autoload"
+camblas = "camblas:_autoload"
 
 [tool.setuptools]
-packages = ["_camblas"]
-py-modules = ["_camblas_backend", "camblas_sglang"]
+packages = ["camblas"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-include = ["bench/*.py", "scripts/*.py", "tests/*.py", "_camblas/*.py", "camblas_sglang.py", "_camblas_backend.py"]
+include = ["bench/*.py", "scripts/*.py", "tests/*.py", "camblas/*.py"]
 extend-exclude = ["bench/results"]
 
 [tool.ruff.lint]

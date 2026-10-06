@@ -263,9 +263,7 @@ def main():
     inputs = [
         Path(__file__),
         ROOT / "bench/llm_workload.py",
-        ROOT / "camblas_sglang.py",
-        ROOT / "_camblas_backend.py",
-        *sorted((ROOT / "_camblas").glob("*.py")),
+        *sorted((ROOT / "camblas").glob("*.py")),
         ROOT / "bench/verify_llm_weights.py",
         args.runtime,
         args.weights_manifest,

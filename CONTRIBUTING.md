@@ -5,7 +5,7 @@ Start with the [README](README.md), create a branch from `main`, and keep each p
 ```bash
 git switch -c your-change
 make test CC=gcc-14 PYTHON=python3.11
-python3.11 -m compileall -q scripts bench tests
+python3.11 -m compileall -q camblas scripts bench tests
 git diff --check
 ```
 
@@ -24,6 +24,6 @@ Include the evidence needed to assess each change:
 - **Correctness:** keep tests that protect required behaviour, and remove duplicate or obsolete cases. Extend an existing independent test where possible; cover the precisions, layouts, alpha/beta values, changed inputs and dispatch boundaries affected by the change. Alternative multiplication algorithms also require cancellation and exceptional-input checks, because overflow checks alone do not establish accuracy. Preserve caller-owned workspace and synchronous executor contracts, and use sanitiser checks when the change affects memory or synchronisation.
 - **Performance:** measure the candidate and an unchanged CAMBLAS control under the same inputs, precision, hardware, affinity, thread settings and transfer policy. Use OpenBLAS and NVPL for CPU comparisons, PyTorch for CUDA comparisons, and the same SGLang engine for LLM comparisons. Run at least three fresh processes with rotated backend order on quiet allocated nodes, then report medians, ranges and regressions. Identify results that were not remeasured, and record any allocator or OpenMP settings that differ from the defaults.
 - **Reproduction:** record commands, compiler and dependency versions, library identities and evidence of actual backend calls. Explain how the change works, where it applies, and whether it changes the ABI or rounding behaviour.
-- **Hygiene:** keep binaries, wheels, dependencies, results, credentials and internal records out of Git. Store them under ignored `build/`, `.frameworks/` or `results/` directories.
+- **Hygiene:** keep binaries, wheels, dependencies, credentials and generated timing records out of Git. Use ignored `build/`, `.frameworks/` or `bench/results/` directories; keep concise verified reports under `results/`.
 
 Contributions use the [MIT licence](LICENSE); preserve copyright notices and required third-party attribution.

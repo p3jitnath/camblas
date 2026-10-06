@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import torch
 
-import _camblas as cb
-from camblas_sglang import canonical_moe_tokens
+import camblas._kernels as cb
+from camblas.sglang import canonical_moe_tokens
 
 
 class SglangAlignmentTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class SglangFp8Tests(unittest.TestCase):
             deepgemm_w8a8_block_fp8_linear_with_fallback,
         )
 
-        from _camblas._hopper import bmm, product
+        from camblas._hopper import bmm, product
 
         torch.manual_seed(717)
         with torch.no_grad():
@@ -122,7 +122,7 @@ class SglangFp8Tests(unittest.TestCase):
             moe_align_block_size,
         )
 
-        from _camblas._hopper import fused, product
+        from camblas._hopper import fused, product
 
         ids = torch.arange(9, device="cuda", dtype=torch.int32).view(1, 9)
         routing = torch.linspace(0.05, 1.0, 9, device="cuda").view(1, 9)
@@ -374,7 +374,7 @@ class SglangFp8Tests(unittest.TestCase):
                                 fused_expected.view(torch.int16),
                             )
                         )
-                        from _camblas._hopper import block32
+                        from camblas._hopper import block32
 
                         fused = block32(bf16, b, b_scale)
                         self.assertTrue(

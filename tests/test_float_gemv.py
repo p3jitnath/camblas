@@ -4,8 +4,8 @@ import unittest
 
 import torch
 
-import _camblas as cb
-from _camblas import _native
+import camblas._kernels as cb
+from camblas import _native
 
 
 class GemvTests(unittest.TestCase):

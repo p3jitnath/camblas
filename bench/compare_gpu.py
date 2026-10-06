@@ -419,7 +419,6 @@ def main():
     }
     sources = [
         ROOT / "bench/cuda_workload.py",
-        ROOT / "_camblas_backend.py",
         ROOT / "bench/compare_cuda.py",
         ROOT / "bench/compare.py",
         Path(__file__).resolve(),
@@ -429,7 +428,7 @@ def main():
         ROOT / "tests/cuda_fail_alloc.c",
         ROOT / "tests/test_tools.py",
         *sorted((ROOT / "src/cuda").glob("*")),
-        *sorted((ROOT / "_camblas").glob("*.py")),
+        *sorted((ROOT / "camblas").glob("*.py")),
     ]
     sources = [p for p in sources if p.is_file()]
     manifest["source_sha256"] = {str(p.relative_to(ROOT)): digest(p) for p in sources}

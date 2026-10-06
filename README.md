@@ -43,7 +43,23 @@ y = torch.nn.functional.linear(x, weight)
 
 PyTorch loads CAMBLAS through backend discovery. Eligible CUDA products use CAMBLAS; unsupported types, layouts and requested TF32 use PyTorch's existing kernels. Autograd, tensor arguments and return values retain the PyTorch interface. Operations use the active stream; warm that stream before CUDA graph capture.
 
-See [experimental results](RESULTS.md), [contribution and validation guidance](CONTRIBUTING.md), and the [MIT licence](LICENSE).
+For SGLang, enable the plugin when you launch the server:
+
+```bash
+CAMBLAS_ENABLE=1 SGLANG_PLUGINS=camblas CAMBLAS_SGLANG_OPS=linear,fp8 \
+  python -m sglang.launch_server --model-path /path/to/model
+```
+
+See [contribution and validation guidance](CONTRIBUTING.md) and the [MIT licence](LICENSE).
+
+<details>
+<summary>Results</summary>
+
+- [LLM inference](results/llm.md)
+- [CPU matrix multiplication](results/cpu.md)
+- [GPU matrix multiplication and attention](results/gpu.md)
+
+</details>
 
 <details>
 <summary>Runtime settings and reproduction</summary>

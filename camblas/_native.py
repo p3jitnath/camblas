@@ -155,6 +155,7 @@ def library():
 
 
 def _check(status, handle):
+    """Raise a Python exception when the native CUDA call reports failure."""
     if status:
         error = library().camblas_cuda_error(handle).decode()
         raise RuntimeError(error)
@@ -185,7 +186,18 @@ class Context:
 
 
 def context(device):
-    """Return the current thread's context for the active stream on a device."""
+    """Return the current thread's context for the active CUDA stream.
+
+    Parameters
+    ----------
+    device : int or None, optional
+        CUDA device index; None selects the current device.
+
+    Returns
+    -------
+    _Context
+        Reused native context with the requested device and active stream.
+    """
     if not hasattr(_LOCAL, "contexts"):
         _LOCAL.contexts = {}
     stream = torch.cuda.current_stream(device)
@@ -234,6 +246,21 @@ def algorithm(name):
     error when products cancel; auto considers it only for guarded large even
     square products. The policies keep TF32 disabled and preserve the declared
     storage and compute types.
+
+    Parameters
+    ----------
+    name : str
+        Multiplication policy to use within the context manager.
+
+    Yields
+    ------
+    None
+        The previous policy is restored when the context exits.
+
+    Raises
+    ------
+    ValueError
+        If the requested policy is unknown.
     """
     if name not in _ALGORITHMS:
         raise ValueError(f"Unknown algorithm {name!r}; choose {tuple(_ALGORITHMS)}")
@@ -251,7 +278,18 @@ def algorithm(name):
 
 
 def set_algorithm(name):
-    """Select the default algorithm for this Python host thread."""
+    """Select the default multiplication policy for this host thread.
+
+    Parameters
+    ----------
+    name : str
+        Policy name from the private native algorithm registry.
+
+    Raises
+    ------
+    ValueError
+        If the requested policy is unknown.
+    """
     if name not in _ALGORITHMS:
         raise ValueError(f"Unknown algorithm {name!r}; choose {tuple(_ALGORITHMS)}")
     module = tensor_module()
@@ -261,10 +299,22 @@ def set_algorithm(name):
 
 
 def stats(device=None, reset=False, all_threads=False):
-    """Read launch counts for the calling thread's current device and stream.
+    """Read launch counts for the current device and stream.
 
-    Use ``all_threads=True`` to include autograd workers and the separate
-    coherent-host contexts on the requested device.
+    Parameters
+    ----------
+    device : int, str or torch.device, optional
+        CUDA device; None selects the current device.
+    reset : bool, optional
+        Clear the counters after reading them.
+    all_threads : bool, optional
+        Include autograd workers and coherent-host contexts on the device.
+
+    Returns
+    -------
+    dict[str, int]
+        Counts before any requested reset; CUDA graph replays do not increment
+        host launch counters.
     """
     if device is None:
         device = torch.cuda.current_device()

@@ -107,10 +107,8 @@ def main():
     cb = None
     if args.engine == "camblas":
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        import _camblas
-
-        cb = _camblas
-        from _camblas_backend import _autoload
+        import camblas._kernels as cb
+        from camblas import _autoload
 
         _autoload()
     rng = np.random.default_rng(20260906)

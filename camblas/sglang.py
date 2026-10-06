@@ -9,12 +9,29 @@ _calls = {}
 
 
 def dispatch_counts():
-    """Return host dispatch counts, excluding replayed CUDA graph operations."""
+    """Return host dispatch counts, excluding replayed CUDA graph operations.
+
+    Returns
+    -------
+    dict[str, int]
+        A copy of per-operation and per-shape counts for this process.
+    """
     return dict(_calls)
 
 
 def install_fp8_tiles(path):
-    """Apply common SGLang tile settings for single-token GH200 FP8 products."""
+    """Apply common SGLang tile settings for single-token GH200 FP8 products.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        JSON tile settings with the original 32 by 32 block scales.
+
+    Raises
+    ------
+    ValueError
+        If the settings change the block size or FP32 reduction order.
+    """
     import torch
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
@@ -61,7 +78,27 @@ def install_fp8_tiles(path):
 
 
 def canonical_moe_tokens(token_ids, expert_ids, count, block_size, choices):
-    """Order token choices within pre-sorted expert blocks, retaining padding."""
+    """Order token choices within pre-sorted expert blocks, retaining padding.
+
+    Parameters
+    ----------
+    token_ids : torch.Tensor
+        One-dimensional token-choice indices, including padded capacity.
+    expert_ids : torch.Tensor
+        Expert label for each existing block.
+    count : torch.Tensor
+        Scalar number of entries within live expert blocks.
+    block_size : int
+        Entries per expert block.
+    choices : int
+        Number of token choices; also the output padding sentinel.
+
+    Returns
+    -------
+    torch.Tensor
+        New indices with the original dtype and expert membership; unused
+        capacity contains the padding sentinel.
+    """
     import torch
 
     span = choices + 1
@@ -118,7 +155,7 @@ def install():
     import torch
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
-    import _camblas as cb
+    import camblas._kernels as cb
 
     @functools.lru_cache
     def hopper_supported(device):
@@ -173,7 +210,7 @@ def install():
                 and not torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction
                 and hopper_supported(input.device)
             ):
-                from _camblas._hopper import bmm
+                from camblas._hopper import bmm
 
                 output = bmm(input, weight)
                 _calls["bmm"] = _calls.get("bmm", 0) + 1
@@ -256,7 +293,7 @@ def install():
                 and not torch.is_grad_enabled()
                 and hopper_supported(hidden_states.device)
             ):
-                from _camblas._hopper import fused
+                from camblas._hopper import fused
 
                 output = (
                     hidden_states if cfg.inplace else torch.empty_like(hidden_states)
@@ -318,7 +355,7 @@ def install():
                 and not torch._dynamo.is_compiling()
                 and hopper_supported(input.device)
             ):
-                from _camblas._hopper import product
+                from camblas._hopper import product
 
                 output = torch.empty(
                     (1, weight.shape[0]), device=input.device, dtype=torch.bfloat16
@@ -454,7 +491,7 @@ def install():
                     and weight_scale.shape[0] >= weight.shape[0] // 32
                     and weight_scale.shape[1] >= weight.shape[1] // 32
                 ):
-                    from _camblas._hopper import block32
+                    from camblas._hopper import block32
 
                     output = block32(input.view(1, -1), weight, weight_scale)
                     _calls["fp8_tma"] = _calls.get("fp8_tma", 0) + 1

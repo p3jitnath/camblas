@@ -6,7 +6,7 @@ import unittest
 import torch
 import torch.nn.functional as functional
 
-from _camblas import _native
+from camblas import _native
 
 
 @unittest.skipUnless(

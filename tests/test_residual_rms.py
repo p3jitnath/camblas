@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from _camblas import _native
+from camblas import _native
 
 
 class ResidualRMSTests(unittest.TestCase):

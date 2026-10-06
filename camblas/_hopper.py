@@ -372,6 +372,11 @@ def bmm(input, weight):
         Contiguous BF16 input in [2, 1, 128] order.
     weight : torch.Tensor
         Contiguous BF16 weights in [2, 2048, 128] order.
+
+    Returns
+    -------
+        torch.Tensor
+            New BF16 output in [2, 1, 2048] order.
     """
     output = torch.empty((2, 1, 2048), device=input.device, dtype=torch.bfloat16)
     with torch.cuda.device(input.device):
@@ -505,6 +510,16 @@ def block32(input, weight, weight_scale):
         Contiguous E4M3 weights in [outputs, inputs] order.
     weight_scale : torch.Tensor
         FP32 weight scales; positive padded or column-major strides are supported.
+
+    Returns
+    -------
+        torch.Tensor
+            New BF16 output with one row and one column per output channel.
+
+    Notes
+    -----
+        The caller validates Hopper hardware, Triton 3.7 and the original UE8M0
+        input scales before dispatch.
     """
     n, k = weight.shape
     rows = 64 if (n, k) in {(4096, 1280), (5120, 576)} else 128

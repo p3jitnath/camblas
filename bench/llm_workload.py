@@ -20,7 +20,7 @@ def install_verifier():
     import torch.distributed as dist
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
-    from camblas_sglang import dispatch_counts
+    from camblas.sglang import dispatch_counts
 
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
