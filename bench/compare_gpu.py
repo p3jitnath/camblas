@@ -42,7 +42,18 @@ GPU_WORKLOADS = (
 
 
 def digest(path):
-    """Return a content identity for a source or binary artefact."""
+    """Return a content identity for a source or binary artefact.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Source or native-library file to hash.
+
+    Returns
+    -------
+    str
+        SHA256 hexadecimal digest.
+    """
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
@@ -108,7 +119,17 @@ def validate_native_libraries(record, identity, *, control=False):
 
 
 def report(directory, rows, manifest):
-    """Write medians, ranges and speed ratios without omitting regressions."""
+    """Write medians, ranges and speed ratios without omitting regressions.
+
+    Parameters
+    ----------
+    directory : pathlib.Path
+        Output directory for the Markdown comparison.
+    rows : list of dict
+        Validated workload records with per-backend medians and ranges.
+    manifest : dict
+        Hardware, precision, timing and control settings for these records.
+    """
     lines = [
         "# CAMBLAS CUDA versus PyTorch CUDA",
         "",

@@ -140,7 +140,13 @@ def main():
         y = array((n, n), n**-0.5)
 
         def operation():
-            """Return the square matrix product using the prepared input arrays."""
+            """Return the square matrix product using the prepared input arrays.
+
+            Returns
+            -------
+            numpy.ndarray or torch.Tensor
+                Product with shape (n, n), using the selected framework and precision.
+            """
             return x @ y
 
         flops = 2 * n**3
@@ -149,7 +155,13 @@ def main():
         y = array((512, 2048), 512**-0.5)
 
         def operation():
-            """Return the matrix product with a transposed left input view."""
+            """Return the matrix product with a transposed left input view.
+
+            Returns
+            -------
+            numpy.ndarray or torch.Tensor
+                Product with shape (1024, 2048), using the selected framework and precision.
+            """
             return x.T @ y
 
         flops = 2 * 1024 * 2048 * 512
@@ -157,7 +169,13 @@ def main():
         x = array((4096, 512), 4096**-0.5)
 
         def operation():
-            """Return the Gram matrix of the prepared input array."""
+            """Return the Gram matrix of the prepared input array.
+
+            Returns
+            -------
+            numpy.ndarray or torch.Tensor
+                Gram matrix with shape (512, 512), using the selected framework and precision.
+            """
             return x.T @ x
     elif args.workload in ("mlp", "backward"):
         grad = args.workload == "backward"

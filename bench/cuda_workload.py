@@ -179,7 +179,18 @@ def main():
         from torch.nn import functional
 
         def pytorch_expression(*inputs):
-            """Evaluate the selected PyTorch expression with matching values."""
+            """Evaluate the selected PyTorch expression with matching values.
+
+            Parameters
+            ----------
+            *inputs : torch.Tensor
+                Prepared operands in the selected workload's order.
+
+            Returns
+            -------
+            torch.Tensor
+                Matrix, MLP or attention output before gradient calculation.
+            """
             if args.workload.startswith("square") or args.workload == "transpose":
                 x, y = inputs
                 return (x.T if args.workload == "transpose" else x) @ y
@@ -209,7 +220,13 @@ def main():
         )
 
     def device_inputs():
-        """Copy every input and create leaf parameters for the backward workload."""
+        """Copy every input and create leaf parameters for the backward workload.
+
+        Returns
+        -------
+        list of torch.Tensor
+            Fresh CUDA inputs, with gradient tracking enabled for selected parameters.
+        """
         return [
             value.to("cuda").requires_grad_(i in gradient_indices)
             for i, value in enumerate(host_inputs)
@@ -248,7 +265,18 @@ def main():
         return [output] + [inputs[index].grad for index in gradient_indices]
 
     def pytorch_call(inputs):
-        """Start a compiled iteration and include all execution overhead in timing."""
+        """Start a compiled iteration and include all execution overhead in timing.
+
+        Parameters
+        ----------
+        inputs : list of torch.Tensor
+            Prepared CUDA operands for the selected expression.
+
+        Returns
+        -------
+        torch.Tensor
+            Expression output, with compiler and graph-dispatch overhead included.
+        """
         if compiled and args.compile_mode in ("reduce-overhead", "max-autotune"):
             torch.compiler.cudagraph_mark_step_begin()
         return pytorch_function(*inputs)
@@ -286,7 +314,13 @@ def main():
         resident = device_inputs() if mode == "resident" else None
 
         def call():
-            """Run one complete operation, copying results when transfers are timed."""
+            """Run one complete operation, copying results when transfers are timed.
+
+            Returns
+            -------
+            list of torch.Tensor
+                Output and requested gradients, on CPU for transfer timing or CUDA for resident timing.
+            """
             inputs = resident if resident is not None else device_inputs()
             results = operation(inputs)
             if mode == "transfer":
