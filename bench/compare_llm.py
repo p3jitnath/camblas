@@ -23,12 +23,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def digest(path):
-    """Hash a file used by the measured worker."""
+    """Hash a file used by a measured worker.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Source or native-library file to hash.
+
+    Returns
+    -------
+    str
+        SHA256 hexadecimal digest.
+    """
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def source_identity(directory):
-    """Record the pinned runtime revision and any explicit local source changes."""
+    """Record the pinned runtime revision and local Python changes.
+
+    Parameters
+    ----------
+    directory : str or pathlib.Path
+        SGLang Git checkout used by the worker.
+
+    Returns
+    -------
+    tuple[str, bytes]
+        Git revision and binary diff against that revision.
+
+    Raises
+    ------
+    ValueError
+        If the checkout has untracked Python runtime source.
+    """
     revision = subprocess.check_output(
         ["git", "-C", str(directory), "rev-parse", "HEAD"], text=True
     ).strip()
@@ -54,11 +81,42 @@ def source_identity(directory):
 
 
 def load_verified_logits(directory, result):
-    """Reject incomplete, stale or inconsistent vocabulary captures for a worker."""
+    """Reject incomplete or inconsistent raw vocabulary captures.
+
+    Parameters
+    ----------
+    directory : str or pathlib.Path
+        Worker output directory containing accuracy captures.
+    result : dict
+        Passed worker record with its case and capture filenames.
+
+    Returns
+    -------
+    dict[int, list[dict]]
+        Validated captures grouped by model rank and prediction order.
+
+    Raises
+    ------
+    ValueError
+        If captures, repetitions or ranks violate the precision contract.
+    """
     import torch
 
     def identical_bits(a, b):
-        """Compare tensor storage bitwise, including signed zeros."""
+        """Compare FP32 tensor storage, including signed zeros.
+
+        Parameters
+        ----------
+        a : torch.Tensor
+            Reference FP32 logits.
+        b : torch.Tensor
+            Candidate FP32 logits with the same shape.
+
+        Returns
+        -------
+        bool
+            True when all underlying FP32 bits match.
+        """
         return torch.equal(a.view(torch.int32), b.view(torch.int32))
 
     directory = Path(directory)
@@ -101,11 +159,46 @@ def load_verified_logits(directory, result):
 
 
 def compare_outputs(reference_directory, actual_directory, *, atol, rtol):
-    """Check returned tokens, repeats, ranks and full raw vocabulary vectors."""
+    """Compare greedy outputs and complete raw vocabulary vectors.
+
+    Parameters
+    ----------
+    reference_directory : str or pathlib.Path
+        Passed reference worker output.
+    actual_directory : str or pathlib.Path
+        Passed candidate worker output.
+    atol : float
+        Absolute logit tolerance; zero with zero rtol requires bitwise equality.
+    rtol : float
+        Relative logit tolerance.
+
+    Returns
+    -------
+    dict
+        Precision checks, maximum error and the number of vocabulary values compared.
+
+    Raises
+    ------
+    ValueError
+        If inputs, greedy outputs or raw logits violate the comparison contract.
+    """
     import torch
 
     def identical_bits(a, b):
-        """Compare tensor storage bitwise, including signed zeros."""
+        """Compare FP32 tensor storage, including signed zeros.
+
+        Parameters
+        ----------
+        a : torch.Tensor
+            Reference FP32 logits.
+        b : torch.Tensor
+            Candidate FP32 logits with the same shape.
+
+        Returns
+        -------
+        bool
+            True when all underlying FP32 bits match.
+        """
         return torch.equal(a.view(torch.int32), b.view(torch.int32))
 
     directories = [Path(reference_directory), Path(actual_directory)]
@@ -166,7 +259,20 @@ def compare_outputs(reference_directory, actual_directory, *, atol, rtol):
 
 
 def summarise(records, generated_tokens):
-    """Retain fresh-process medians and ranges for CPU-to-CPU requests."""
+    """Retain fresh-process medians and ranges for complete requests.
+
+    Parameters
+    ----------
+    records : list of dict
+        Passed paired-process records grouped by prompt length.
+    generated_tokens : int
+        Requested output count; decode excludes the first token.
+
+    Returns
+    -------
+    list of dict
+        Prefill, decode and request rates, process ranges and speedups.
+    """
     rows = []
     for prompt in sorted({r["prompt_length"] for r in records}):
         selected = [r for r in records if r["prompt_length"] == prompt]

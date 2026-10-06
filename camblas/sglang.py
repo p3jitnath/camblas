@@ -45,7 +45,28 @@ def install_fp8_tiles(path):
 
     @functools.lru_cache
     def lookup(original, n, k, block_n, block_k, device):
-        """Return existing settings or the matching shared GH200 decode tile."""
+        """Return existing settings or the shared GH200 decode tile.
+
+        Parameters
+        ----------
+        original : callable
+            Unmodified SGLang function used for fallback.
+        n : int
+            Number of output features.
+        k : int
+            Number of input features.
+        block_n : int
+            Scale block size along output features.
+        block_k : int
+            Scale block size along input features.
+        device : str
+            CUDA device name used to match the pinned tile settings.
+
+        Returns
+        -------
+        dict or None
+            Existing settings, or decode and prefill tile settings for the matching device.
+        """
         existing = original(n, k, block_n, block_k)
         tile = tiles.get(f"{n},{k}")
         if (
@@ -67,7 +88,26 @@ def install_fp8_tiles(path):
         return {1: tile, 2: baseline}
 
     def configured(original, N, K, block_n, block_k):
-        """Preserve the upstream lookup during PyTorch compilation."""
+        """Preserve the original tile lookup during PyTorch compilation.
+
+        Parameters
+        ----------
+        original : callable
+            Unmodified SGLang function used for fallback.
+        N : int
+            Number of output features.
+        K : int
+            Number of input features.
+        block_n : int
+            Scale block size along output features.
+        block_k : int
+            Scale block size along input features.
+
+        Returns
+        -------
+        dict or None
+            Original settings or the shared decode tile settings.
+        """
         if torch._dynamo.is_compiling():
             return original(N, K, block_n, block_k)
         return lookup(original, N, K, block_n, block_k, torch.cuda.get_device_name())
@@ -117,7 +157,28 @@ def install_stable_moe():
     from sglang.srt.plugins.hook_registry import HookRegistry, HookType
 
     def aligned(original, topk_ids, block_size, num_experts, *args, **kwargs):
-        """Order prefill token choices inside the existing expert blocks."""
+        """Order prefill token choices within existing expert blocks.
+
+        Parameters
+        ----------
+        original : callable
+            Unmodified SGLang function used for fallback.
+        topk_ids : torch.Tensor
+            Expert choices with shape (tokens, choices).
+        block_size : int
+            Number of padded token choices per expert block.
+        num_experts : int
+            Number of routed experts.
+        *args
+            Additional positional arguments forwarded unchanged.
+        **kwargs
+            Additional keyword arguments forwarded unchanged.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            Token indices, expert block labels and live padded entry count.
+        """
         ids, experts, count = original(
             topk_ids, block_size, num_experts, *args, **kwargs
         )
@@ -162,7 +223,18 @@ def install():
 
     @functools.lru_cache
     def hopper_supported(device):
-        """Cache the Hopper hardware and Triton version requirements."""
+        """Check Hopper hardware and the supported Triton version.
+
+        Parameters
+        ----------
+        device : int or torch.device
+            CUDA device to check.
+
+        Returns
+        -------
+        bool
+            True for compute capability 9.0 with Triton 3.7.
+        """
         import triton
 
         return torch.cuda.get_device_capability(device) == (9, 0) and tuple(
@@ -176,7 +248,26 @@ def install():
         )
 
     def linear(original, method, layer, x, bias=None):
-        """Route eligible CUDA linear calls through the ordinary PyTorch interface."""
+        """Route eligible linear calls through the ordinary PyTorch interface.
+
+        Parameters
+        ----------
+        original : callable
+            Unmodified SGLang function used for fallback.
+        method : object
+            Original unquantised linear method instance.
+        layer : object
+            SGLang layer that owns the projection weight.
+        x : torch.Tensor
+            Input with features on the final axis.
+        bias : torch.Tensor or None, optional
+            Projection bias, forwarded unchanged on fallback.
+
+        Returns
+        -------
+        torch.Tensor
+            Projected output with the original shape and storage type.
+        """
         weight = layer.weight
         operands = (x, weight) if bias is None else (x, weight, bias)
         if (
@@ -201,7 +292,22 @@ def install():
         )
 
         def batched(original, layer, input):
-            """Use the BF16 projection for its validated Hopper shape."""
+            """Use the BF16 projection for its validated Hopper shape.
+
+            Parameters
+            ----------
+            original : callable
+                Unmodified SGLang function used for fallback.
+            layer : object
+                Batched linear layer that owns the projection weight.
+            input : torch.Tensor
+                Batched input; the native shape is (2, 1, 128).
+
+            Returns
+            -------
+            torch.Tensor
+                Projected output with the original shape and storage type.
+            """
             weight = layer.weight
             if (
                 input.is_cuda
@@ -241,7 +347,32 @@ def install():
             *args,
             **kwargs,
         ):
-            """Preserve the selected MoE activation, scales and rounding rules."""
+            """Preserve the selected MoE activation, scales and rounding.
+
+            Parameters
+            ----------
+            original : callable
+                Unmodified SGLang function used for fallback.
+            hidden_states : torch.Tensor
+                Token activations with features on the final axis.
+            w1 : torch.Tensor
+                Expert gate and up-projection weights.
+            w2 : torch.Tensor
+                Expert down-projection weights.
+            topk_output : object
+                Router output with expert indices and routing weights.
+            moe_runner_config : object
+                Original activation, gating and expert configuration.
+            *args
+                Additional positional arguments forwarded unchanged.
+            **kwargs
+                Additional keyword arguments forwarded unchanged.
+
+            Returns
+            -------
+            object
+                Original MoE combine-input payload with the selected expert results.
+            """
             cfg = moe_runner_config
             ids, routing = topk_output.topk_ids, topk_output.topk_weights
             scales = (kwargs.get("w1_scale"), kwargs.get("w2_scale"))
@@ -341,7 +472,30 @@ def install():
             input_scale=None,
             bias=None,
         ):
-            """Apply ordered block128 FP8 products to eligible one-row projections."""
+            """Apply ordered block128 FP8 products to validated decode shapes.
+
+            Parameters
+            ----------
+            original : callable
+                Unmodified SGLang function used for fallback.
+            input : torch.Tensor
+                Input activations; the native path requires one BF16 row.
+            weight : torch.Tensor
+                Projection weights with shape (output features, input features).
+            block_size : sequence of int
+                Checkpoint scale block dimensions for output and input features.
+            weight_scale : torch.Tensor
+                Original per-block weight scales.
+            input_scale : torch.Tensor or None, optional
+                Existing activation scales; None permits the original dynamic quantisation.
+            bias : torch.Tensor or None, optional
+                Projection bias, forwarded unchanged on fallback.
+
+            Returns
+            -------
+            torch.Tensor
+                Projected output with the original shape and storage type.
+            """
             if (
                 input.is_cuda
                 and input.ndim >= 2
@@ -403,11 +557,45 @@ def install():
 
         @functools.lru_cache
         def supported(device):
-            """Validate the FP8 storage, scale layout and CUDA decode shapes."""
+            """Check whether the device supports native FP8 decode.
+
+            Parameters
+            ----------
+            device : int
+                CUDA device index passed to the native capability check.
+
+            Returns
+            -------
+            bool
+                True when the native tensor binding supports decode on this device.
+            """
             return cb.fp8_decode_supported(device)
 
         def fp8_product(original, A, B, As, Bs, block_size, output_dtype=torch.float16):
-            """Use native block32 decode only when all numerical guards hold."""
+            """Use block32 decode when its numerical and layout guards hold.
+
+            Parameters
+            ----------
+            original : callable
+                Unmodified SGLang function used for fallback.
+            A : torch.Tensor
+                FP8 input rows with input features on the final axis.
+            B : torch.Tensor
+                FP8 weights with shape (output features, input features).
+            As : torch.Tensor
+                Per-block input scales.
+            Bs : torch.Tensor
+                Per-block weight scales.
+            block_size : sequence of int
+                Checkpoint scale block dimensions for output and input features.
+            output_dtype : torch.dtype, optional
+                Requested output storage type; native decode requires BF16.
+
+            Returns
+            -------
+            torch.Tensor
+                Projected output with the original shape and storage type.
+            """
             operands = (A, B, As, Bs)
             if (
                 not torch._dynamo.is_compiling()
@@ -459,7 +647,34 @@ def install():
             act_scale_ue8m0=False,
             weight_bf16=None,
         ):
-            """Keep the original activation quantisation and FP32 reduction order."""
+            """Preserve activation quantisation and FP32 reduction order.
+
+            Parameters
+            ----------
+            original : callable
+                Unmodified SGLang function used for fallback.
+            input : torch.Tensor
+                Input activations; the native path requires one BF16 row.
+            weight : torch.Tensor
+                Projection weights with shape (output features, input features).
+            block_size : sequence of int
+                Checkpoint scale block dimensions for output and input features.
+            weight_scale : torch.Tensor
+                Original per-block weight scales.
+            input_scale : torch.Tensor or None, optional
+                Existing activation scales; None permits the original dynamic quantisation.
+            bias : torch.Tensor or None, optional
+                Projection bias, forwarded unchanged on fallback.
+            act_scale_ue8m0 : bool, optional
+                Whether activation scales use the original UE8M0 policy.
+            weight_bf16 : torch.Tensor or None, optional
+                Original dequantised weight fallback, forwarded unchanged.
+
+            Returns
+            -------
+            torch.Tensor
+                Projected output with the original shape and storage type.
+            """
             operands = (input, weight, weight_scale)
             if (
                 not torch._dynamo.is_compiling()

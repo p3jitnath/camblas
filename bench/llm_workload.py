@@ -30,7 +30,37 @@ def install_verifier():
     def capture(
         original, sampler, logits_output, sampling_info, return_logprob, *a, **k
     ):
-        """Record untimed raw vocabulary logits, then call the original sampler."""
+        """Save untimed raw logits before calling the original sampler.
+
+        Parameters
+        ----------
+        original : callable
+            Unmodified SGLang function used for fallback.
+        sampler : object
+            Original SGLang sampler instance.
+        logits_output : object
+            Sampler input containing complete next-token vocabulary logits.
+        sampling_info : object
+            Original sampling configuration.
+        return_logprob : bool
+            Whether this request needs untimed accuracy capture.
+        *a
+            Original extra positional arguments, including prediction positions.
+        **k
+            Original keyword arguments, including optional prediction positions.
+
+        Returns
+        -------
+        torch.Tensor
+            Token IDs returned by the original sampler.
+
+        Raises
+        ------
+        RuntimeError
+            If accuracy capture is attempted inside a CUDA graph.
+        ValueError
+            If the prediction positions required for verification are absent.
+        """
         nonlocal step
         if return_logprob:
             if torch.cuda.is_current_stream_capturing():
@@ -105,7 +135,29 @@ install_verifier()
 
 
 def request(engine, token_ids, generated_tokens, *, accuracy=False):
-    """Time CPU token input to completed CPU token output for one request."""
+    """Measure CPU token input to completed CPU output for one request.
+
+    Parameters
+    ----------
+    engine : sglang.Engine
+        Loaded engine with streaming and metrics enabled.
+    token_ids : list of int
+        Complete prompt token IDs.
+    generated_tokens : int
+        Requested greedy output count, with EOS stopping disabled.
+    accuracy : bool, optional
+        Request log probabilities to activate untimed raw-logit capture.
+
+    Returns
+    -------
+    dict
+        Request, first-token and decode times in milliseconds, output IDs and engine metadata.
+
+    Raises
+    ------
+    ValueError
+        If generation is incomplete or reuses the prefix cache.
+    """
     start = time.perf_counter()
     first = None
     final = None

@@ -38,7 +38,13 @@ _COUNTERS = (
 
 @lru_cache(maxsize=1)
 def tensor_module():
-    """Load the optional native tensor binding to minimise host call overhead."""
+    """Load the optional native tensor binding once per process.
+
+    Returns
+    -------
+    module or None
+        Loaded tensor binding, or None when no binding exists beside the CUDA library.
+    """
     override = os.environ.get("CAMBLAS_CUDA_LIBRARY")
     core = Path(
         override
@@ -61,7 +67,20 @@ def tensor_module():
 
 @lru_cache(maxsize=1)
 def library():
-    """Load and declare the CUDA C ABI once per process."""
+    """Load and declare the CUDA C ABI once per process.
+
+    Returns
+    -------
+    ctypes.CDLL
+        CUDA library with argument and return types declared.
+
+    Raises
+    ------
+    RuntimeError
+        If the selected CUDA library has not been built.
+    OSError
+        If the dynamic loader cannot load the selected library.
+    """
     path = Path(
         os.environ.get(
             "CAMBLAS_CUDA_LIBRARY",
@@ -175,23 +194,23 @@ def _check(status, handle):
 
 
 class Context:
-    """Own a native handle for one device, stream and Python host thread."""
+    """Own a native handle for one device, stream and host thread.
+
+    Parameters
+    ----------
+    device : int
+        CUDA device index.
+    stream : int
+        Raw CUDA stream handle; zero selects the default stream.
+
+    Raises
+    ------
+    RuntimeError
+        If the native context cannot be created.
+    """
 
     def __init__(self, device, stream):
-        """Create a native handle for one CUDA device and stream.
-
-        Parameters
-        ----------
-        device : int
-            CUDA device index.
-        stream : int
-            Raw CUDA stream handle; zero selects the default stream.
-
-        Raises
-        ------
-        RuntimeError
-            If the native context cannot be created.
-        """
+        """Initialise the native handle and register its lifetime."""
         self.pid = os.getpid()
         self.device = device
         self.handle = ct.c_void_p()
@@ -318,7 +337,7 @@ def algorithm(name):
 
 
 def set_algorithm(name):
-    """Select the multiplication algorithm for this native context.
+    """Select the multiplication policy for the calling host thread.
 
     Parameters
     ----------
@@ -327,10 +346,8 @@ def set_algorithm(name):
 
     Raises
     ------
-    KeyError
-        If the name is unknown.
-    RuntimeError
-        If the native context rejects the selection.
+    ValueError
+        If the policy name is unknown.
     """
     if name not in _ALGORITHMS:
         raise ValueError(f"Unknown algorithm {name!r}; choose {tuple(_ALGORITHMS)}")

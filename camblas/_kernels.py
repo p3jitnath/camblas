@@ -12,7 +12,22 @@ _tensor_binding = tensor_module()
 
 
 def _require_native(name, *args, **kwargs):
-    """Report a missing internal kernel in a build without the tensor binding."""
+    """Report an unavailable native tensor operation.
+
+    Parameters
+    ----------
+    name : str
+        Requested internal operation.
+    *args
+        Positional arguments accepted before the missing-build error.
+    **kwargs
+        Keyword arguments accepted before the missing-build error.
+
+    Raises
+    ------
+    RuntimeError
+        Always raised when the current tensor binding is unavailable.
+    """
     raise RuntimeError(f"{name} requires a current CUDA build with --torch")
 
 
