@@ -19,7 +19,24 @@ class GemvTests(unittest.TestCase):
         torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
 
     def check(self, actual, x, weight, alpha=1, beta=0, old=None):
-        """Compare every output element with independent CPU double arithmetic."""
+        """Compare every output element with independent CPU double arithmetic.
+
+        Parameters
+        ----------
+        actual : torch.Tensor
+            Candidate FP32 output.
+        x, weight : torch.Tensor
+            Input rows and projection weights in [outputs, inputs] order.
+        alpha, beta : float, optional
+            Multipliers for the matrix product and existing output.
+        old : torch.Tensor or None, optional
+            Existing output; required when beta is nonzero.
+
+        Raises
+        ------
+        AssertionError
+            If any output violates the FP32 error tolerance.
+        """
         expected = alpha * (x.cpu().double() @ weight.cpu().double().T)
         if beta:
             expected += beta * old.cpu().double()

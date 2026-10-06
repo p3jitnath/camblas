@@ -14,7 +14,18 @@ class LlmComparisonTests(unittest.TestCase):
     """Check the logit contract and evidence covering every model rank."""
 
     def fixtures(self, parent):
-        """Create paired, repeated two-rank vocabulary captures."""
+        """Create paired, repeated two-rank vocabulary captures.
+
+        Parameters
+        ----------
+        parent : pathlib.Path
+            Temporary parent directory for the two worker records.
+
+        Returns
+        -------
+        list of pathlib.Path
+            Reference and CAMBLAS directories, including repeated and changed-input captures.
+        """
         directories = [parent / name for name in ("stock", "camblas")]
         for directory in directories:
             directory.mkdir()

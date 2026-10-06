@@ -327,6 +327,22 @@ class SglangFp8Tests(unittest.TestCase):
         )
 
         def product(a, b, a_scale, b_scale, tile):
+            """Evaluate the original block32 FP8 kernel with a selected tile.
+
+            Parameters
+            ----------
+            a, b : torch.Tensor
+                E4M3 input rows and projection weights.
+            a_scale, b_scale : torch.Tensor
+                Original FP32 activation and weight block scales.
+            tile : dict
+                Decode tile passed to the original kernel's configuration lookup.
+
+            Returns
+            -------
+            torch.Tensor
+                BF16 reference output from the original SGLang kernel.
+            """
             with patch.object(
                 fp8, "get_w8a8_block_fp8_configs", return_value={1: tile}
             ):

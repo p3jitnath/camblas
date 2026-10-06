@@ -36,7 +36,20 @@ class CudaTests(unittest.TestCase):
         torch.manual_seed(73013)
 
     def assert_close(self, actual, expected, *, strassen=False):
-        """Compare every output element with a dtype-specific error tolerance."""
+        """Compare every output element with a dtype-specific error tolerance.
+
+        Parameters
+        ----------
+        actual, expected : torch.Tensor
+            Candidate and reference outputs with matching shape and precision.
+        strassen : bool, optional
+            Apply the absolute tolerance used for Strassen rounding.
+
+        Raises
+        ------
+        AssertionError
+            If any output exceeds the selected tolerance.
+        """
         rtol, atol = (1e-5, 3e-6) if actual.dtype == torch.float32 else (2e-13, 3e-14)
         if strassen:
             atol *= 5
@@ -478,6 +491,18 @@ for dtype in (torch.float32, torch.float64):
         for relu in (False, True):
 
             def call(x, w, b):
+                """Evaluate the affine operation used by the graph-lifetime test.
+
+                Parameters
+                ----------
+                x, w, b : torch.Tensor
+                    Prepared input, weight and bias operands.
+
+                Returns
+                -------
+                torch.Tensor
+                    Affine output with the test's selected ReLU setting.
+                """
                 return cb.affine(x, w, b, relu=relu)
 
             self.assertTrue(torch.autograd.gradcheck(call, inputs))

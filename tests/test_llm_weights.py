@@ -14,7 +14,22 @@ class LlmWeightsTests(unittest.TestCase):
     """Reject changed tensor bytes and inconsistent checkpoint metadata."""
 
     def fixture(self, directory, *, dtype="BF16", offset=(0, 8)):
-        """Create a tiny safetensors-format checkpoint for identity checks."""
+        """Create a tiny safetensors-format checkpoint for identity checks.
+
+        Parameters
+        ----------
+        directory : pathlib.Path
+            Temporary directory for checkpoint, index and configuration files.
+        dtype : str, optional
+            Header storage type; tests can supply invalid types for rejection checks.
+        offset : tuple of int, optional
+            Header data offsets; tests can supply invalid bounds for rejection checks.
+
+        Returns
+        -------
+        dict
+            Expected checkpoint manifest with shard size, SHA256 and parameter count.
+        """
         name = "model-00001-of-00001.safetensors"
         key = "model.layers.0.weight"
         header = json.dumps(

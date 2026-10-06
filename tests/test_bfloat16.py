@@ -22,7 +22,24 @@ class Bfloat16Tests(unittest.TestCase):
         torch.manual_seed(705537)
 
     def assert_product(self, actual, a, b, alpha=1.0, beta=0.0, old=None):
-        """Compare every element with FP64 arithmetic followed by BF16 rounding."""
+        """Compare every element with FP64 arithmetic followed by BF16 rounding.
+
+        Parameters
+        ----------
+        actual : torch.Tensor
+            Candidate BF16 output.
+        a, b : torch.Tensor
+            Input matrices in left-product and right-product order.
+        alpha, beta : float, optional
+            Multipliers for the matrix product and existing output.
+        old : torch.Tensor or None, optional
+            Existing output; required when beta is nonzero.
+
+        Raises
+        ------
+        AssertionError
+            If any output violates the BF16 error tolerance.
+        """
         expected = alpha * (a.cpu().double() @ b.cpu().double())
         if beta != 0:
             expected += beta * old.cpu().double()

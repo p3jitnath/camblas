@@ -10,7 +10,26 @@ from camblas import _native
 
 
 def dequantize(x, scales, block, packed=False, weight=False):
-    """Decode storage bytes and scale blocks independently of the CUDA kernel."""
+    """Decode storage bytes and scale blocks independently of the CUDA kernel.
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        E4M3 bytes or packed E2M1 nibbles to decode on CPU.
+    scales : torch.Tensor
+        Original E8M0 block-scale bytes.
+    block : int
+        Input elements represented by each activation scale.
+    packed : bool, optional
+        Decode two E2M1 elements per byte when true.
+    weight : bool, optional
+        Expand E4M3 weight scales over 32 output rows when true.
+
+    Returns
+    -------
+    torch.Tensor
+        CPU FP64 values after unpacking and applying the original scale powers.
+    """
     raw = x.cpu().view(torch.uint8)
     if packed:
         table = torch.tensor(
@@ -48,7 +67,24 @@ class QuantizedTests(unittest.TestCase):
     def operands(
         self, rows=1, outputs=8, inner=32, packed=True, block=32, device="cuda"
     ):
-        """Generate finite values and non-uniform scale blocks with a fixed seed."""
+        """Generate finite operands and non-uniform scales for quantised tests.
+
+        Parameters
+        ----------
+        rows, outputs, inner : int, optional
+            Input row count, output width and input width.
+        packed : bool, optional
+            Store weights as two E2M1 elements per byte instead of E4M3.
+        block : int, optional
+            Input elements per activation scale.
+        device : str, optional
+            Device for operands and scale bytes.
+
+        Returns
+        -------
+        tuple of torch.Tensor
+            Input, activation scales, weights and weight scales, in native storage types.
+        """
         x = (torch.randn(rows, inner, device=device) * 8).to(torch.float8_e4m3fn)
         if packed:
             weight = torch.randint(

@@ -185,20 +185,22 @@ def _reduce(
 def product(
     input, weight, input_scale, weight_scale, expert_ids, routing, output, down
 ):
-    """Write an inference-only block128 FP8 expert product.
+    """Write an inference-only block128 FP8 dense or expert product.
 
     Parameters
     ----------
     input : torch.Tensor
-        Contiguous BF16 or E4M3 input, with one row for up or nine for down.
+        Contiguous BF16 or E4M3 input, with one row for up or one per expert for down.
     weight : torch.Tensor
-        Contiguous E4M3 expert weights in [experts, outputs, inputs] order.
-    input_scale, weight_scale : torch.Tensor
-        Contiguous FP32 dequantisation scales for the original 128-element blocks.
-    expert_ids, routing : torch.Tensor
-        Local expert indices and FP32 router weights; use None for one dense product.
+        Contiguous E4M3 weights in [experts, outputs, inputs] order.
+    input_scale : torch.Tensor or None
+        Contiguous FP32 input block scales; BF16 input permits None and uses the original dynamic quantisation.
+    weight_scale : torch.Tensor
+        Contiguous FP32 checkpoint scales with shape [experts, ceil(outputs / 128), inputs / 128].
+    expert_ids, routing : torch.Tensor or None
+        Local expert indices and FP32 router weights; dense products omit both.
     output : torch.Tensor
-        Contiguous BF16 destination with one row per selected expert.
+        Contiguous BF16 destination with one row per selected expert, or one for a dense product.
     down : bool
         Apply router weights after the ordered FP32 accumulation when true.
     """

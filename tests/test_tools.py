@@ -162,7 +162,18 @@ class ComparisonTests(unittest.TestCase):
     """Validate comparison policy and reporting without running numerical work."""
 
     def invoke(self, arguments):
-        """Capture the comparison driver output for synthetic records."""
+        """Capture the comparison driver output for synthetic records.
+
+        Parameters
+        ----------
+        arguments : list of str
+            Command-line arguments appended to the synthetic program name.
+
+        Returns
+        -------
+        str
+            Captured standard output from the comparison driver.
+        """
         output = io.StringIO()
         with (
             patch("sys.argv", ["compare.py"] + arguments),
