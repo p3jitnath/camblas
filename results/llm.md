@@ -8,6 +8,7 @@ Quiet exclusive GH200 nodes; batch one and 256 greedy output tokens. Rates use m
 | DeepSeek V4.1 Flash | 4 | 128 | 156.82 | 138.96 | −11.4% | Three fresh pairs; tuned native SGLang |
 | GLM 5.3 Flash | 4 | 128 | 152.14 | 161.30 | 6.02% | Three fresh pairs |
 | MiMo V2.6 Flash RL | 4 | 128 | 179.60 | 181.12 | 0.85% | Three fresh pairs; FP8 plugin only |
+| MiMo V2.6 Pro RL | 8 | 128 | 68.56 | 68.82 | 0.38% | Three fresh pairs; FP8 plugin only |
 
 GLM shares the tuned SGLang MoE tiles between backends. All 89.2 million measured logits matched bitwise, including repeated and changed inputs. Original FP8 weights/inputs, BF16 activation/KV storage and FP32 accumulation remain unchanged.
 
