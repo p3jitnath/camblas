@@ -99,7 +99,7 @@ def install():
     """Register selected inference operations through SGLang's hook registry.
 
     ``CAMBLAS_SGLANG_OPS=linear,fp8`` enables unquantised CUDA linear
-    products and selected single-token block32 FP8 products.
+    products and selected single-token block32 and block128 FP8 products.
     CAMBLAS_SGLANG_FP8_TILES supplies common single-token tile settings,
     independently of the selected CAMBLAS operations. Unsupported storage,
     data types and gradient-enabled inputs use the original linear method.
@@ -151,6 +151,107 @@ def install():
         )
 
     if "fp8" in selected:
+
+        @functools.lru_cache
+        def moe_supported(device):
+            import triton
+
+            return torch.cuda.get_device_capability(device) == (9, 0) and tuple(
+                map(int, triton.__version__.split(".")[:2])
+            ) == (3, 7)
+
+        def fp8_moe_fused(
+            original,
+            hidden_states,
+            w1,
+            w2,
+            topk_output,
+            moe_runner_config,
+            *args,
+            **kwargs,
+        ):
+            cfg = moe_runner_config
+            ids, routing = topk_output.topk_ids, topk_output.topk_weights
+            scales = (kwargs.get("w1_scale"), kwargs.get("w2_scale"))
+            if (
+                not args
+                and not torch._dynamo.is_compiling()
+                and hidden_states.is_cuda
+                and hidden_states.dtype == torch.bfloat16
+                and hidden_states.shape == (1, 4096)
+                and w1.shape == (289, 1024, 4096)
+                and w2.shape == (289, 4096, 512)
+                and w1.dtype == w2.dtype == torch.float8_e4m3fn
+                and cfg.activation == "silu"
+                and cfg.is_gated
+                and not cfg.no_combine
+                and not cfg.apply_router_weight_on_input
+                and cfg.swiglu_limit == 10
+                and cfg.gemm1_alpha is None
+                and cfg.gemm1_clamp_limit is None
+                and cfg.num_experts == cfg.num_local_experts == 289
+                and kwargs.get("use_fp8_w8a8")
+                and kwargs.get("block_shape") == [128, 128]
+                and not any(
+                    kwargs.get(k, False)
+                    for k in (
+                        "use_int8_w8a8",
+                        "use_int8_w8a16",
+                        "use_int4_w4a16",
+                        "per_channel_quant",
+                        "fuse_swiglu_interleaved",
+                    )
+                )
+                and all(
+                    kwargs.get(k) is None
+                    for k in (
+                        "b1",
+                        "b2",
+                        "w1_zp",
+                        "w2_zp",
+                        "a1_scale",
+                        "a2_scale",
+                        "a1_q",
+                    )
+                )
+                and ids.dtype == torch.int32
+                and ids.shape == (1, 9)
+                and routing.dtype == torch.float32
+                and routing.shape == (1, 9)
+                and all(t is not None and t.dtype == torch.float32 for t in scales)
+                and scales[0].shape == (289, 8, 32)
+                and scales[1].shape == (289, 32, 4)
+                and all(
+                    t.is_contiguous() and t.device == hidden_states.device
+                    for t in (hidden_states, w1, w2, ids, routing, *scales)
+                )
+                and not torch.is_grad_enabled()
+                and moe_supported(hidden_states.device)
+            ):
+                from _camblas._fp8_moe import fused
+
+                output = (
+                    hidden_states if cfg.inplace else torch.empty_like(hidden_states)
+                )
+                factor = (
+                    1.0
+                    if cfg.routed_scaling_factor is None
+                    else cfg.routed_scaling_factor
+                )
+                fused(hidden_states, w1, w2, *scales, ids, routing, output, factor)
+                _calls["fp8"] = _calls.get("fp8", 0) + 1
+                _calls["fp8_moe"] = _calls.get("fp8_moe", 0) + 1
+                return output
+            return original(
+                hidden_states, w1, w2, topk_output, moe_runner_config, *args, **kwargs
+            )
+
+        HookRegistry.register(
+            "sglang.srt.layers.moe.moe_runner.triton_utils.fused_moe.fused_experts",
+            fp8_moe_fused,
+            HookType.AROUND,
+        )
+
         fused_shapes = {
             (1152, 5120),
             (1792, 5120),

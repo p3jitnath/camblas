@@ -1,24 +1,17 @@
 # Experimental results
 
-Historical measurements at [ab838f2](https://github.com/p3jitnath/camblas/blob/ab838f2/README.md), before the PyTorch interface change. Speed-up is reference latency divided by CAMBLAS latency.
+Four GH200 GPUs on a quiet exclusive node; batch one, 128 prompt tokens and 256 greedy output tokens. Rates measure decode.
 
-## LLM inference — 5 October 2026
+| Model | SGLang tokens/s | CAMBLAS tokens/s | Gain | Evidence |
+|---|---:|---:|---:|---|
+| Llama 3.1 70B | 78.31 | 78.30 | 0.0% | Historical |
+| DeepSeek V4.1 Flash | 145.08 | 153.63 | 5.9% | Single-process pilots |
+| GLM 5.3 Flash | 152.19 | 156.37 | 2.75% | Three fresh pairs |
 
-Four GH200 GPUs on a quiet exclusive node; batch one, 256 greedy tokens, prompts of 128/512 tokens. Each value is the median of three fresh-process medians.
+GLM shares the tuned SGLang MoE tiles between backends. All 89.2 million measured logits matched bitwise, including repeated and changed inputs. Original FP8 weights/inputs, BF16 activation/KV storage and FP32 accumulation remain unchanged.
 
-| Model | Prompt | SGLang tokens/sec | CAMBLAS tokens/sec | Decode speed-up |
-|---|---:|---:|---:|---:|
-| Llama 3.1 70B | 128 | 78.31 | 78.30 | 1.000× |
-| Llama 3.1 70B | 512 | 78.04 | 78.08 | 1.000× |
-| DeepSeek V4.1 Flash | 128 | 77.17 | 153.13 | 1.984× |
-| DeepSeek V4.1 Flash | 512 | 76.95 | 152.44 | 1.981× |
+DeepSeek retains FP4 experts, FP8 dense weights/KV and FP32 accumulation; 24.8 million measured logits matched bitwise. Llama retains BF16 and showed no meaningful gain.
 
-DeepSeek's request speed-up was 1.889×. Its slower 512-token process, 145.39 tokens/sec, remains included. Logits and greedy outputs matched bitwise.
+The [runtime](configs/sglang.json) pins reproduction. [Archived results](https://github.com/p3jitnath/camblas/blob/ab838f2/README.md), including Llama, precede the PyTorch interface change.
 
-Llama retains BF16. DeepSeek retains FP4 experts, FP8 dense weights/KV and FP32 accumulation. The [runtime settings](configs/sglang.json) and archived measurements retain the protocol and identities.
-
-## CPU and CUDA — 2–3 October 2026
-
-CAMBLAS beat OpenBLAS and NVPL in all 60 FP32/FP64 CPU cases at 16/64 Grace cores; see the [CPU report](bench/reports/grace_20261002.json).
-
-The 32,768-square FP64 CUDA case, including transfers, reached 0.292× against PyTorch and 0.338× against unchanged CAMBLAS.
+CPU: CAMBLAS won all 60 Grace FP32/FP64 cases against OpenBLAS and NVPL at 16/64 cores ([report](bench/reports/grace_20261002.json)). CUDA: transfer-inclusive 32,768-square FP64 reached 0.292× against PyTorch and 0.338× against unchanged CAMBLAS.

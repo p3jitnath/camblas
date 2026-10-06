@@ -50,7 +50,7 @@ See [experimental results](RESULTS.md), [contribution and validation guidance](C
 
 The [SGLang runtime](configs/sglang.json) and [requirements](configs/sglang-requirements.txt) pin the measured GH200 environment. Enable its plugin with `SGLANG_PLUGINS=camblas` and `CAMBLAS_SGLANG_OPS=linear,fp8`; set `CAMBLAS_CUDA_LIBRARY` when the native library is outside `build/cuda/`. The plugin uses standard PyTorch linear calls and private native kernels for the checkpoint's existing FP8 operations.
 
-Verify the original checkpoint against the [Llama manifest](configs/llama31-70b-weights.json) or [DeepSeek manifest](configs/deepseek-v41-flash-weights.json), then compare the same pinned engine with and without CAMBLAS:
+Verify the original checkpoint against the [Llama manifest](configs/llama31-70b-weights.json), [DeepSeek manifest](configs/deepseek-v41-flash-weights.json) or [GLM manifest](configs/glm53-flash-weights.json), then compare the same pinned engine with and without CAMBLAS:
 
 ```bash
 python bench/verify_llm_weights.py \
@@ -67,7 +67,7 @@ python bench/compare_llm.py \
   --gpu-cutoff "$CAMBLAS_GPU_CUTOFF" --output bench/results/llama-sglang
 ```
 
-Run measurements on quiet exclusive nodes, with a cutoff at least five minutes before the allocation ends. Request the full host memory for DeepSeek's Engram tables, and rebuild SGLang's native extensions against the pinned PyTorch/CUDA environment. Both routes must use the same precision, hardware, graphs and shared tuning.
+Run measurements on quiet exclusive nodes, with a cutoff at least five minutes before the allocation ends. Request the full host memory for DeepSeek's Engram tables, and rebuild SGLang's native extensions against the pinned PyTorch/CUDA environment. Both routes must use the same precision, hardware, graphs and shared tuning. For GLM, use its manifest and model directory with a 128-token prompt; the pinned profile selects text-only inference and BF16 KV storage.
 
 The CUDA backend defaults to cuBLASLt. `CAMBLAS_CUDA_ALGORITHM=classical` selects classical cuBLAS; `auto` can select guarded Strassen for large products. Strassen changes rounding, and its finite-range guard bounds overflow growth rather than relative error. Keep full precision for comparisons by disabling TF32 and BF16 reduced-precision reduction.
 

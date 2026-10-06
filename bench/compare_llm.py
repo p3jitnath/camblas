@@ -274,6 +274,9 @@ def main():
     fp8_tiles = profile.get("fp8_tiles")
     if fp8_tiles:
         inputs.append(ROOT / fp8_tiles)
+    moe_tiles = profile.get("moe_tiles")
+    if moe_tiles:
+        inputs.append(ROOT / moe_tiles)
     inputs += sorted(args.camblas_library.parent.glob("_camblas_cuda_torch*.so"))
     build_path = args.camblas_library.parent / "build.json"
     build = json.loads(build_path.read_text())
@@ -439,6 +442,10 @@ def main():
                             env["CAMBLAS_SGLANG_FP8_TILES"] = str(ROOT / fp8_tiles)
                         else:
                             env.pop("CAMBLAS_SGLANG_FP8_TILES", None)
+                        if moe_tiles:
+                            env["SGLANG_MOE_CONFIG_DIR"] = str(
+                                (ROOT / moe_tiles).parents[2]
+                            )
                         command = [
                             str(args.python.absolute()),
                             str(ROOT / "bench/llm_workload.py"),

@@ -31,7 +31,8 @@
     "OMP_NUM_THREADS": "1",
     "OPENBLAS_NUM_THREADS": "1",
     "MKL_NUM_THREADS": "1",
-    "CAMBLAS_SGLANG_ALGORITHM": "lt"
+    "CAMBLAS_SGLANG_ALGORITHM": "lt",
+    "CXX": "/usr/bin/g++-14"
   },
   "models": {
     "meta-llama/Llama-3.1-70B": {
@@ -62,6 +63,26 @@
         "CAMBLAS_SGLANG_STABLE_MOE": "1"
       },
       "fp8_tiles": "configs/sglang-gh200-fp8.json"
+    },
+    "zai-org/GLM-5.3-Flash": {
+      "precision": "Original block128 FP8 weights and GEMM inputs; BF16 unquantised weights, activation storage and KV cache; FP32 accumulation",
+      "atol": 0,
+      "rtol": 0,
+      "camblas_operations": "linear,fp8",
+      "engine_args": {
+        "moe_runner_backend": "auto",
+        "attention_backend": "dsa",
+        "dsa_prefill_backend": "tilelang",
+        "dsa_decode_backend": "tilelang",
+        "linear_attn_backend": "triton",
+        "kv_cache_dtype": "bfloat16",
+        "language_only": true,
+        "max_mamba_cache_size": 8
+      },
+      "environment": {
+        "SGLANG_DSA_PREFILL_DENSE_ATTN_KV_LEN_THRESHOLD": "0"
+      },
+      "moe_tiles": "configs/sglang-gh200-glm/configs/triton_3_7_1/E=289,N=512,device_name=NVIDIA_GH200_120GB,dtype=fp8_w8a8,block_shape=[128, 128].json"
     }
   },
   "sglang": "0.5.20",

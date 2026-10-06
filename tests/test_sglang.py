@@ -57,6 +57,198 @@ class SglangFp8Tests(unittest.TestCase):
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = False
 
+    def test_block128_moe_reduction_order(self):
+        """Preserve up and routed down products when inputs and scales change."""
+        import triton.language as tl
+        from sglang.kernels.ops.attention.dsv4 import silu_and_mul_clamp
+        from sglang.kernels.ops.moe.fused_moe_triton_kernels import (
+            invoke_fused_moe_kernel,
+            moe_sum_reduce_triton,
+        )
+        from sglang.kernels.ops.quantization.fp8_kernel import (
+            sglang_per_token_group_quant_fp8,
+        )
+        from sglang.srt.layers.moe.moe_runner.triton_utils.moe_align_block_size import (
+            moe_align_block_size,
+        )
+
+        from _camblas._fp8_moe import fused, product
+
+        ids = torch.arange(9, device="cuda", dtype=torch.int32).view(1, 9)
+        routing = torch.linspace(0.05, 1.0, 9, device="cuda").view(1, 9)
+        sorted_ids, experts, padded = moe_align_block_size(ids, 64, 9)
+        tile = dict(
+            BLOCK_SIZE_M=64,
+            BLOCK_SIZE_N=128,
+            BLOCK_SIZE_K=128,
+            GROUP_SIZE_M=32,
+            num_warps=4,
+            num_stages=3,
+        )
+        parameters = {}
+        with torch.no_grad():
+            for down, n, k in ((False, 1024, 4096), (True, 4096, 512)):
+                torch.manual_seed(842)
+                weight = (torch.randn(9, n, k, device="cuda") * 0.6).to(
+                    torch.float8_e4m3fn
+                )
+                scales = (
+                    torch.rand(9, n // 128, k // 128, device="cuda") * 0.001 + 0.001
+                )
+                parameters[down] = (weight, scales)
+                for magnitude in (0.75, 80.0):
+                    with self.subTest(down=down, magnitude=magnitude):
+                        input = (
+                            torch.randn(
+                                9 if down else 1, k, device="cuda", dtype=torch.bfloat16
+                            )
+                            * magnitude
+                        )
+                        quant, input_scale = sglang_per_token_group_quant_fp8(
+                            input, 128
+                        )
+                        scales.mul_(1.25)
+                        expected = torch.empty(
+                            9, n, device="cuda", dtype=torch.bfloat16
+                        )
+                        actual = torch.empty_like(expected)
+                        invoke_fused_moe_kernel(
+                            quant,
+                            weight,
+                            None,
+                            expected,
+                            input_scale,
+                            scales,
+                            None,
+                            routing,
+                            ids,
+                            sorted_ids,
+                            experts,
+                            padded,
+                            down,
+                            1 if down else 9,
+                            tile,
+                            compute_type=tl.bfloat16,
+                            use_fp8_w8a8=True,
+                            use_int8_w8a8=False,
+                            use_int8_w8a16=False,
+                            use_int4_w4a16=False,
+                            per_channel_quant=False,
+                            block_shape=[128, 128],
+                            filter_expert=False,
+                        )
+                        product(
+                            quant,
+                            weight,
+                            input_scale,
+                            scales,
+                            ids,
+                            routing,
+                            actual,
+                            down,
+                        )
+                        self.assertTrue(
+                            torch.equal(
+                                expected.view(torch.int16), actual.view(torch.int16)
+                            )
+                        )
+
+            up_weight, up_scale = parameters[False]
+            down_weight, down_scale = parameters[True]
+            for magnitude in (0.75, 80.0):
+                with self.subTest(fused=True, magnitude=magnitude):
+                    input = (
+                        torch.randn(1, 4096, device="cuda", dtype=torch.bfloat16)
+                        * magnitude
+                    )
+                    q, sf = sglang_per_token_group_quant_fp8(input, 128)
+                    up = torch.empty(9, 1024, device="cuda", dtype=torch.bfloat16)
+                    down = torch.empty(9, 4096, device="cuda", dtype=torch.bfloat16)
+                    common = dict(
+                        compute_type=tl.bfloat16,
+                        use_fp8_w8a8=True,
+                        use_int8_w8a8=False,
+                        use_int8_w8a16=False,
+                        use_int4_w4a16=False,
+                        per_channel_quant=False,
+                        block_shape=[128, 128],
+                        filter_expert=False,
+                    )
+                    invoke_fused_moe_kernel(
+                        q,
+                        up_weight,
+                        None,
+                        up,
+                        sf,
+                        up_scale,
+                        None,
+                        routing,
+                        ids,
+                        sorted_ids,
+                        experts,
+                        padded,
+                        False,
+                        9,
+                        tile,
+                        **common,
+                    )
+                    act = torch.empty(9, 512, device="cuda", dtype=torch.bfloat16)
+                    silu_and_mul_clamp(up, act, 10.0)
+                    q, sf = sglang_per_token_group_quant_fp8(act, 128)
+                    invoke_fused_moe_kernel(
+                        q,
+                        down_weight,
+                        None,
+                        down,
+                        sf,
+                        down_scale,
+                        None,
+                        routing,
+                        ids,
+                        sorted_ids,
+                        experts,
+                        padded,
+                        True,
+                        1,
+                        tile,
+                        **common,
+                    )
+                    expected = torch.empty_like(input)
+                    moe_sum_reduce_triton(down.view(1, 9, 4096), expected, 2.5)
+                    actual = input.clone()
+                    fused(
+                        input,
+                        up_weight,
+                        down_weight,
+                        up_scale,
+                        down_scale,
+                        ids,
+                        routing,
+                        actual,
+                        2.5,
+                    )
+                    self.assertTrue(
+                        torch.equal(
+                            expected.view(torch.int16), actual.view(torch.int16)
+                        )
+                    )
+                    fused(
+                        actual.copy_(input),
+                        up_weight,
+                        down_weight,
+                        up_scale,
+                        down_scale,
+                        ids,
+                        routing,
+                        actual,
+                        2.5,
+                    )
+                    self.assertTrue(
+                        torch.equal(
+                            expected.view(torch.int16), actual.view(torch.int16)
+                        )
+                    )
+
     def test_products_and_changed_scales(self):
         """Compare each tile with upstream and selected independent FP64 outputs."""
         from sglang.kernels.ops.quantization import fp8_kernel as fp8
