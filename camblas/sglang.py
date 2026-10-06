@@ -461,6 +461,12 @@ def install():
             (4096, 4096),
             (6144, 4096),
             (4096, 3072),
+            (3392, 4096),
+            (3712, 4096),
+            (8192, 4096),
+            (3392, 6144),
+            (4096, 6144),
+            (6144, 2048),
         }
 
         def dense(
@@ -506,7 +512,7 @@ def install():
                 and list(block_size) == [128, 128]
                 and weight_scale.dtype == torch.float32
                 and weight_scale.shape
-                == (weight.shape[0] // 128, weight.shape[1] // 128)
+                == ((weight.shape[0] + 127) // 128, weight.shape[1] // 128)
                 and input_scale is None
                 and bias is None
                 and all(

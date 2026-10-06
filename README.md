@@ -50,6 +50,17 @@ CAMBLAS_ENABLE=1 SGLANG_PLUGINS=camblas CAMBLAS_SGLANG_OPS=linear,fp8 \
   python -m sglang.launch_server --model-path /path/to/model
 ```
 
+For MiMo V2.6, use the FP8 plugin with the existing BF16 PyTorch kernels:
+
+```bash
+CAMBLAS_ENABLE=0 SGLANG_PLUGINS=camblas CAMBLAS_SGLANG_OPS=fp8 \
+  python -m sglang.launch_server --model-path /path/to/model \
+  --attention-backend triton --moe-runner-backend flashinfer_mxfp4 \
+  --kv-cache-dtype bfloat16 --tp 4 --ep 4 --trust-remote-code
+```
+
+Use four GPUs for Flash and eight GPUs across two nodes for Pro. The pinned runtime preserves the checkpoint's quantisation.
+
 See [contribution and validation guidance](CONTRIBUTING.md) and the [MIT licence](LICENSE).
 
 <details>
