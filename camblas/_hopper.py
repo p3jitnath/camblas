@@ -25,7 +25,31 @@ def _products(
     QUANT: gl.constexpr = False,
     ACTIVATE: gl.constexpr = False,
 ):
-    """Store each unscaled block128 Tensor Core contribution."""
+    """Store each unscaled block128 Tensor Core contribution.
+
+    Parameters
+    ----------
+    X, W : pointer
+        Contiguous inputs and E4M3 weights in [expert, N, K] order.
+    IDS : pointer or None
+        Selected local expert indices; unused when CHOICES is one.
+    OUT : pointer
+        FP32 destination in [K / 128, CHOICES, N] order.
+    N, K, CHOICES, R : constexpr int
+        Output width, input width, expert choices and output rows per CTA.
+    DOWN : constexpr bool
+        Select a separate input row for each expert when true.
+    SF : pointer or None
+        FP32 [input rows, K / 128] scales written when QUANT is true.
+    QUANT, ACTIVATE : constexpr bool
+        Quantise BF16 input; optionally apply the original clipped SiLU and
+        BF16 rounding before quantisation.
+
+    Notes
+    -----
+    K must be divisible by 128. Store unscaled FP32 partial products; apply
+    scales and ordered accumulation in the reduction kernel.
+    """
     choice = gl.program_id(2)
     group = gl.program_id(1)
     expert = 0 if CHOICES == 1 else gl.load(IDS + choice).to(gl.int64)
@@ -116,7 +140,27 @@ def _reduce(
     DOWN: tl.constexpr,
     C: tl.constexpr,
 ):
-    """Apply the original scale products and ordered FP32 fused additions."""
+    """Apply the original scale products and ordered FP32 fused additions.
+
+    Parameters
+    ----------
+    DOT : pointer
+        FP32 partial products in [G, CHOICES, N] order.
+    AS, WS : pointer
+        FP32 scales in [input rows, G] and [expert, ceil(N / 128), G] order.
+    IDS, ROUTING : pointer or None
+        Local expert indices and router weights; dense products omit both.
+    OUT : pointer
+        BF16 destination in [CHOICES, N] order.
+    N, G, CHOICES, C : constexpr int
+        Output width, input groups, expert choices and outputs per CTA.
+    DOWN : constexpr bool
+        Use per-expert input scales and apply routing after accumulation.
+
+    Notes
+    -----
+    Accumulate input groups in their original order, then round once to BF16.
+    """
     choice = tl.program_id(1)
     cols = tl.program_id(0) * C + tl.arange(0, C)
     expert = 0 if CHOICES == 1 else tl.load(IDS + choice).to(tl.int64)
@@ -217,7 +261,28 @@ def _combine(
     FACTOR: tl.constexpr,
     C: tl.constexpr,
 ):
-    """Apply ordered block scales, BF16 rounding and expert addition."""
+    """Apply ordered block scales, BF16 rounding and expert addition.
+
+    Parameters
+    ----------
+    DOT : pointer
+        FP32 partial products in [G, CHOICES, N] order.
+    AS, WS : pointer
+        FP32 scales in [CHOICES, G] and [expert, N / 128, G] order.
+    IDS, ROUTING : pointer
+        Local expert indices and original FP32 router weights.
+    OUT : pointer
+        BF16 destination with N elements.
+    N, G, CHOICES, C : constexpr int
+        Output width, input groups, at most 16 choices and outputs per CTA.
+    FACTOR : constexpr float
+        Original scaling factor applied after the expert sum.
+
+    Notes
+    -----
+    N must be divisible by 128. Round each routed expert to BF16 before its
+    ordered FP32 addition; round the scaled total to BF16.
+    """
     choices = tl.arange(0, 16)
     cols = tl.program_id(0) * C + tl.arange(0, C)
     expert = tl.load(IDS + choices, mask=choices < CHOICES, other=0).to(tl.int64)
@@ -321,7 +386,20 @@ def fused(
 
 @gluon.jit
 def _bmm(X, W, OUT):
-    """Write the original BF16 batched product with FP32 accumulation."""
+    """Write the original BF16 batched product with FP32 accumulation.
+
+    Parameters
+    ----------
+    X, W : pointer
+        Contiguous BF16 inputs in [batch, 128] and [batch, 128, 2048] order.
+    OUT : pointer
+        Contiguous BF16 destination in [batch, 2048] order.
+
+    Notes
+    -----
+    Each CTA writes 64 outputs for one batch, using the original 128-term
+    FP32 Tensor Core product before BF16 rounding.
+    """
     N: gl.constexpr = 2048
     R: gl.constexpr = 64
     batch = gl.program_id(1)
@@ -395,7 +473,24 @@ def _reduce32(
     B: tl.constexpr,
     U: tl.constexpr,
 ):
-    """Apply the original ordered FP32 fused additions."""
+    """Apply the original ordered FP32 fused additions.
+
+    Parameters
+    ----------
+    PART : pointer
+        FP32 weight-scaled partial products in [G, N] order.
+    SCALE : pointer
+        FP32 power-of-two activation scales with stride AS.
+    Y : pointer
+        BF16 destination with N elements.
+    N, G, AS, B, U : constexpr int
+        Output width, group count, scale stride, outputs per CTA and unroll size.
+
+    Notes
+    -----
+    Mask the final partial unroll. Apply one FP32 fused addition per group
+    in increasing group order before rounding the final value to BF16.
+    """
     rows = tl.program_id(0) * B + tl.arange(0, B)
     acc = tl.full((B,), 0, tl.float32)
     for start in range(0, G, U):
@@ -411,7 +506,27 @@ def _reduce32(
 
 @gluon.jit
 def _input32(X, SCALE, group, K: gl.constexpr):
-    """Preserve the original power-of-two activation scales."""
+    """Preserve the original power-of-two activation scales.
+
+    Parameters
+    ----------
+    X, SCALE : pointer
+        Contiguous BF16 input and FP32 scale destination with K / 32 elements.
+    group : int
+        Index of the original 32-element quantisation group.
+    K : constexpr int
+        Input width, divisible by 32.
+
+    Returns
+    -------
+    shared_memory_descriptor
+        E4M3 [32, 8] input tile, with the same vector in all eight columns.
+
+    Notes
+    -----
+    Round the scale upwards to a power of two. Only output CTA zero writes
+    the scale for each valid group; mask padding beyond the last group.
+    """
     input_layout: gl.constexpr = gl.BlockedLayout([1, 1], [32, 1], [1, 4], [0, 1])
     pk = gl.arange(0, 32, layout=gl.SliceLayout(1, input_layout))
     xf = gl.load(X + group * 32 + pk, mask=group < K // 32, other=0.0).to(gl.float32)
@@ -453,7 +568,28 @@ def _products32(
     R: gl.constexpr,
     P: gl.constexpr,
 ):
-    """Load four weight groups together and preserve each FP32 scale product."""
+    """Load four weight groups together and preserve each FP32 scale product.
+
+    Parameters
+    ----------
+    X : pointer
+        Contiguous BF16 input with K elements.
+    WD : TensorDescriptor
+        Contiguous E4M3 [N, K] weights, with an [R, P * 32] TMA tile.
+    WS : pointer
+        FP32 scales for the original 32 by 32 weight blocks.
+    OUT, SCALE : pointer
+        FP32 destinations for [K / 32, N] partials and K / 32 input scales.
+    N, K, SK, SN, R, P : constexpr int
+        Output width, input width, weight-scale strides, rows per CTA and
+        input groups per CTA.
+
+    Notes
+    -----
+    K must be divisible by 32. TMA loads may include masked padding.
+    Round each Tensor Core product times its weight scale to FP32 before
+    the separate ordered activation-scale reduction.
+    """
     a = gl.allocate_shared_memory(WD.dtype, WD.block_type.shape, WD.layout)
     bar = mbarrier.allocate_mbarrier()
     mbarrier.init(bar, count=1)

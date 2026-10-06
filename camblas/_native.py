@@ -155,7 +155,20 @@ def library():
 
 
 def _check(status, handle):
-    """Raise a Python exception when the native CUDA call reports failure."""
+    """Raise an exception when a native CUDA call reports failure.
+
+    Parameters
+    ----------
+    status : int
+        Native status code; zero means success.
+    handle : ctypes.c_void_p or None
+        Context handle, or None when context creation failed.
+
+    Raises
+    ------
+    RuntimeError
+        If the native call failed; includes its diagnostic message.
+    """
     if status:
         error = library().camblas_cuda_error(handle).decode()
         raise RuntimeError(error)
@@ -165,7 +178,20 @@ class Context:
     """Own a native handle for one device, stream and Python host thread."""
 
     def __init__(self, device, stream):
-        """Create a native handle and retain its device, stream and process."""
+        """Create a native handle for one CUDA device and stream.
+
+        Parameters
+        ----------
+        device : int
+            CUDA device index.
+        stream : int
+            Raw CUDA stream handle; zero selects the default stream.
+
+        Raises
+        ------
+        RuntimeError
+            If the native context cannot be created.
+        """
         self.pid = os.getpid()
         self.device = device
         self.handle = ct.c_void_p()
@@ -177,7 +203,20 @@ class Context:
             _CONTEXTS.append(self)
 
     def set_algorithm(self, name):
-        """Select a numerical algorithm without rebuilding the library."""
+        """Select the multiplication algorithm for this native context.
+
+        Parameters
+        ----------
+        name : str
+            Name in the private algorithm table, such as auto, classical or lt.
+
+        Raises
+        ------
+        KeyError
+            If the name is unknown.
+        RuntimeError
+            If the native context rejects the selection.
+        """
         if name != self.algorithm:
             _check(
                 library().camblas_cuda_set_algorithm(self.handle, _ALGORITHMS[name]),
@@ -279,17 +318,19 @@ def algorithm(name):
 
 
 def set_algorithm(name):
-    """Select the default multiplication policy for this host thread.
+    """Select the multiplication algorithm for this native context.
 
     Parameters
     ----------
     name : str
-        Policy name from the private native algorithm registry.
+        Name in the private algorithm table, such as auto, classical or lt.
 
     Raises
     ------
-    ValueError
-        If the requested policy is unknown.
+    KeyError
+        If the name is unknown.
+    RuntimeError
+        If the native context rejects the selection.
     """
     if name not in _ALGORITHMS:
         raise ValueError(f"Unknown algorithm {name!r}; choose {tuple(_ALGORITHMS)}")

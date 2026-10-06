@@ -144,11 +144,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--node-rank", type=int, default=0)
     args = parser.parse_args()
     case = json.loads(args.case.read_text())
     cutoff = datetime.fromisoformat(case["gpu_cutoff"])
     if datetime.now(timezone.utc) >= cutoff:
         raise RuntimeError("Allocation cutoff passed")
+    engine_args = dict(case["engine_args"])
+    engine_args["node_rank"] = args.node_rank
+    if args.node_rank:
+        logits_dir = args.output / "logits"
+        while not logits_dir.is_dir():
+            if datetime.now(timezone.utc) >= cutoff:
+                raise RuntimeError(
+                    "Allocation cutoff passed while waiting for rank zero"
+                )
+            time.sleep(0.1)
+        os.environ["CAMBLAS_LLM_VERIFY_DIRECTORY"] = str(logits_dir.absolute())
+        install_verifier()
+        import sglang
+
+        engine = sglang.Engine(**engine_args)
+        engine.shutdown()
+        return
     args.output.mkdir(parents=True, exist_ok=False)
     if "weights_verification" in case:
         from bench.verify_llm_weights import check_verified_files
@@ -172,16 +190,23 @@ def main():
     tokenizer = Tokenizer.from_file(str(directory / "tokenizer.json"))
     prefix = config.get("bos_token_id", 0)
     if isinstance(prefix, list):
-        prefix = prefix[0]
+        prefix = prefix[0] if prefix else None
+    prefix_ids = [] if prefix is None else [prefix]
     prompt = case["prompt_length"]
     text = "Explain how matrix multiplication is used in language model inference. "
     changed_text = "Describe the differences between prefill and token generation. "
-    token_ids = [prefix] + tokenizer.encode(
-        text * prompt, add_special_tokens=False
-    ).ids[: prompt - 1]
-    changed_ids = [prefix] + tokenizer.encode(
-        changed_text * prompt, add_special_tokens=False
-    ).ids[: prompt - 1]
+    token_ids = (
+        prefix_ids
+        + tokenizer.encode(text * prompt, add_special_tokens=False).ids[
+            : prompt - len(prefix_ids)
+        ]
+    )
+    changed_ids = (
+        prefix_ids
+        + tokenizer.encode(changed_text * prompt, add_special_tokens=False).ids[
+            : prompt - len(prefix_ids)
+        ]
+    )
     if (
         len(token_ids) != prompt
         or len(changed_ids) != prompt
@@ -191,7 +216,7 @@ def main():
 
     started = datetime.now(timezone.utc).isoformat()
     setup = time.perf_counter()
-    engine = sglang.Engine(**case["engine_args"])
+    engine = sglang.Engine(**engine_args)
     setup_seconds = time.perf_counter() - setup
     try:
         samples = []

@@ -7,6 +7,7 @@ import json
 import math
 import os
 import struct
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,14 +15,38 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def manifest_identity(manifest):
-    """Identify parsed checkpoint metadata independently of JSON formatting."""
+    """Identify checkpoint metadata independently of JSON formatting.
+
+    Parameters
+    ----------
+    manifest : dict
+        JSON-compatible checkpoint identity and expected file hashes.
+
+    Returns
+    -------
+    str
+        SHA256 hexadecimal digest of the canonical JSON representation.
+    """
     return hashlib.sha256(
         json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
 
 def check_verified_files(directory, record):
-    """Reject a stale checkpoint verification before or after a measured worker."""
+    """Reject stale checkpoint verification around a measured worker.
+
+    Parameters
+    ----------
+    directory : pathlib.Path
+        Local checkpoint directory used by the measured worker.
+    record : dict
+        Successful verification record returned by verify.
+
+    Raises
+    ------
+    ValueError
+        If a shard size or modification time changed, or metadata hashes differ.
+    """
     for name, expected in record["weights"].items():
         stat = (directory / name).stat()
         if (stat.st_size, stat.st_mtime_ns) != (
@@ -34,7 +59,37 @@ def check_verified_files(directory, record):
             raise ValueError(f"Verified checkpoint metadata changed: {name}")
 
 
-def verify(directory, manifest, output):
+def _hash_shard(path):
+    """Hash one complete shard without retaining its file cache.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Checkpoint shard to read.
+
+    Returns
+    -------
+    tuple[str, os.stat_result]
+        SHA256 digest and the file identity before hashing.
+
+    Raises
+    ------
+    ValueError
+        If the shard changes during hashing.
+    """
+    before = path.stat()
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(32 * 2**20), b""):
+            digest.update(block)
+        os.posix_fadvise(source.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+    after = path.stat()
+    if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+        raise ValueError(f"Shard changed during verification: {path.name}")
+    return digest.hexdigest(), before
+
+
+def verify(directory, manifest, output, *, workers=1):
     """Hash every shard and check tensor storage, configuration and file identities.
 
     Parameters
@@ -45,6 +100,8 @@ def verify(directory, manifest, output):
         Public model identity, expected configuration and shard SHA256 hashes.
     output : pathlib.Path
         New JSON verification record for ``compare_llm.py``.
+    workers : int, optional
+        Parallel shard hashing threads; one preserves serial I/O.
 
     Returns
     -------
@@ -77,23 +134,29 @@ def verify(directory, manifest, output):
             raise ValueError("Checkpoint metadata names must be plain filenames")
         if hashlib.sha256((directory / name).read_bytes()).hexdigest() != expected:
             raise ValueError(f"Checkpoint metadata SHA256 mismatch: {name}")
-    dtype_bytes = {"BF16": 2, "F32": 4, "F8_E4M3": 1, "F8_E8M0": 1, "I8": 1}
+    dtype_bytes = {"BF16": 2, "F32": 4, "F8_E4M3": 1, "F8_E8M0": 1, "I8": 1, "U8": 1}
     allowed_dtypes = manifest.get("dtypes", ["BF16"])
     names = set()
     parameters = 0
-    for name, expected in sorted(manifest["weights"].items()):
+    shards = sorted(manifest["weights"].items())
+    for name, expected in shards:
         if Path(name).name != name:
             raise ValueError("Shard names must be plain filenames")
+        if (directory / name).stat().st_size != expected["bytes"]:
+            raise ValueError(f"Shard size mismatch: {name}")
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        hashed = dict(
+            zip(
+                (name for name, _ in shards),
+                executor.map(_hash_shard, (directory / name for name, _ in shards)),
+            )
+        )
+    for name, expected in shards:
         path = directory / name
-        before = path.stat()
+        digest, before = hashed[name]
         if before.st_size != expected["bytes"]:
             raise ValueError(f"Shard size mismatch: {name}")
-        digest = hashlib.sha256()
-        with path.open("rb") as source:
-            for block in iter(lambda: source.read(32 * 2**20), b""):
-                digest.update(block)
-            os.posix_fadvise(source.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
-        if digest.hexdigest() != expected["sha256"]:
+        if digest != expected["sha256"]:
             raise ValueError(f"Shard SHA256 mismatch: {name}")
         with path.open("rb") as source:
             header_size = struct.unpack("<Q", source.read(8))[0]
@@ -126,7 +189,7 @@ def verify(directory, manifest, output):
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
             raise ValueError(f"Shard changed during verification: {name}")
         record["weights"][name] = dict(
-            sha256=digest.hexdigest(), bytes=after.st_size, mtime_ns=after.st_mtime_ns
+            sha256=digest, bytes=after.st_size, mtime_ns=after.st_mtime_ns
         )
         print(f"Verified {name}", flush=True)
     if names != set(index["weight_map"]) or (
@@ -154,9 +217,15 @@ def main():
         "--manifest", type=Path, default=ROOT / "configs/llama31-70b-weights.json"
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Parallel shard hashing threads"
+    )
     args = parser.parse_args()
     record = verify(
-        args.model_directory, json.loads(args.manifest.read_text()), args.output
+        args.model_directory,
+        json.loads(args.manifest.read_text()),
+        args.output,
+        workers=args.workers,
     )
     print(json.dumps({key: value for key, value in record.items() if key != "weights"}))
 
