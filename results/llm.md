@@ -13,6 +13,6 @@ GLM shares the tuned SGLang MoE tiles between backends. All 89.2 million measure
 
 DeepSeek's reference uses native SGLang tuning without CAMBLAS. Its fresh-process range is 149.19–158.04 tokens/s; CAMBLAS ranges from 137.03 to 156.84. All 148.9 million measured logits matched bitwise with the original FP4 experts, FP8 dense weights/KV and FP32 accumulation. Llama retains BF16 and showed no meaningful gain.
 
-MiMo retains original MXFP4 expert weights, block128 FP8 dense weights, BF16 activations/KV and FP32 accumulation. All reported MiMo pairs matched every raw logit bitwise; the BF16 PyTorch path stays unchanged.
+MiMo retains original MXFP4 expert weights, block128 FP8 dense weights, BF16 activations/KV and FP32 accumulation. All reported MiMo pairs matched every raw logit bitwise; the BF16 PyTorch path stays unchanged. The Flash row is provisional: three pairs passed on one node, but later fresh-process comparisons also differed between reference-only runs.
 
 The [runtime](../configs/sglang.json) pins reproduction. [Archived results](https://github.com/p3jitnath/camblas/blob/ab838f2/README.md), including Llama, precede the PyTorch interface change.
