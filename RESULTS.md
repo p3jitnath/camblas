@@ -1,12 +1,12 @@
 # Experimental results
 
-Four GH200 GPUs on a quiet exclusive node; batch one, 128 prompt tokens and 256 greedy output tokens. Rates measure decode.
+Four GH200 GPUs on a quiet exclusive node; batch one, 128 prompt tokens and 256 greedy output tokens. Rates use median decode latency.
 
 | Model | SGLang tokens/s | CAMBLAS tokens/s | Gain | Evidence |
 |---|---:|---:|---:|---|
 | Llama 3.1 70B | 78.31 | 78.30 | 0.0% | Historical |
 | DeepSeek V4.1 Flash | 145.08 | 153.63 | 5.9% | Single-process pilots |
-| GLM 5.3 Flash | 152.16 | 159.69 | 4.95% | Three fresh pairs |
+| GLM 5.3 Flash | 152.14 | 161.30 | 6.02% | Three fresh pairs |
 
 GLM shares the tuned SGLang MoE tiles between backends. All 89.2 million measured logits matched bitwise, including repeated and changed inputs. Original FP8 weights/inputs, BF16 activation/KV storage and FP32 accumulation remain unchanged.
 

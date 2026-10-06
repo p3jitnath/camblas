@@ -21,6 +21,7 @@ def _products(
     R: gl.constexpr,
     SF=None,
     QUANT: gl.constexpr = False,
+    ACTIVATE: gl.constexpr = False,
 ):
     """Store each unscaled block128 Tensor Core contribution."""
     choice = gl.program_id(2)
@@ -36,7 +37,22 @@ def _products(
     cr = gl.program_id(0) * R + gl.arange(0, R, layout=gl.SliceLayout(1, mma_layout))
     cc = gl.arange(0, 8, layout=gl.SliceLayout(0, mma_layout))
     xrow = choice if DOWN else 0
-    x = gl.load(X + xrow * K + group * 128 + pk)
+    if ACTIVATE:
+        gate = gl.load(X + xrow * (2 * K) + group * 128 + pk).to(gl.float32)
+        up = gl.load(X + xrow * (2 * K) + K + group * 128 + pk).to(gl.float32)
+        gate = gl.minimum(gate, 10.0)
+        up = gl.minimum(gl.maximum(up, -10.0), 10.0)
+        value = gl.inline_asm_elementwise(
+            "{ .reg .f32 e,t; mul.ftz.f32 e,$1,0fBFB8AA3B; ex2.approx.ftz.f32 e,e; add.ftz.f32 t,e,0f3F800000; div.approx.ftz.f32 $0,$1,t; }",
+            constraints="=f,f",
+            args=[gate],
+            dtype=gl.float32,
+            is_pure=True,
+            pack=1,
+        )
+        x = (value * up).to(gl.bfloat16)
+    else:
+        x = gl.load(X + xrow * K + group * 128 + pk)
     if QUANT:
         value = x.to(gl.float32)
         maximum = gl.maximum(gl.max(gl.abs(value), 0), 1e-10)
@@ -50,7 +66,10 @@ def _products(
             pack=1,
         )
         x = gl.minimum(gl.maximum(value * inv, -448.0), 448.0).to(gl.float8e4nv)
-        gl.store(SF + group, scale, mask=(gl.program_id(0) == 0) & (choice == 0))
+        if ACTIVATE:
+            gl.store(SF + xrow * (K // 128) + group, scale, mask=gl.program_id(0) == 0)
+        else:
+            gl.store(SF + group, scale, mask=(gl.program_id(0) == 0) & (choice == 0))
     duplicated = gl.where(
         gl.full((128, 8), True, gl.int1, layout=input_layout),
         x[:, None],
@@ -183,62 +202,6 @@ def product(
 
 
 @triton.jit
-def _activate_quant(
-    IN,
-    ACT,
-    Q,
-    SF,
-    H: tl.constexpr,
-    G: tl.constexpr,
-    ROWS: tl.constexpr,
-    GPB: tl.constexpr,
-):
-    """Preserve the clamp, BF16 rounding and block128 quantisation."""
-    group = tl.program_id(0) * GPB + tl.arange(0, GPB)
-    row = group // G
-    block = group % G
-    k = block[:, None] * 128 + tl.arange(0, 128)[None, :]
-    gate = tl.load(
-        IN + row[:, None] * (2 * H) + k, mask=row[:, None] < ROWS, other=0.0
-    ).to(tl.float32)
-    up = tl.load(
-        IN + row[:, None] * (2 * H) + H + k, mask=row[:, None] < ROWS, other=0.0
-    ).to(tl.float32)
-    gate = tl.minimum(gate, 10.0)
-    up = tl.minimum(tl.maximum(up, -10.0), 10.0)
-    value = (
-        tl.inline_asm_elementwise(
-            "{ .reg .f32 e,t; mul.ftz.f32 e,$1,0fBFB8AA3B; ex2.approx.ftz.f32 e,e; add.ftz.f32 t,e,0f3F800000; div.approx.ftz.f32 $0,$1,t; }",
-            constraints="=f,f",
-            args=[gate],
-            dtype=tl.float32,
-            is_pure=True,
-            pack=1,
-        )
-        * up
-    )
-    rounded = value.to(tl.bfloat16)
-    value = rounded.to(tl.float32)
-    maximum = tl.maximum(tl.max(tl.abs(value), 1), 1e-10)
-    scale = maximum * (1.0 / 448.0)
-    inv = tl.inline_asm_elementwise(
-        "div.approx.ftz.f32 $0,0f43E00000,$1;",
-        constraints="=f,f",
-        args=[maximum],
-        dtype=tl.float32,
-        is_pure=True,
-        pack=1,
-    )
-    quant = tl.minimum(tl.maximum(value * inv[:, None], -448.0), 448.0).to(
-        tl.float8e4nv
-    )
-    if ACT is not None:
-        tl.store(ACT + row[:, None] * H + k, rounded, mask=row[:, None] < ROWS)
-    tl.store(Q + row[:, None] * H + k, quant, mask=row[:, None] < ROWS)
-    tl.store(SF + group, scale, mask=row < ROWS)
-
-
-@triton.jit
 def _combine(
     DOT,
     AS,
@@ -314,30 +277,15 @@ def fused(
         quantised, scales = input, None
         up = torch.empty((choices, n), device=input.device, dtype=torch.bfloat16)
         product(quantised, weight_up, scales, scale_up, expert_ids, routing, up, False)
-        quantised = torch.empty(
-            (choices, h), device=input.device, dtype=torch.float8_e4m3fn
-        )
         scales = torch.empty(
             (choices, h // 128), device=input.device, dtype=torch.float32
-        )
-        _activate_quant[(triton.cdiv(choices * (h // 128), 4),)](
-            up,
-            None,
-            quantised,
-            scales,
-            h,
-            h // 128,
-            choices,
-            4,
-            num_warps=4,
-            enable_fp_fusion=False,
         )
         _, n, k = weight_down.shape
         scratch = torch.empty(
             (k // 128, choices, n), device=input.device, dtype=torch.float32
         )
         _products[(triton.cdiv(n, 64), k // 128, choices)](
-            quantised,
+            up,
             weight_down,
             expert_ids,
             scratch,
@@ -346,7 +294,11 @@ def fused(
             choices,
             True,
             64,
+            scales,
+            True,
+            True,
             num_warps=4,
+            enable_fp_fusion=False,
         )
         _combine[(triton.cdiv(n, 64),)](
             scratch,
@@ -367,9 +319,9 @@ def fused(
 
 @gluon.jit
 def _bmm(X, W, OUT):
+    """Write the original BF16 batched product with FP32 accumulation."""
     N: gl.constexpr = 2048
     R: gl.constexpr = 64
-    """Write the original BF16 batched product with FP32 accumulation."""
     batch = gl.program_id(1)
     input_layout: gl.constexpr = gl.BlockedLayout([1, 1], [32, 1], [1, 4], [0, 1])
     pk = gl.arange(0, 128, layout=gl.SliceLayout(1, input_layout))
