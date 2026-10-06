@@ -56,7 +56,8 @@ For MiMo V2.6, use the FP8 plugin with the existing BF16 PyTorch kernels:
 CAMBLAS_ENABLE=0 SGLANG_PLUGINS=camblas CAMBLAS_SGLANG_OPS=fp8 \
   python -m sglang.launch_server --model-path /path/to/model \
   --attention-backend triton --moe-runner-backend flashinfer_mxfp4 \
-  --kv-cache-dtype bfloat16 --tp 4 --ep 4 --trust-remote-code
+  --kv-cache-dtype bfloat16 --tp 4 --ep 4 --trust-remote-code \
+  --disable-flashinfer-autotune --disable-prefill-cuda-graph
 ```
 
 Use four GPUs for Flash. For Pro, set `--tp 8 --ep 8 --nnodes 2 --dist-init-addr HOST:PORT` and start the command on both nodes with `--node-rank 0` or `--node-rank 1`. The pinned runtime preserves the checkpoint's quantisation.

@@ -81,36 +81,43 @@ class SglangFp8Tests(unittest.TestCase):
 
         torch.manual_seed(717)
         with torch.no_grad():
-            weight = (torch.randn(2048, 4096, device="cuda") * 0.6).to(
-                torch.float8_e4m3fn
-            )
-            scales = torch.rand((16, 32), device="cuda") * 0.02 + 0.001
             batched_weight = torch.randn(
                 (2, 2048, 128), device="cuda", dtype=torch.bfloat16
             )
+            for n, k in ((2048, 4096), (3392, 6144)):
+                weight = (torch.randn(n, k, device="cuda") * 0.6).to(
+                    torch.float8_e4m3fn
+                )
+                scales = (
+                    torch.rand(((n + 127) // 128, k // 128), device="cuda") * 0.02
+                    + 0.001
+                )
+                for magnitude in (0.75, 80.0):
+                    input = (
+                        torch.randn((1, k), device="cuda", dtype=torch.bfloat16)
+                        * magnitude
+                    )
+                    scales.mul_(1.25)
+                    expected = deepgemm_w8a8_block_fp8_linear_with_fallback(
+                        input, weight, [128, 128], scales
+                    )
+                    actual = torch.empty_like(expected)
+                    product(
+                        input,
+                        weight.unsqueeze(0),
+                        None,
+                        scales.unsqueeze(0),
+                        None,
+                        None,
+                        actual,
+                        False,
+                    )
+                    self.assertTrue(
+                        torch.equal(
+                            actual.view(torch.int16), expected.view(torch.int16)
+                        )
+                    )
             for magnitude in (0.75, 80.0):
-                input = (
-                    torch.randn((1, 4096), device="cuda", dtype=torch.bfloat16)
-                    * magnitude
-                )
-                scales.mul_(1.25)
-                expected = deepgemm_w8a8_block_fp8_linear_with_fallback(
-                    input, weight, [128, 128], scales
-                )
-                actual = torch.empty_like(expected)
-                product(
-                    input,
-                    weight.unsqueeze(0),
-                    None,
-                    scales.unsqueeze(0),
-                    None,
-                    None,
-                    actual,
-                    False,
-                )
-                self.assertTrue(
-                    torch.equal(actual.view(torch.int16), expected.view(torch.int16))
-                )
                 batched_input = (
                     torch.randn((2, 1, 128), device="cuda", dtype=torch.bfloat16)
                     * magnitude

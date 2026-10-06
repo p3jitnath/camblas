@@ -209,6 +209,21 @@ def product(
     rows = 64
     columns = 256 if down else 32
     quant_input = not down and input.dtype == torch.bfloat16
+    if (
+        quant_input
+        and expert_ids is None
+        and (n, k)
+        in {
+            (3392, 4096),
+            (3712, 4096),
+            (8192, 4096),
+            (3392, 6144),
+            (4096, 6144),
+            (6144, 2048),
+        }
+    ):
+        rows = 128
+        columns = 32 if n >= 6144 else 16
     if quant_input:
         input_scale = torch.empty(
             (1, k // 128), device=input.device, dtype=torch.float32
